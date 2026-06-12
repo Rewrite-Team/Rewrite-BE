@@ -8,6 +8,13 @@ on:
     branches:
       - dev     # PR 대상 프랜치가 dev 일 때 실행
 
+permissions:  # 권한 설정
+  contents: read
+
+concurrency:  # 중복 실행 취소
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true   # 같은 PR이나 브랜치에 새 push 가 오면 이전에 돌던 CI 취소
+
 jobs:
   test:
     name: test
@@ -26,6 +33,72 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Run tests
+      - name: Run tests   # test 실행
         run: ./gradlew test
 
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-report
+          path: build/reports/tests/test
+          if-no-files-found: ignore
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage-report
+          path: build/reports/jacoco/test
+          if-no-files-found: ignore
+
+      - name: Write job summary
+        if: always()
+        run: |
+          {
+            echo "## Backend Test Result"
+            echo ""
+            echo "Test reports are available in this workflow run's artifacts."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  coverage:
+    name: coverage
+    runs-on: ubuntu-latest
+    needs: test
+    if: always()
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Download coverage report
+        id: download-coverage
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: backend-coverage-report
+          path: build/reports/jacoco/test
+
+      - name: Upload coverage to Codecov
+        id: codecov
+        if: steps.download-coverage.outcome == 'success'
+        uses: codecov/codecov-action@v7
+        continue-on-error: true
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./build/reports/jacoco/test/jacocoTestReport.xml
+          name: backend
+          fail_ci_if_error: false
+
+      - name: Write job summary
+        if: always()
+        run: |
+          {
+            echo "## Backend Coverage Result"
+            echo ""
+            echo "| Item | Result |"
+            echo "| --- | --- |"
+            echo "| Coverage artifact | ${{ steps.download-coverage.outcome }} |"
+            echo "| Codecov upload | ${{ steps.codecov.outcome }} |"
+            echo "| Commit | \`${{ github.sha }}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
