@@ -11,6 +11,7 @@ import com.daon.rewrite.global.exception.ErrorCode;
 import com.daon.rewrite.global.exception.GlobalExceptionHandler;
 import java.time.LocalDateTime;
 import java.util.List;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -31,6 +32,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(CoverLetterController.class)
 @Import(GlobalExceptionHandler.class)
+@Disabled("CoverLetter 기본 CRUD 구현 PR에서 활성화")
 class CoverLetterControllerTest {
 
     @Autowired

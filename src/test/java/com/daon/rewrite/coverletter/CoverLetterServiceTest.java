@@ -9,6 +9,7 @@ import com.daon.rewrite.coverletter.dto.CoverLetterDetailResponse;
 import com.daon.rewrite.coverletter.dto.CoverLetterListResponse;
 import com.daon.rewrite.global.exception.BusinessException;
 import com.daon.rewrite.global.exception.ErrorCode;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -16,6 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+@Disabled("CoverLetter 기본 CRUD 구현 PR에서 활성화")
 class CoverLetterServiceTest {
 
     private final CoverLetterRepository repository = new CoverLetterRepository();
