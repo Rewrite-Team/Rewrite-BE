@@ -571,7 +571,7 @@ partial result는 최종 데이터가 아니라 진행 중 스트리밍 화면 �
 
 이 경우 이미 생성된 텍스트는 복구하지 못하므로, SSE 연결 이후 수신한 delta 텍스트도 화면에 렌더링하지 않는다.
 
-클라이언트는 SSE를 완료/실패 이벤트 감지 용도로만 사용한다. 완료되면 `resultRef` 기준으로 `ReviewVersion` 상세를 조회해 온전한 최종 결과를 표시한다.
+클라이언트는 SSE를 완료/실패 이벤트 감지 용도로만 사용한다. 완료되면 `resultRef.type`을 확인하고 해당 결과 API를 조회해 온전한 최종 결과를 표시한다.
 
 Job 자체는 실패 처리하지 않는다.
 
@@ -593,7 +593,7 @@ PROCESSING + partialResult null:
   progress 렌더링 후 SSE 재연결
   이미 생성된 텍스트 복구 생략
   delta 텍스트 렌더링 생략
-  완료 후 ReviewVersion 상세 조회
+  완료 후 resultRef.type 기준 결과 API 조회
 ```
 
 ### PRD 근거
@@ -611,7 +611,7 @@ PROCESSING + partialResult null:
 
 2. `partialResult=null`이면 delta 텍스트는 숨기고 progress와 완료/실패만 감지
    - 문장 일부만 보이는 문제를 피할 수 있다.
-   - 완료 후 `ReviewVersion` 상세 조회로 온전한 최종 결과를 표시할 수 있다.
+   - 완료 후 `resultRef.type` 기준 결과 API 조회로 온전한 최종 결과를 표시할 수 있다.
    - 하지만 진행 중 스트리밍 텍스트 UX는 제공하지 못한다.
 
 3. `partialResult=null`이면 Job을 실패 처리하고 재시도 유도
@@ -622,7 +622,7 @@ PROCESSING + partialResult null:
 
 partial result는 진행 중 화면 복구를 위한 임시 데이터다. 서버 메모리 저장소 특성상 유실될 수 있지만, 이것이 LLM Job 실패를 의미하지는 않는다. 따라서 Job은 계속 유지하고, 클라이언트는 progress를 표시한 뒤 SSE에 다시 연결하는 것이 가장 안전하다.
 
-다만 이어붙일 기준 텍스트가 없는 상태에서 delta를 렌더링하면 문장 앞부분 없이 뒤쪽만 보일 수 있다. 그러므로 `partialResult=null`인 재진입 화면에서는 delta 텍스트를 숨기고, 완료 후 `ReviewVersion` 상세 조회로 온전한 최종 결과를 보여준다.
+다만 이어붙일 기준 텍스트가 없는 상태에서 delta를 렌더링하면 문장 앞부분 없이 뒤쪽만 보일 수 있다. 그러므로 `partialResult=null`인 재진입 화면에서는 delta 텍스트를 숨기고, 완료 후 `resultRef.type` 기준 결과 API 조회로 온전한 최종 결과를 보여준다.
 
 ### 트레이드오프
 
@@ -918,5 +918,4 @@ LLM 출력은 사용자에게 직접 보이는 결과 데이터다. 구조가 �
   - 일부 유효한 내용이 있어도 사용자에게 제공하지 않는다.
   - LLM 출력 형식이 자주 흔들리면 실패율이 높아질 수 있다.
   - 프롬프트와 파서, schema validation 품질 관리가 중요해진다.
-
 

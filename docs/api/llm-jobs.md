@@ -118,7 +118,7 @@ status가 FAILED 또는 CANCELED이면 상태 메시지를 표시한다.
 
 `PROCESSING` 상태에서 재연결하는 경우 이미 생성된 텍스트는 SSE replay로 받지 않고, Job 상태 조회 또는 자기소개서 상세 조회의 `partialResult`로 복구한다. SSE 재연결 이후 수신한 delta만 기존 partial text 뒤에 이어붙인다.
 
-메모리 저장소 유실 등으로 `partialResult`가 `null`이면 이미 생성된 텍스트 복구는 생략한다. 클라이언트는 `progress`를 표시하고 SSE 재연결 이후 수신한 delta 텍스트는 숨긴다. `job.completed` 이벤트 또는 상태 조회에서 `COMPLETED`를 확인하면 `resultRef` 기준으로 `ReviewVersion` 상세를 조회해 온전한 최종 결과를 표시한다.
+메모리 저장소 유실 등으로 `partialResult`가 `null`이면 이미 생성된 텍스트 복구는 생략한다. 클라이언트는 `progress`를 표시하고 SSE 재연결 이후 수신한 delta 텍스트는 숨긴다. `job.completed` 이벤트 또는 상태 조회에서 `COMPLETED`를 확인하면 `resultRef.type`을 확인하고 해당 결과 API를 조회해 온전한 최종 결과를 표시한다. 예를 들어 `REVIEW_VERSION`은 첨삭 버전 상세, `KEYWORD_ANALYSIS`는 최신 키워드 분석 결과, `INTERVIEW_SESSION` 또는 `INTERVIEW_QUESTION`은 면접 세션/질문 목록, `INTERVIEW_MESSAGE`는 대화 메시지를 조회한다.
 
 응답 Content-Type:
 
