@@ -164,7 +164,6 @@ API 응답 DTO로 변환할 때는 `ZoneId.of("Asia/Seoul")` 기준으로 변환
 
 ```text
 UNAUTHORIZED
-FORBIDDEN
 NOT_FOUND
 VALIDATION_ERROR
 CONFLICT
@@ -539,4 +538,3 @@ USER
 ASSISTANT
 SYSTEM
 ```
-
