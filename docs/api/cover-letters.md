@@ -57,7 +57,7 @@ REVIEW_FAILED: AI 첨삭 실패 화면
 
 ### 자기소개서 생성
 
-등록 step1 진입 후 최초 저장 시 사용한다.
+자기소개서 작성 플로우를 시작할 때 빈 초안을 생성한다.
 
 ```http
 POST /cover-letters
@@ -65,27 +65,11 @@ POST /cover-letters
 
 Request:
 
-```json
-{
-  "title": "2026 상반기 백엔드 개발자 자기소개서",
-  "companyName": "Rewrite Corp",
-  "positionTitle": "백엔드 개발자",
-  "jobPostingUrl": "https://example.com/jobs/1"
-}
-```
-
-Validation:
-
 ```text
-title: 필수, trim 후 Unicode code point 기준 1~50자
-companyName: 필수, trim 후 Unicode code point 기준 1~30자
-positionTitle: 필수, trim 후 Unicode code point 기준 1~30자
-jobPostingUrl: 선택, trim 후 최대 500자, URL 형식
+No request body.
 ```
 
-서버는 `title`, `companyName`, `positionTitle`의 앞뒤 공백을 제거한 뒤 길이를 검증하고, 공백이 제거된 값을 저장한다. trim 후 빈 문자열이면 `VALIDATION_ERROR`를 반환한다.
-
-서버는 `jobPostingUrl`의 앞뒤 공백을 제거한 뒤 URL 형식을 검증하고, 공백이 제거된 값을 저장한다. `jobPostingUrl`이 누락되거나 trim 후 빈 문자열이면 `null`로 저장한다. `jobPostingUrl`은 URL 형식만 검증한다. 백엔드는 해당 URL이 실제로 접근 가능한지, 로그인 없이 열리는지, 채용공고가 만료되지 않았는지는 검증하지 않는다.
+서버는 현재 사용자의 비어 있는 `DRAFT` 자기소개서를 생성하고 id를 반환한다. 기본 정보, 우대사항, 질문과 답변은 각 step 저장 API에서 입력받는다.
 
 Response:
 
