@@ -361,7 +361,7 @@ questions는 1개 이상이어야 한다.
 
 이미 `REVIEWED` 상태이면 새 Job을 만들지 않고 기존 최신 `ReviewVersion` 정보를 반환한다.
 
-필수 step 데이터가 누락된 경우 `VALIDATION_ERROR`를 반환하고, `details`에 누락된 field와 이동해야 할 step을 포함한다.
+필수 step 데이터가 누락된 경우 `VALIDATION_ERROR`를 반환하고, `details`에 누락된 field와 reason을 포함한다.
 
 Validation Error Response:
 
@@ -373,12 +373,10 @@ Validation Error Response:
     "details": [
       {
         "field": "preferences",
-        "step": "STEP2",
         "reason": "채용 우대사항을 입력해야 합니다."
       },
       {
         "field": "questions",
-        "step": "STEP3",
         "reason": "질문과 답변을 1개 이상 입력해야 합니다."
       }
     ]
