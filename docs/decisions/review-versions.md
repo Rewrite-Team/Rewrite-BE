@@ -78,6 +78,7 @@ ReviewVersionQuestionResult
 `ReviewVersionQuestionResult`는 문항별로 다음 정보를 가진다.
 
 ```text
+questionResultId
 questionId
 question
 originalAnswer
@@ -86,6 +87,8 @@ aiReport
 rewrittenAnswer
 finalAnswer
 ```
+
+`questionResultId`는 서버가 발급하는 opaque identifier이며, 하나의 `ReviewVersion` 안에서 유일하다. 클라이언트는 이 값을 읽기 전용으로 취급하고, `PUT /cover-letters/{coverLetterId}/review-versions/{versionId}/final-answers`의 `answers[].questionResultId`에 그대로 전달한다. `questionId`는 원본 자기소개서 문항 ID이고, `questionResultId`는 특정 첨삭 버전의 문항별 결과 ID다.
 
 API 형태:
 
@@ -680,5 +683,4 @@ Decision 039에서 최종 작성본은 빈 문자열로 저장할 수 없다고 
 - 단점
   - 사용자가 의도적으로 앞뒤 공백을 넣어도 보존되지 않는다.
   - 원문 입력을 완전 그대로 보관하는 요구가 생기면 별도 raw value 저장 정책이 필요하다.
-
 

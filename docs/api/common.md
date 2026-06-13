@@ -324,7 +324,7 @@ originalAnswer: trim 후 Unicode code point 기준 1~5000자
 
 ```json
 {
-  "id": "rvqr_01HZ...",
+  "questionResultId": "rvqr_01HZ...",
   "questionId": "clq_01HZ...",
   "order": 1,
   "question": "지원 동기를 작성해주세요.",
@@ -338,6 +338,8 @@ originalAnswer: trim 후 Unicode code point 기준 1~5000자
   "finalAnswerLength": 810
 }
 ```
+
+`questionResultId`는 서버가 발급하는 opaque identifier이며, 하나의 `ReviewVersion` 안에서 유일하다. 클라이언트는 최종 작성본 일괄 저장 요청의 `answers[].questionResultId`에 이 값을 그대로 사용한다. `questionId`는 원본 자기소개서 문항 ID이고, `questionResultId`는 특정 첨삭 버전의 문항별 결과 ID다.
 
 `aiReport`는 프론트엔드에 그대로 렌더링할 단일 문자열이다. STAR, 구체성, 우대사항 적합성, 직무 키워드, 맞춤법, 문장 자연스러움, 중복 표현, 글자 수 준수 여부는 API 필드가 아니라 LLM 프롬프트의 평가 기준으로 관리한다.
 

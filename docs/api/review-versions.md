@@ -51,7 +51,7 @@ Response:
   "createdAt": "2026-06-20T14:11:00",
   "questionResults": [
     {
-      "id": "rvqr_01HZ...",
+      "questionResultId": "rvqr_01HZ...",
       "questionId": "clq_01HZ...",
       "order": 1,
       "question": "지원 동기를 작성해주세요.",
@@ -167,12 +167,12 @@ Response:
   "reviewVersionId": "rv_01HZ...",
   "questionResults": [
     {
-      "id": "rvqr_01HZ...",
+      "questionResultId": "rvqr_01HZ...",
       "finalAnswer": "저는 백엔드 개발자로서...",
       "finalAnswerLength": 810
     },
     {
-      "id": "rvqr_01HY...",
+      "questionResultId": "rvqr_01HY...",
       "finalAnswer": "저는 프로젝트에서...",
       "finalAnswerLength": 920
     }
