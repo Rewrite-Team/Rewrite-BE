@@ -97,9 +97,12 @@ Response:
 {
   "jobId": "job_01HZ...",
   "coverLetterId": "cl_01HZ...",
-  "status": "REVIEWING"
+  "coverLetterStatus": "REVIEWED",
+  "jobStatus": "PENDING"
 }
 ```
+
+재첨삭 진행 중에도 `CoverLetter.status`는 `REVIEWED`를 유지한다. 재첨삭 진행 상태는 `jobStatus`와 Job 조회/스트림 API로 확인한다.
 
 재첨삭 Job이 완료되어 새 `ReviewVersion`이 생성되면 기존 키워드 분석 결과는 삭제된다.
 
