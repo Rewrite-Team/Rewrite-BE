@@ -179,7 +179,14 @@ AI 면접은 질문을 많이 만드는 것보다 질문별 대화 품질이 중
 
 MVP에서는 자기소개서당 AI 면접 세션을 하나만 유지한다.
 
-사용자가 `모의면접 시작하기`를 한 번 눌러 면접 세션이 생성된 이후에는, AI 면접 페이지 진입 시 시작 버튼 화면을 다시 보여주지 않고 기존 면접 대화 화면을 바로 보여준다.
+AI 면접 페이지는 현재 면접 세션 상태에 따라 화면을 결정한다.
+
+```text
+세션 없음: 모의면접 시작하기 화면
+QUESTION_GENERATING: 초기 질문 생성 진행 화면
+ACTIVE: 기존 대화 화면과 질문 리스트
+FAILED: 실패 안내와 다시 시작하기 또는 재시도 버튼
+```
 
 기존 면접 세션이 있는 상태에서 사용자가 `새로운 질문 추가하기`를 실행하면 새 면접 세션을 만들지 않고, 기존 세션에 최신 첨삭 버전 기준 면접 질문 5개를 추가한다.
 
@@ -193,7 +200,7 @@ POST /interviews/{interviewSessionId}/questions
 
 `GET /cover-letters/{coverLetterId}/interview`는 현재 면접 세션이 있으면 세션 정보를 반환하고, 없으면 `interviewSession: null`을 반환한다.
 
-`POST /cover-letters/{coverLetterId}/interviews`는 면접 세션이 없을 때만 새 세션과 초기 질문 생성 Job을 만든다. 이미 세션이 있으면 기존 세션을 반환하고 초기 질문 생성 Job을 새로 만들지 않는다.
+`POST /cover-letters/{coverLetterId}/interviews`는 면접 세션이 없을 때 새 세션과 초기 질문 생성 Job을 만든다. 이미 `ACTIVE` 또는 `QUESTION_GENERATING` 세션이 있으면 기존 세션을 반환하고 초기 질문 생성 Job을 새로 만들지 않는다. 기존 세션이 `FAILED`이면 같은 세션을 재사용해 다시 `QUESTION_GENERATING`으로 전환하고 새 초기 질문 생성 Job을 시작한다.
 
 `POST /interviews/{interviewSessionId}/questions`는 기존 면접 세션에 새 질문 생성 Job을 만들고, 성공 시 질문 5개를 기존 질문 목록 뒤에 추가한다.
 
@@ -498,5 +505,4 @@ COMPLETED:
   - 사용자가 피드백 생성 중 화면을 이탈하면 완료 전까지 생성된 delta를 복구할 수 없다.
   - 진행 중 재진입 화면에서는 스트리밍 텍스트 UX가 제한된다.
   - 향후 긴 면접 피드백이나 복구 UX가 중요해지면 partial 저장 정책을 다시 검토해야 한다.
-
 

@@ -2,7 +2,14 @@
 
 ## Interview API
 
-자기소개서당 AI 면접 세션은 하나만 유지한다. 면접 세션이 이미 있으면 AI 면접 페이지는 `모의면접 시작하기` 화면을 보여주지 않고 기존 대화 화면과 질문 리스트를 보여준다.
+자기소개서당 AI 면접 세션은 하나만 유지한다. AI 면접 페이지는 현재 면접 세션 상태에 따라 다음 화면을 표시한다.
+
+```text
+세션 없음: 모의면접 시작하기 화면
+QUESTION_GENERATING: 초기 질문 생성 진행 화면
+ACTIVE: 기존 대화 화면과 질문 리스트
+FAILED: 실패 안내와 다시 시작하기 또는 재시도 버튼
+```
 
 면접 세션은 최초 질문 세트를 생성할 때 기준이 된 첨삭 버전을 `initialSourceReviewVersionId`로 기록한다. 재첨삭 후에도 기존 면접 세션과 기존 질문별 대화방은 유지된다.
 
@@ -84,7 +91,7 @@ Response:
 }
 ```
 
-단, 기존 면접 세션이 `FAILED` 상태이면 같은 `interviewSessionId`를 재사용해 다시 `QUESTION_GENERATING`으로 전환하고 새 질문 생성 Job을 시작한다.
+단, 기존 면접 세션이 `FAILED` 상태이면 같은 `interviewSessionId`를 재사용해 다시 `QUESTION_GENERATING`으로 전환하고 새 질문 생성 Job을 시작한다. 프론트엔드는 `FAILED` 상태에서 다시 시작하기 또는 재시도 버튼으로 이 API를 다시 호출한다.
 
 ```json
 {
