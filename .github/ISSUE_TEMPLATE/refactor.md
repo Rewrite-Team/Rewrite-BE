@@ -1,40 +1,25 @@
 ---
 name: Refactor
-about: 리팩토링
+about: 공개 동작을 유지하면서 내부 구조를 개선합니다.
 title: '[♻️Refactor] '
 labels: '♻️ Refactor'
 assignees: 'yong203'
 ---
 
-## Description
-<!-- 리팩토링 내용을 설명해주세요. -->
+## 목표
 
-## Scope
-- Related REQ:
-- Related API:
-- Related Decision:
-- Affected packages:
+<!-- 어떤 구조를 왜 개선하는지 적어주세요. -->
 
-## Tasks
-- [ ] TODO
-- [ ] TODO
+## 작업 범위
 
-## Behavior Contract
-- [ ] Public behavior does not change.
-- [ ] API contract does not change.
-- [ ] If behavior or API changes, related feature issue/docs are linked.
+- 관련 기능/API:
+- 영향을 받는 패키지:
+- 공개 동작 변경 여부:
 
-## Docs to Update
-- [ ] `docs/architecture.md`
-- [ ] `docs/conventions.md`
-- [ ] `docs/testing.md`
-- [ ] Related `docs/api/` document
-- [ ] Related `docs/decisions/` document
-- [ ] Not needed. Reason:
+## 완료 기준
 
-## Verification
-- [ ] Test command:
-- [ ] Regression scope:
+- [ ] 공개 동작이 의도치 않게 바뀌지 않는다.
+- [ ] API 계약이 의도치 않게 바뀌지 않는다.
+- [ ] 변경 전후를 비교할 테스트 또는 확인 방법이 있다.
 
-## References
-<!-- 관련 문서, 스크린샷, 또는 예시 등이 있다면 여기에 첨부해주세요. -->
+## 참고

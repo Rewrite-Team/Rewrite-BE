@@ -1,37 +1,34 @@
 ---
-name: Bug report
-about: 디버깅
+name: 버그 수정
+about: 재현 가능한 오류를 고칩니다.
 title: '[🚨BUG] '
 labels: '🚨 Bug'
 assignees: 'yong203'
 ---
 
-## Description
-<!-- 버그 내용을 설명해주세요. (Given-When-Then 형식으로 서술해주세요.) -->
+## 문제
 
-## Scope
-- Related REQ:
-- Related API:
-- Related Decision:
+<!-- 어떤 상황에서 무엇이 잘못됐는지 적어주세요. -->
 
-## Expected Behavior
-<!-- 예상했던 정상적인 결과가 어떤 것이었는지 설명해주세요. -->
+## 기대 동작
 
-## Reproduction
+<!-- 원래 어떻게 동작해야 하는지 적어주세요. -->
+
+## 재현 방법
+
 - Given:
 - When:
 - Then:
 
-## Docs to Update
-- [ ] `docs/status.md`
-- [ ] `docs/api/README.md`
-- [ ] `docs/api/` related domain document
-- [ ] `docs/decisions/` related domain document
-- [ ] Not needed. Reason:
+## 영향 범위
 
-## Verification
-- [ ] Regression test:
-- [ ] Test command:
+- 관련 API/기능:
+- 영향을 받는 영역:
 
-## References
-<!-- 관련 문서, 스크린샷, 또는 예시 등이 있다면 여기에 첨부해주세요. -->
+## 완료 기준
+
+- [ ] 버그 원인을 확인했다.
+- [ ] 재현 케이스가 통과한다.
+- [ ] 같은 문제가 다시 생기지 않도록 테스트 또는 확인 방법을 남겼다.
+
+## 참고
