@@ -642,7 +642,7 @@ PUT /cover-letters/{coverLetterId}/review-versions/{versionId}/final-answers
 
 ```text
 1. finalAnswer 앞뒤 공백 제거
-2. trim된 finalAnswer가 1~5000자인지 검증
+2. trim된 finalAnswer의 Unicode code point 기준 길이가 1~5000자인지 검증
 3. trim된 finalAnswer 저장
 ```
 
@@ -683,4 +683,3 @@ Decision 039에서 최종 작성본은 빈 문자열로 저장할 수 없다고 
 - 단점
   - 사용자가 의도적으로 앞뒤 공백을 넣어도 보존되지 않는다.
   - 원문 입력을 완전 그대로 보관하는 요구가 생기면 별도 raw value 저장 정책이 필요하다.
-
