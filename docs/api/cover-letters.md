@@ -71,6 +71,12 @@ No request body.
 
 서버는 현재 사용자의 비어 있는 `DRAFT` 자기소개서를 생성하고 id를 반환한다. 기본 정보, 우대사항, 질문과 답변은 각 step 저장 API에서 입력받는다.
 
+Success Status:
+
+```text
+201 Created
+```
+
 Response:
 
 ```json
