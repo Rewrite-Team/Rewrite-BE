@@ -6,7 +6,7 @@
 - 개발 진행 상태와 다음 작업은 `docs/status.md`를 기준으로 확인한다.
 - 주요 제품/기능 요구사항은 `docs/requirements.md`를 기준으로 확인한다.
 - API 계약과 구현 상태는 `docs/api/README.md`와 관련 도메인별 API 문서를 기준으로 확인한다.
-- API 설계 결정과 트레이드오프는 `docs/decisions/README.md`와 관련 도메인별 결정 문서를 참고한다.
+- API와 persistence 설계 결정 및 트레이드오프는 `docs/decisions/README.md`와 관련 결정 문서를 참고한다.
 
 ## Default workflow
 

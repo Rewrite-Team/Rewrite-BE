@@ -20,11 +20,11 @@ API 계약과 API별 상태는 `docs/api/README.md`와 `docs/api/` 하위 도메
 |---|---|---|---|---|---|---|---|
 | REQ-001 | 공통 예외 응답 기반 | Verified | High | 공통 에러 응답 | [#2](https://github.com/Rewrite-Team/Rewrite-BE/issues/2), [PR #3](https://github.com/Rewrite-Team/Rewrite-BE/pull/3) | `GlobalExceptionHandlerTest`, `./gradlew test` | `BusinessException`, `ErrorCode`, `GlobalExceptionHandler`, `ErrorResponse` 구현됨 |
 | REQ-002 | 개발용 현재 사용자 Provider | Verified | High | 인증 필요 API 공통 | [#4](https://github.com/Rewrite-Team/Rewrite-BE/issues/4), [PR #6](https://github.com/Rewrite-Team/Rewrite-BE/pull/6) | `DevCurrentUserProviderTest`, `./gradlew test` | `CurrentUserProvider`, `DevCurrentUserProvider` 구현됨 |
-| REQ-003 | 자기소개서 기본 CRUD | In Progress | High | API-007, API-008, API-012, API-013 | [#5](https://github.com/Rewrite-Team/Rewrite-BE/issues/5), [#18](https://github.com/Rewrite-Team/Rewrite-BE/issues/18), [PR #15](https://github.com/Rewrite-Team/Rewrite-BE/pull/15) | `CoverLetterServiceTest`, `CoverLetterControllerTest`, `./gradlew test` | API-008 자기소개서 초안 생성 구현됨. 나머지 CRUD는 다음 slice 후보 기준으로 분리 진행 |
-| REQ-004 | 자기소개서 등록 step 저장 | Planned | High | API-009, API-010, API-011 | - | - | REQ-003 이후 진행 권장 |
+| REQ-003 | 자기소개서 기본 CRUD | In Progress | High | API-007, API-008, API-012, API-013 | [#5](https://github.com/Rewrite-Team/Rewrite-BE/issues/5), [#18](https://github.com/Rewrite-Team/Rewrite-BE/issues/18), [PR #15](https://github.com/Rewrite-Team/Rewrite-BE/pull/15) | `CoverLetterServiceTest`, `CoverLetterControllerTest`, `./gradlew test` | API-008 자기소개서 초안 생성 계약 구현됨. 내부 persistence 구현은 DB/JPA 전환 이슈에서 교체하고, 나머지 CRUD는 그 이후 slice 후보 기준으로 분리 진행 |
+| REQ-004 | 자기소개서 등록 step 저장 | Planned | High | API-009, API-010, API-011 | - | - | DB/JPA 전환 이후 진행 권장 |
 | REQ-005 | 자기소개서 제출과 LLM Job 생성 | Planned | High | API-014, API-015, API-016 | - | - | LLM provider 호출 전 skeleton 우선 |
 | REQ-006 | 첨삭 버전 조회와 최종 작성본 저장 | Planned | High | API-017, API-018, API-019, API-024 | - | - | 제출/Job skeleton 이후 진행 권장 |
-| REQ-007 | DB/JPA/Flyway 전환 | Planned | Medium | persistence 내부 변경 | - | - | in-memory 흐름 검증 후 진행 |
+| REQ-007 | DB/JPA 전환 | Planned | High | API-008 내부 persistence, persistence 내부 변경 | [#22](https://github.com/Rewrite-Team/Rewrite-BE/issues/22) | - | API-008 공개 계약은 유지하고 내부 구현을 DB/JPA로 교체한 뒤 남은 자기소개서 CRUD를 확장. Flyway는 별도 이슈로 분리 |
 | REQ-008 | 실제 인증 경계 | Planned | Medium | API-001 - API-006 | - | - | 카카오 OAuth, cookie, CSRF |
 | REQ-009 | 키워드 분석 | Planned | Medium | API-020, API-021 | - | - | LLM Job 기반 |
 | REQ-010 | AI 면접 | Planned | Medium | API-022, API-023, API-025 - API-029 | - | - | LLM Job/SSE 기반 |
@@ -36,6 +36,7 @@ API 계약과 API별 상태는 `docs/api/README.md`와 `docs/api/` 하위 도메
 | Issue | Scope | Status | Notes |
 |---|---|---|---|
 | [#16](https://github.com/Rewrite-Team/Rewrite-BE/issues/16) | Backend 문서 구조 및 개발 규칙 정리 | Open | 현재 문서 구조와 작업 규칙 정리 범위 |
+| [#22](https://github.com/Rewrite-Team/Rewrite-BE/issues/22) | DB/JPA 전환 선행을 위한 문서 계획 수정 | Open | Flyway는 제외하고 DB/JPA 전환을 남은 자기소개서 CRUD보다 먼저 진행하도록 문서 정리 |
 
 ## Current Recommended Next Work
 
@@ -58,9 +59,10 @@ API 계약과 API별 상태는 `docs/api/README.md`와 `docs/api/` 하위 도메
 
 | Candidate | Related REQ | Related APIs | Suggested Scope |
 |---|---|---|---|
-| 현재 사용자 자기소개서 목록 조회 | REQ-003 | API-007 | in-memory repository, pagination, status filter, owner filter, controller/service/web test |
-| 자기소개서 상세 조회 | REQ-003 | API-012 | owner 검증, deletedAt 제외, 질문/최신 Job 요약 포함 skeleton, service/web test |
-| 자기소개서 soft delete | REQ-003 | API-013 | soft delete, 삭제 후 조회 제외, 하위 리소스 접근 정책 skeleton, service/web test |
+| DB/JPA 기반 persistence 전환 | REQ-007 | API-008 구현 전환, API-007/API-012/API-013 선행 기반 | JPA/DB driver 도입, CoverLetter DB-backed repository 전환, transaction boundary 검증, 기존 API-008 공개 계약 유지 및 내부 persistence 구현 교체. Flyway 제외 |
+| 현재 사용자 자기소개서 목록 조회 | REQ-003 | API-007 | DB/JPA repository 기반 pagination, status filter, owner filter, deletedAt 제외, controller/service/repository test |
+| 자기소개서 상세 조회 | REQ-003 | API-012 | DB/JPA repository 기반 owner 검증, deletedAt 제외, 질문/최신 Job 요약 포함 skeleton, service/web/repository test |
+| 자기소개서 soft delete | REQ-003 | API-013 | DB/JPA repository 기반 soft delete, 삭제 후 조회 제외, 하위 리소스 접근 정책 skeleton, service/web/repository test |
 | 등록 step1 저장 | REQ-004 | API-009 | basic info replace, trim, URL validation, DRAFT 상태 검증, service/web test |
 | 등록 step2 저장 | REQ-004 | API-010 | preferences replace, trim, empty validation, DRAFT 상태 검증, service/web test |
 | 등록 step3 저장 | REQ-004 | API-011 | questions replace, order 재부여, 글자 수 검증, service/web test |

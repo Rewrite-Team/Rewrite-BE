@@ -18,8 +18,9 @@
 
 ### Integration Tests
 
-- DB/JPA/Flyway 도입 이후 repository, migration, transaction 동작을 검증한다.
-- in-memory 단계에서는 DB integration test를 만들지 않는다.
+- DB/JPA 도입 이후 repository와 transaction 동작을 검증한다.
+- DB/JPA 전환 전 in-memory repository 단계에서는 DB integration test를 만들지 않는다.
+- Flyway migration 검증은 Flyway 도입 이슈 이후에 추가한다.
 
 ## Required Verification
 

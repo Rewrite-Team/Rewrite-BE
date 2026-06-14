@@ -22,7 +22,7 @@ Rewrite는 AI를 활용해 자기소개서 첨삭, 자기소개서 키워드 분
 | REQ-004 | 자기소개서 등록 step 저장 | Cover Letters | High | `docs/api/cover-letters.md` |
 | REQ-005 | 자기소개서 제출과 LLM Job 생성 | Cover Letters/LLM Jobs | High | `docs/api/cover-letters.md`, `docs/api/llm-jobs.md` |
 | REQ-006 | 첨삭 버전 조회와 최종 작성본 저장 | Review Versions | High | `docs/api/review-versions.md` |
-| REQ-007 | DB/JPA/Flyway 전환 | Persistence | Medium | 내부 persistence 변경 |
+| REQ-007 | DB/JPA 전환 | Persistence | High | 내부 persistence 변경 |
 | REQ-008 | 실제 인증 경계 | Auth | Medium | `docs/api/auth.md` |
 | REQ-009 | 키워드 분석 | Keyword Analysis | Medium | `docs/api/keyword-analysis.md`, `docs/api/llm-jobs.md` |
 | REQ-010 | AI 면접 | Interviews | Medium | `docs/api/interviews.md`, `docs/api/llm-jobs.md` |
@@ -188,23 +188,27 @@ LLM 첨삭은 다음 기준을 참고한다.
 - 최종 작성본 저장은 모든 문항을 검증하고 한 번에 반영한다.
 - 최신 버전이 아닌 버전에 저장을 시도하면 계약된 오류를 반환한다.
 
-## REQ-007: DB/JPA/Flyway 전환
+## REQ-007: DB/JPA 전환
 
 ### Goal
 
-in-memory repository로 검증한 API 계약과 도메인 규칙을 영속 저장소 기반으로 전환한다.
+API-008 자기소개서 초안 생성의 공개 API 계약은 유지하되, 현재 in-memory persistence 구현을 DB/JPA 기반으로 교체한 뒤 남은 자기소개서 CRUD를 확장한다.
 
 ### Rules
 
-- 초기 구현은 in-memory repository로 API 계약과 도메인 규칙을 검증한다.
-- in-memory 단계는 단일 프로세스 검증용이며 운영 배포 기준이 아니다.
-- DB/JPA/Flyway 전환은 in-memory 흐름을 검증한 뒤 별도 이슈로 진행한다.
-- 전환 후 사용자 데이터 보존, migration, transaction 동작을 테스트한다.
+- API-008 자기소개서 초안 생성까지는 in-memory repository로 API 계약과 기본 service/controller 흐름을 확인한 상태로 본다.
+- DB/JPA 전환 이슈는 API-008의 path, status code, response body 계약을 유지하면서 내부 persistence 구현을 DB/JPA로 교체하는 작업을 포함한다.
+- API-007 목록 조회, API-012 상세 조회, API-013 soft delete, 등록 step 저장 API는 pagination, owner filter, deletedAt 필터, 정렬, transaction boundary 영향을 받으므로 DB/JPA 전환 이후 구현한다.
+- DB/JPA 전환은 기존 API 계약을 유지하면서 persistence 구현을 교체하는 별도 이슈로 진행한다.
+- 초기 DB/JPA 전환 범위는 JPA entity/repository, DB driver, 테스트 가능한 DB 설정, transaction 검증까지로 제한한다.
+- Flyway와 migration versioning은 초기 DB/JPA 전환 범위에 포함하지 않고, 스키마 변경 이력 관리가 필요한 시점에 별도 이슈로 검토한다.
 
 ### Acceptance Criteria
 
-- 서버 재시작 후에도 사용자 데이터가 보존된다.
-- repository 테스트와 migration 검증이 추가된다.
+- 기존 API-008 응답 계약은 DB/JPA 전환 후에도 유지된다.
+- 선택한 DB 설정에서 애플리케이션 프로세스 재시작 후에도 저장 데이터가 보존된다.
+- repository 테스트와 transaction 검증이 추가된다.
+- Flyway 의존성, migration 파일, migration 검증은 이번 전환의 완료 기준에 포함하지 않는다.
 - 기존 API 계약은 유지된다.
 
 ## REQ-008: 실제 인증 경계
@@ -297,7 +301,8 @@ in-memory repository로 검증한 API 계약과 도메인 규칙을 영속 저�
 - 장기 LLM 작업은 비동기 Job과 SSE로 처리한다.
 - 같은 자기소개서에 대한 진행 중 LLM Job은 하나만 허용한다.
 - 한 자기소개서 안에서 첨삭, 키워드 분석, 면접 질문 생성, 면접 답변 피드백을 동시에 실행하지 않는다.
-- 서버 재시작 시 in-memory 데이터와 진행 중 partial result는 유실될 수 있다.
+- DB/JPA 전환 전 in-memory repository에 저장된 데이터와 진행 중 LLM partial result는 서버 재시작 시 유실될 수 있다.
+- DB/JPA 전환 후 일반 CRUD 데이터는 선택한 DB 저장소에 보존하고, 진행 중 LLM partial result는 별도 cache 저장소 도입 전까지 서버 메모리에 둘 수 있다.
 - 진행 중 LLM partial result를 서버 재시작 또는 scale-out 상황에서도 유지하려면 Redis 같은 외부 cache 저장소가 필요하다.
 - LLM 비용과 남용 방지를 위해 사용자별 rate limit, quota, Job 재시도 정책을 운영 설정으로 둘 수 있어야 한다.
 - 인증 cookie, CORS, CSRF, SameSite 설정은 프론트엔드 배포 도메인과 함께 검증해야 한다.
