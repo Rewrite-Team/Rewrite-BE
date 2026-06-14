@@ -22,6 +22,8 @@ API-013 DELETE /cover-letters/{coverLetterId}
 
 Flyway는 초기 DB/JPA 전환 범위에 포함하지 않는다. migration versioning은 스키마 변경 이력 관리가 실제로 필요한 시점에 별도 이슈로 검토한다.
 
+DB/JPA 구현 전 MVP persistence 구조는 `docs/erd.md`를 기준으로 확인한다. `docs/erd.md`는 전체 MVP 테이블 관계를 정리하되, 초기 DB/JPA 전환 이슈가 모든 테이블을 한 번에 구현한다는 의미는 아니다.
+
 ### 근거
 
 REQ-003의 남은 CRUD는 저장소 구현 세부사항의 영향을 직접 받는다.
