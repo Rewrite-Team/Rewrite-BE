@@ -63,6 +63,12 @@ REVIEW_FAILED: AI 첨삭 실패 화면
 POST /cover-letters
 ```
 
+Related Requirement:
+
+```text
+REQ-003
+```
+
 Request:
 
 ```text
@@ -70,6 +76,13 @@ No request body.
 ```
 
 서버는 현재 사용자의 비어 있는 `DRAFT` 자기소개서를 생성하고 id를 반환한다. 기본 정보, 우대사항, 질문과 답변은 각 step 저장 API에서 입력받는다.
+
+Validation:
+
+```text
+요청 본문이 없으므로 request body validation은 없다.
+현재 사용자 식별은 공통 인증 경계 또는 개발용 CurrentUserProvider를 통해 수행한다.
+```
 
 Success Status:
 
@@ -84,6 +97,21 @@ Response:
   "id": "cl_01HZ...",
   "status": "DRAFT",
   "createdAt": "2026-06-20T14:00:00"
+}
+```
+
+Error Response:
+
+공통 인증 도입 후 인증되지 않은 요청은 `UNAUTHORIZED`를 반환한다.
+개발 단계에서는 `DevCurrentUserProvider`를 사용하므로 이 API 자체에서 별도 인증 실패를 발생시키지 않는다.
+
+```json
+{
+  "error": {
+    "code": "UNAUTHORIZED",
+    "message": "인증이 필요합니다.",
+    "details": []
+  }
 }
 ```
 
