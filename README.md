@@ -33,7 +33,7 @@ OPENAI_API_KEY=your-api-key ./gradlew bootRun
 - `docs/status.md`: 기능 진행 상태, 남은 작업, 다음 권장 작업
 - `docs/requirements.md`: 제품 요구사항과 화면별 기능
 - `docs/api/README.md`: API 상태표와 도메인별 API 문서 라우팅
-- `docs/decisions/README.md`: API 설계 결정 인덱스와 도메인별 결정 문서 라우팅
+- `docs/decisions/README.md`: API와 persistence 설계 결정 인덱스 및 도메인별 결정 문서 라우팅
 - `docs/architecture.md`: 패키지 구조와 계층 책임
 - `docs/conventions.md`: Java/Spring/API/예외 처리 규칙
 - `docs/testing.md`: 테스트 전략과 검증 명령

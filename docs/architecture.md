@@ -65,8 +65,9 @@ com.daon.rewrite.auth
 ### Repository
 
 - 저장소 접근을 담당한다.
-- in-memory 단계에서는 Java collection 기반 저장소를 사용한다.
-- JPA 전환은 별도 이슈에서 진행한다.
+- API-008까지는 Java collection 기반 in-memory 저장소로 기본 흐름을 확인한 상태로 본다.
+- 남은 자기소개서 CRUD 확장 전 API-008의 공개 계약은 유지하면서 내부 저장소 구현을 DB/JPA 기반으로 전환한다.
+- Flyway는 초기 DB/JPA 전환 범위에 포함하지 않고, migration versioning이 필요한 시점에 별도 이슈로 검토한다.
 
 ### Entity / Model
 
@@ -91,6 +92,8 @@ controller -> service -> repository -> model/entity
 
 ## Scope Rules
 
-- in-memory 단계에서는 JPA, Flyway, DB driver를 도입하지 않는다.
-- DB/JPA/Flyway는 in-memory 흐름을 검증한 뒤 별도 이슈에서 도입한다.
+- API-008 이후 남은 자기소개서 CRUD(API-007, API-012, API-013, API-009~API-011)는 DB/JPA 전환을 먼저 진행한 뒤 구현한다.
+- DB/JPA 전환 이슈에서는 API-008 공개 계약 유지, API-008 내부 persistence 구현 교체, JPA entity/repository, DB driver, 테스트 가능한 DB 설정, transaction 검증을 다룬다.
+- Flyway, migration 파일, migration 검증은 초기 DB/JPA 전환 이슈에 포함하지 않는다.
+- Flyway는 스키마 변경 이력 관리가 필요한 시점에 별도 이슈로 도입 여부를 결정한다.
 - LLM provider 실제 호출은 skeleton API와 상태 모델이 안정된 뒤 별도 이슈로 진행한다.

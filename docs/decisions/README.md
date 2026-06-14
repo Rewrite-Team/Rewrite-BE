@@ -1,6 +1,6 @@
-# API Decisions
+# Design Decisions
 
-이 디렉터리는 Rewrite API 설계 결정을 도메인별로 관리한다.
+이 디렉터리는 Rewrite API와 persistence 설계 결정을 도메인별로 관리한다.
 
 PRD: `../requirements.md`
 
@@ -17,6 +17,7 @@ API 계약: `../api/README.md`
 | `llm-jobs.md` | LLM Job, SSE, partial result, 실패 처리 결정 |
 | `keyword-analysis.md` | 키워드 분석 결정 |
 | `interviews.md` | AI 면접 결정 |
+| `persistence.md` | DB/JPA 전환과 Flyway 후순위 결정 |
 
 ## Decision Index
 
@@ -93,3 +94,4 @@ API 계약: `../api/README.md`
 | Decision 069 | 모든 사용자 리소스 접근은 소유자 검증 후 비소유 리소스는 NOT_FOUND로 응답한다 | `common.md` | REQ-001, REQ-002 | 공통 API 정책 | Active |
 | Decision 070 | 삭제된 자기소개서와 하위 리소스는 사용자-facing API에서 모두 NOT_FOUND로 응답한다 | `cover-letters.md` | REQ-003, REQ-004, REQ-005 | API-007 - API-014 | Active |
 | Decision 071 | 날짜/시간 응답은 Asia/Seoul 기준 LocalDateTime으로 반환한다 | `common.md` | REQ-001, REQ-002 | 공통 API 정책 | Active |
+| Decision 072 | 남은 자기소개서 CRUD 확장 전 DB/JPA 전환을 선행한다 | `persistence.md` | REQ-003, REQ-007 | API-007 - API-013 | Active |
