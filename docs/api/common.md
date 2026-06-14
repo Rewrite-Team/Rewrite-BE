@@ -490,8 +490,9 @@ AI 면접 질문은 세션 시작 시 5개 생성하고, 사용자가 `새로운
 ```text
 COVER_LETTER_BASED
 TECHNICAL
-FOLLOW_UP
 ```
+
+꼬리질문은 `InterviewQuestion` type이 아니라 `InterviewMessage.followUpQuestion`으로 저장한다.
 
 ### InterviewThread
 

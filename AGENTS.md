@@ -12,6 +12,7 @@
 
 - 작업 전 `docs/README.md`를 기준으로 필요한 문서만 읽고, 변경 범위를 짧게 정리한 뒤 진행한다.
 - 사용자가 명시적으로 요청하지 않은 commit, branch 생성, push, PR 생성은 하지 않는다.
+- issue, PR, commit, branch, push, 진행 현황 보고처럼 Codex 작업 절차와 관련된 요청은 `docs/codex-workflow.md`를 먼저 확인한다.
 - 기존 패턴을 우선하고, 불필요한 새 추상화나 범위 밖 리팩터링은 피한다.
 - 기능, 기획, API, 설계 결정, 아키텍처, 테스트 기준을 변경하면 `docs/README.md`의 Change Impact Matrix에 따라 관련 문서를 함께 갱신한다.
 - 문서와 코드가 충돌하면 충돌 내용을 사용자에게 알리고, 어느 쪽을 기준으로 할지 확인한다.

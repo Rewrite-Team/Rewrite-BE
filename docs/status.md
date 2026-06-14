@@ -24,7 +24,7 @@ API 계약과 API별 상태는 `docs/api/README.md`와 `docs/api/` 하위 도메
 | REQ-004 | 자기소개서 등록 step 저장 | Planned | High | API-009, API-010, API-011 | - | - | DB/JPA 전환 이후 진행 권장 |
 | REQ-005 | 자기소개서 제출과 LLM Job 생성 | Planned | High | API-014, API-015, API-016 | - | - | LLM provider 호출 전 skeleton 우선 |
 | REQ-006 | 첨삭 버전 조회와 최종 작성본 저장 | Planned | High | API-017, API-018, API-019, API-024 | - | - | 제출/Job skeleton 이후 진행 권장 |
-| REQ-007 | DB/JPA 전환 | Planned | High | API-008 내부 persistence, persistence 내부 변경 | [#22](https://github.com/Rewrite-Team/Rewrite-BE/issues/22) | - | API-008 공개 계약은 유지하고 내부 구현을 DB/JPA로 교체한 뒤 남은 자기소개서 CRUD를 확장. Flyway는 별도 이슈로 분리 |
+| REQ-007 | DB/JPA 전환 | Planned | High | API-008 내부 persistence, persistence 내부 변경 | [#22](https://github.com/Rewrite-Team/Rewrite-BE/issues/22), [#24](https://github.com/Rewrite-Team/Rewrite-BE/issues/24), [#25](https://github.com/Rewrite-Team/Rewrite-BE/issues/25) | - | #25 MVP ERD 확정 후 API-008 공개 계약은 유지하고 내부 구현을 DB/JPA로 교체. Flyway는 별도 이슈로 분리 |
 | REQ-008 | 실제 인증 경계 | Planned | Medium | API-001 - API-006 | - | - | 카카오 OAuth, cookie, CSRF |
 | REQ-009 | 키워드 분석 | Planned | Medium | API-020, API-021 | - | - | LLM Job 기반 |
 | REQ-010 | AI 면접 | Planned | Medium | API-022, API-023, API-025 - API-029 | - | - | LLM Job/SSE 기반 |
@@ -36,7 +36,7 @@ API 계약과 API별 상태는 `docs/api/README.md`와 `docs/api/` 하위 도메
 | Issue | Scope | Status | Notes |
 |---|---|---|---|
 | [#16](https://github.com/Rewrite-Team/Rewrite-BE/issues/16) | Backend 문서 구조 및 개발 규칙 정리 | Open | 현재 문서 구조와 작업 규칙 정리 범위 |
-| [#22](https://github.com/Rewrite-Team/Rewrite-BE/issues/22) | DB/JPA 전환 선행을 위한 문서 계획 수정 | Open | Flyway는 제외하고 DB/JPA 전환을 남은 자기소개서 CRUD보다 먼저 진행하도록 문서 정리 |
+| [#25](https://github.com/Rewrite-Team/Rewrite-BE/issues/25) | MVP persistence ERD 설계 | Open | #24 DB/JPA 전환 구현 전 전체 MVP persistence ERD를 문서로 확정 |
 
 ## Current Recommended Next Work
 
@@ -59,7 +59,7 @@ API 계약과 API별 상태는 `docs/api/README.md`와 `docs/api/` 하위 도메
 
 | Candidate | Related REQ | Related APIs | Suggested Scope |
 |---|---|---|---|
-| DB/JPA 기반 persistence 전환 | REQ-007 | API-008 구현 전환, API-007/API-012/API-013 선행 기반 | JPA/DB driver 도입, CoverLetter DB-backed repository 전환, transaction boundary 검증, 기존 API-008 공개 계약 유지 및 내부 persistence 구현 교체. Flyway 제외 |
+| DB/JPA 기반 persistence 전환 | REQ-007 | API-008 구현 전환, API-007/API-012/API-013 선행 기반 | #25 ERD merge 이후 진행. JPA/DB driver 도입, CoverLetter DB-backed repository 전환, transaction boundary 검증, 기존 API-008 공개 계약 유지 및 내부 persistence 구현 교체. Flyway 제외 |
 | 현재 사용자 자기소개서 목록 조회 | REQ-003 | API-007 | DB/JPA repository 기반 pagination, status filter, owner filter, deletedAt 제외, controller/service/repository test |
 | 자기소개서 상세 조회 | REQ-003 | API-012 | DB/JPA repository 기반 owner 검증, deletedAt 제외, 질문/최신 Job 요약 포함 skeleton, service/web/repository test |
 | 자기소개서 soft delete | REQ-003 | API-013 | DB/JPA repository 기반 soft delete, 삭제 후 조회 제외, 하위 리소스 접근 정책 skeleton, service/web/repository test |

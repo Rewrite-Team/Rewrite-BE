@@ -18,6 +18,7 @@ Codex는 모든 문서를 매번 읽지 않는다. 먼저 이 문서를 보고 �
 | `requirements.md` | `REQ-*` 기준 제품 요구사항과 검증 기준 | 기능 범위 확인 |
 | `api/README.md` | API 상태표와 도메인별 API 문서 라우팅 | API 구현/수정 |
 | `api/*.md` | 도메인별 API 계약, 요청/응답, 에러 | 특정 도메인 API 구현/수정 |
+| `erd.md` | MVP persistence ERD, 테이블 관계, nullable/FK/soft delete 정책 | DB/JPA entity, repository, schema, migration, persistence 전략 작업 |
 | `decisions/README.md` | API와 persistence 설계 결정 인덱스 및 도메인별 결정 문서 라우팅 | 설계 이유 확인, 결정 변경 검토 |
 | `decisions/*.md` | 도메인별 API, persistence 설계 결정과 트레이드오프 | 특정 도메인 또는 persistence 설계 결정 확인 |
 | `architecture.md` | 패키지 구조와 계층 책임 | 새 패키지/계층 추가 |
@@ -29,6 +30,7 @@ Codex는 모든 문서를 매번 읽지 않는다. 먼저 이 문서를 보고 �
 
 - 기능 구현 전에는 `status.md`, 관련 `requirements.md`의 `REQ-*` 섹션, 관련 `api/` 도메인 문서만 읽는다.
 - API를 추가하거나 변경할 때는 `api/README.md`의 상태표와 관련 `api/` 도메인 문서를 갱신한다.
+- DB/JPA entity, repository, schema, migration, persistence 전략을 변경할 때는 `erd.md`를 함께 확인한다.
 - 설계 결정의 배경이 필요할 때만 `decisions/README.md`와 관련 `decisions/` 도메인 또는 persistence 문서를 읽는다.
 - 다음 이슈를 만들 때는 `status.md`, 관련 `requirements.md`, 관련 `api/` 도메인 문서, 실제 코드/테스트 상태, `.github/ISSUE_TEMPLATE/`를 함께 확인한다.
 - PR을 만들 때는 `.github/pull_request_template.md`와 변경 diff를 함께 확인한다.
