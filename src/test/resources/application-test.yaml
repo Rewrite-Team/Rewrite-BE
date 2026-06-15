@@ -1,29 +1,26 @@
 spring:
-  application:
-    name: rewrite
 
   datasource:
-    url: jdbc:h2:file:./data/rewrite;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;AUTO_SERVER=TRUE
+    url: jdbc:h2:mem:rewrite-test;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
     driver-class-name: org.h2.Driver
     username: sa
     password:
 
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: create-drop
     open-in-view: false
     properties:
       hibernate:
-        format_sql: true
+        format_sql: false
 
   h2:
     console:
-      enabled: true
-      path: /h2-console
+      enabled: false
 
   ai:
     openai:
-      api-key: ${OPENAI_API_KEY}
+      api-key: test-key
       chat:
         options:
           model: gpt-5-nano  # GPT-5 models do not support temperature parameter
