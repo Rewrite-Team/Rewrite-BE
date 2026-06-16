@@ -1,7 +1,6 @@
 package com.daon.rewrite.coverletter.controller;
 
 import com.daon.rewrite.coverletter.entity.CoverLetter;
-import com.daon.rewrite.coverletter.entity.CoverLetterStatus;
 import com.daon.rewrite.coverletter.service.CoverLetterService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -9,7 +8,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -28,11 +27,10 @@ class CoverLetterControllerTest {
 
     @Test
     void createDraftReturnsCreatedDraft() throws Exception {
-        CoverLetter draft = new CoverLetter(
+        CoverLetter draft = CoverLetter.draft(
                 "cl_fixed",
                 "user_1",
-                CoverLetterStatus.DRAFT,
-                LocalDateTime.of(2026, 6, 20, 14, 0)
+                Instant.parse("2026-06-20T05:00:00Z")
         );
         given(coverLetterService.createDraft()).willReturn(draft);
 
@@ -40,6 +38,6 @@ class CoverLetterControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(draft.getId()))
                 .andExpect(jsonPath("$.status").value("DRAFT"))
-                .andExpect(jsonPath("$.createdAt").exists());
+                .andExpect(jsonPath("$.createdAt").value("2026-06-20T14:00:00"));
     }
 }
