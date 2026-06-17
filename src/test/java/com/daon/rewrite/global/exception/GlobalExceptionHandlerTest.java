@@ -62,6 +62,16 @@ class GlobalExceptionHandlerTest {
                 .andExpect(jsonPath("$.error.details.length()").value(0));
     }
 
+    @Test
+    void typeMismatchExceptionReturnsValidationError() throws Exception {
+        mockMvc.perform(get("/test/type-mismatch").param("status", "UNKNOWN"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.error.message").value("입력값이 올바르지 않습니다."))
+                .andExpect(jsonPath("$.error.details").isArray())
+                .andExpect(jsonPath("$.error.details.length()").value(0));
+    }
+
     @RestController
     static class TestController {
 
@@ -78,11 +88,19 @@ class GlobalExceptionHandlerTest {
         void unexpectedError() {
             throw new IllegalStateException("raw internal message");
         }
+
+        @GetMapping("/test/type-mismatch")
+        void typeMismatch(TestStatus status) {
+        }
     }
 
     record TestRequest(
             @NotBlank(message = "제목은 필수입니다.")
             String title
     ) {
+    }
+
+    enum TestStatus {
+        ACTIVE
     }
 }

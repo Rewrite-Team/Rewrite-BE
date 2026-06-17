@@ -5,6 +5,8 @@ import com.daon.rewrite.auth.CurrentUserProvider;
 import com.daon.rewrite.coverletter.entity.CoverLetter;
 import com.daon.rewrite.coverletter.entity.CoverLetterStatus;
 import com.daon.rewrite.coverletter.repository.CoverLetterRepository;
+import com.daon.rewrite.global.exception.BusinessException;
+import com.daon.rewrite.global.exception.ErrorCode;
 import com.daon.rewrite.global.util.IdGenerator;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -16,6 +18,9 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.List;
+
+import org.springframework.data.domain.Page;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.BDDMockito.given;
@@ -66,5 +71,54 @@ class CoverLetterServiceTest {
             assertThat(saved.getCreatedAt()).isEqualTo(now);
             assertThat(saved.getUpdatedAt()).isEqualTo(now);
         });
+    }
+
+    @Test
+    void findMyCoverLettersReturnsCurrentUserPage() {
+        Instant base = Instant.parse("2026-06-20T01:00:00Z");
+        given(currentUserProvider.currentUser()).willReturn(new CurrentUser("user_1", "테스트", null));
+        repository.saveAll(List.of(
+                draft("cl_old", "user_1", "Old title", base),
+                draft("cl_new", "user_1", "New title", base.plusSeconds(60)),
+                draft("cl_other", "user_2", "Other title", base.plusSeconds(120))
+        ));
+
+        Page<CoverLetter> page = service.findMyCoverLetters(1, 9, null);
+
+        assertThat(page.getTotalElements()).isEqualTo(2);
+        assertThat(page.getContent()).extracting(CoverLetter::getId)
+                .containsExactly("cl_new", "cl_old");
+    }
+
+    @Test
+    void findMyCoverLettersFiltersStatus() {
+        Instant now = Instant.parse("2026-06-20T01:00:00Z");
+        given(currentUserProvider.currentUser()).willReturn(new CurrentUser("user_1", "테스트", null));
+        repository.save(draft("cl_draft", "user_1", "Draft title", now));
+
+        Page<CoverLetter> page = service.findMyCoverLetters(1, 9, CoverLetterStatus.DRAFT);
+
+        assertThat(page.getTotalElements()).isEqualTo(1);
+        assertThat(page.getContent()).extracting(CoverLetter::getId)
+                .containsExactly("cl_draft");
+    }
+
+    @Test
+    void findMyCoverLettersRejectsInvalidPageAndSize() {
+        assertThatThrownBy(() -> service.findMyCoverLetters(0, 9, null))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.VALIDATION_ERROR);
+
+        assertThatThrownBy(() -> service.findMyCoverLetters(1, 10, null))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.VALIDATION_ERROR);
+    }
+
+    private CoverLetter draft(String id, String ownerId, String title, Instant now) {
+        CoverLetter coverLetter = CoverLetter.draft(id, ownerId, now);
+        coverLetter.fillBasicInfo(title, "Rewrite Corp", "백엔드 개발자", null, now);
+        return coverLetter;
     }
 }
