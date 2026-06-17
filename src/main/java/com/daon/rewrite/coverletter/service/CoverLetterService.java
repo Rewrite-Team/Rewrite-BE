@@ -65,6 +65,17 @@ public class CoverLetterService {
         );
     }
 
+    @Transactional
+    public CoverLetter deleteMyCoverLetter(String coverLetterId) {
+        CurrentUser currentUser = currentUserProvider.currentUser();
+        CoverLetter coverLetter = coverLetterRepository
+                .findByIdAndOwnerIdAndDeletedAtIsNull(coverLetterId, currentUser.id())
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
+
+        coverLetter.markDeleted(Instant.now(clock));
+        return coverLetter;
+    }
+
     private void validateListQuery(int page, int size) {
         if (page < 1 || size < 1 || size > MAX_LIST_SIZE) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR);

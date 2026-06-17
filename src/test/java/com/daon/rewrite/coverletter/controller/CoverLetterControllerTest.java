@@ -18,6 +18,7 @@ import java.time.Instant;
 import java.util.List;
 
 import static org.mockito.BDDMockito.given;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -115,5 +116,31 @@ class CoverLetterControllerTest {
         mockMvc.perform(get("/cover-letters").param("status", "UNKNOWN"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    void deleteMyCoverLetterReturnsDeletedAt() throws Exception {
+        CoverLetter deleted = CoverLetter.draft(
+                "cl_delete",
+                "user_1",
+                Instant.parse("2026-06-20T05:00:00Z")
+        );
+        deleted.markDeleted(Instant.parse("2026-06-20T06:00:00Z"));
+        given(coverLetterService.deleteMyCoverLetter("cl_delete")).willReturn(deleted);
+
+        mockMvc.perform(delete("/cover-letters/{coverLetterId}", "cl_delete"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.deletedAt").value("2026-06-20T15:00:00"));
+    }
+
+    @Test
+    void deleteMyCoverLetterReturnsNotFound() throws Exception {
+        given(coverLetterService.deleteMyCoverLetter("cl_missing"))
+                .willThrow(new BusinessException(ErrorCode.NOT_FOUND));
+
+        mockMvc.perform(delete("/cover-letters/{coverLetterId}", "cl_missing"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("NOT_FOUND"));
     }
 }

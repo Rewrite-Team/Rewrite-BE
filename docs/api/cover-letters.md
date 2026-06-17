@@ -451,6 +451,13 @@ Already Reviewed Response:
 DELETE /cover-letters/{coverLetterId}
 ```
 
+Validation:
+
+```text
+현재 사용자 소유이고 아직 삭제되지 않은 자기소개서만 삭제할 수 있다.
+존재하지 않는 자기소개서, 다른 사용자 소유 자기소개서, 이미 삭제된 자기소개서는 모두 NOT_FOUND를 반환한다.
+```
+
 Response:
 
 ```json
@@ -459,3 +466,17 @@ Response:
   "deletedAt": "2026-06-20T15:00:00"
 }
 ```
+
+Not Found Response:
+
+```json
+{
+  "error": {
+    "code": "NOT_FOUND",
+    "message": "리소스를 찾을 수 없습니다.",
+    "details": []
+  }
+}
+```
+
+현재 구현에서는 `llm_jobs` persistence가 아직 없으므로 진행 중 LLM Job 취소 연결은 Job skeleton 구현 이후 반영한다.

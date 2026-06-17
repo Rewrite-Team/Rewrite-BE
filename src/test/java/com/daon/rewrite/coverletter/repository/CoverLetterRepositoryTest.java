@@ -10,6 +10,7 @@ import org.springframework.test.context.ActiveProfiles;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import org.springframework.data.domain.Page;
@@ -112,6 +113,25 @@ class CoverLetterRepositoryTest {
         assertThat(page.getTotalPages()).isEqualTo(2);
         assertThat(page.getContent()).extracting(CoverLetter::getId)
                 .containsExactly("cl_1");
+    }
+
+    @Test
+    void findActiveByIdAndOwnerReturnsOnlyCurrentOwnerUndeletedCoverLetter() {
+        CoverLetter active = draft("cl_active", "user_1", "Active title", "2026-06-20T01:00:00Z");
+        CoverLetter deleted = draft("cl_deleted", "user_1", "Deleted title", "2026-06-20T02:00:00Z");
+        deleted.markDeleted(Instant.parse("2026-06-20T03:00:00Z"));
+        CoverLetter otherOwner = draft("cl_other", "user_2", "Other title", "2026-06-20T04:00:00Z");
+        repository.saveAll(List.of(active, deleted, otherOwner));
+        entityManager.flush();
+        entityManager.clear();
+
+        Optional<CoverLetter> found = repository.findByIdAndOwnerIdAndDeletedAtIsNull("cl_active", "user_1");
+
+        assertThat(found).hasValueSatisfying(coverLetter ->
+                assertThat(coverLetter.getId()).isEqualTo("cl_active")
+        );
+        assertThat(repository.findByIdAndOwnerIdAndDeletedAtIsNull("cl_deleted", "user_1")).isEmpty();
+        assertThat(repository.findByIdAndOwnerIdAndDeletedAtIsNull("cl_other", "user_1")).isEmpty();
     }
 
     private CoverLetter draft(String id, String ownerId, String title, String createdAt) {
