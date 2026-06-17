@@ -71,4 +71,21 @@ public class CoverLetter {
     public static CoverLetter draft(String id, String ownerId, Instant now) {
         return new CoverLetter(id, ownerId, CoverLetterStatus.DRAFT, now);
     }
+
+    public void fillBasicInfo(String title, String companyName, String positionTitle, String jobPostingUrl, Instant now) {
+        this.title = title;
+        this.companyName = companyName;
+        this.positionTitle = positionTitle;
+        this.jobPostingUrl = jobPostingUrl;
+        this.updatedAt = now;
+    }
+
+    public void markDeleted(Instant now) {
+        this.deletedAt = now;
+        this.updatedAt = now;
+    }
+
+    public void setLatestReviewVersionId(String latestReviewVersionId) {
+        this.latestReviewVersionId = latestReviewVersionId;
+    }
 }

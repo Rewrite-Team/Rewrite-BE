@@ -55,7 +55,7 @@ API 설계 결정과 트레이드오프는 `../decisions/README.md`를 함께 �
 | API-004 | POST | `/auth/refresh` | Planned | REQ-008 | refresh token rotation |
 | API-005 | GET | `/user/me` | Planned | REQ-008 | 내 정보 조회 |
 | API-006 | POST | `/auth/logout` | Planned | REQ-008 | 로그아웃 |
-| API-007 | GET | `/cover-letters` | Planned | REQ-003 | 내 자기소개서 목록 |
+| API-007 | GET | `/cover-letters` | Implemented | REQ-003 | 내 자기소개서 목록 |
 | API-008 | POST | `/cover-letters` | Implemented | REQ-003 | 자기소개서 초안 생성 |
 | API-009 | PUT | `/cover-letters/{coverLetterId}/basic-info` | Planned | REQ-004 | 등록 step1 저장 |
 | API-010 | PUT | `/cover-letters/{coverLetterId}/preferences` | Planned | REQ-004 | 등록 step2 저장 |
