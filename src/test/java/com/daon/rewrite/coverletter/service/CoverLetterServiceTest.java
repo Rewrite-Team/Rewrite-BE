@@ -116,6 +116,52 @@ class CoverLetterServiceTest {
                 .isEqualTo(ErrorCode.VALIDATION_ERROR);
     }
 
+    @Test
+    void deleteMyCoverLetterMarksCurrentUserOwnedCoverLetterDeleted() {
+        Instant createdAt = Instant.parse("2026-06-20T01:00:00Z");
+        Instant deletedAt = Instant.parse("2026-06-20T05:00:00Z");
+        given(currentUserProvider.currentUser()).willReturn(new CurrentUser("user_1", "테스트", null));
+        given(clock.instant()).willReturn(deletedAt);
+        repository.save(draft("cl_delete", "user_1", "Delete title", createdAt));
+
+        CoverLetter result = service.deleteMyCoverLetter("cl_delete");
+
+        assertThat(result.getDeletedAt()).isEqualTo(deletedAt);
+        assertThat(result.getUpdatedAt()).isEqualTo(deletedAt);
+        assertThat(repository.findById("cl_delete")).hasValueSatisfying(saved -> {
+            assertThat(saved.getDeletedAt()).isEqualTo(deletedAt);
+            assertThat(saved.getUpdatedAt()).isEqualTo(deletedAt);
+        });
+        assertThat(service.findMyCoverLetters(1, 9, null).getContent())
+                .extracting(CoverLetter::getId)
+                .doesNotContain("cl_delete");
+    }
+
+    @Test
+    void deleteMyCoverLetterThrowsNotFoundWhenCoverLetterIsMissingOtherOwnerOrAlreadyDeleted() {
+        Instant now = Instant.parse("2026-06-20T01:00:00Z");
+        CoverLetter deleted = draft("cl_deleted", "user_1", "Deleted title", now);
+        deleted.markDeleted(now.plusSeconds(60));
+        repository.saveAll(List.of(
+                draft("cl_other", "user_2", "Other title", now),
+                deleted
+        ));
+        given(currentUserProvider.currentUser()).willReturn(new CurrentUser("user_1", "테스트", null));
+
+        assertThatThrownBy(() -> service.deleteMyCoverLetter("cl_missing"))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.NOT_FOUND);
+        assertThatThrownBy(() -> service.deleteMyCoverLetter("cl_other"))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.NOT_FOUND);
+        assertThatThrownBy(() -> service.deleteMyCoverLetter("cl_deleted"))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.NOT_FOUND);
+    }
+
     private CoverLetter draft(String id, String ownerId, String title, Instant now) {
         CoverLetter coverLetter = CoverLetter.draft(id, ownerId, now);
         coverLetter.fillBasicInfo(title, "Rewrite Corp", "백엔드 개발자", null, now);

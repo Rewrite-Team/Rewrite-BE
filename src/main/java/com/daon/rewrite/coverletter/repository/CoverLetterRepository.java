@@ -6,6 +6,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.Optional;
+
 public interface CoverLetterRepository extends JpaRepository<CoverLetter, String> {
 
     Page<CoverLetter> findByOwnerIdAndDeletedAtIsNull(String ownerId, Pageable pageable);
@@ -15,4 +17,6 @@ public interface CoverLetterRepository extends JpaRepository<CoverLetter, String
             CoverLetterStatus status,
             Pageable pageable
     );
+
+    Optional<CoverLetter> findByIdAndOwnerIdAndDeletedAtIsNull(String id, String ownerId);
 }
