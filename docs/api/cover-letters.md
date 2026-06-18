@@ -154,7 +154,8 @@ Conflict Response:
 {
   "error": {
     "code": "COVER_LETTER_NOT_DRAFT",
-    "message": "제출된 자기소개서의 원본 정보는 수정할 수 없습니다."
+    "message": "제출된 자기소개서의 원본 정보는 수정할 수 없습니다.",
+    "details": []
   }
 }
 ```

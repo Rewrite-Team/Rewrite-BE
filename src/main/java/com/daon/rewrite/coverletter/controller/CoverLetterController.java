@@ -3,6 +3,8 @@ package com.daon.rewrite.coverletter.controller;
 import com.daon.rewrite.coverletter.dto.CoverLetterListResponse;
 import com.daon.rewrite.coverletter.dto.CreateCoverLetterResponse;
 import com.daon.rewrite.coverletter.dto.DeleteCoverLetterResponse;
+import com.daon.rewrite.coverletter.dto.SaveBasicInfoRequest;
+import com.daon.rewrite.coverletter.dto.SaveBasicInfoResponse;
 import com.daon.rewrite.coverletter.entity.CoverLetter;
 import com.daon.rewrite.coverletter.entity.CoverLetterStatus;
 import com.daon.rewrite.coverletter.service.CoverLetterService;
@@ -13,6 +15,8 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
@@ -42,5 +46,20 @@ public class CoverLetterController {
     @DeleteMapping("/cover-letters/{coverLetterId}")
     public DeleteCoverLetterResponse deleteMyCoverLetter(@PathVariable String coverLetterId) {
         return DeleteCoverLetterResponse.from(coverLetterService.deleteMyCoverLetter(coverLetterId));
+    }
+
+    @PutMapping("/cover-letters/{coverLetterId}/basic-info")
+    public SaveBasicInfoResponse saveBasicInfo(
+            @PathVariable String coverLetterId,
+            @RequestBody SaveBasicInfoRequest request
+    ) {
+        CoverLetter result = coverLetterService.saveBasicInfo(
+                coverLetterId,
+                request.title(),
+                request.companyName(),
+                request.positionTitle(),
+                request.jobPostingUrl()
+        );
+        return SaveBasicInfoResponse.from(result);
     }
 }

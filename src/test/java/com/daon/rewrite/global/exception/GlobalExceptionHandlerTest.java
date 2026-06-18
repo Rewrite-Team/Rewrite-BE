@@ -13,6 +13,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -72,6 +74,23 @@ class GlobalExceptionHandlerTest {
                 .andExpect(jsonPath("$.error.details.length()").value(0));
     }
 
+    @Test
+    void businessExceptionReturnsDetailsWhenPresent() throws Exception {
+        mockMvc.perform(get("/test/business-error-with-details"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.error.details[0].field").value("title"))
+                .andExpect(jsonPath("$.error.details[0].reason").value("제목은 필수입니다."));
+    }
+
+    @Test
+    void coverLetterNotDraftReturnsConflict() throws Exception {
+        mockMvc.perform(get("/test/cover-letter-not-draft"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("COVER_LETTER_NOT_DRAFT"))
+                .andExpect(jsonPath("$.error.message").value("제출된 자기소개서의 원본 정보는 수정할 수 없습니다."));
+    }
+
     @RestController
     static class TestController {
 
@@ -91,6 +110,22 @@ class GlobalExceptionHandlerTest {
 
         @GetMapping("/test/type-mismatch")
         void typeMismatch(TestStatus status) {
+        }
+
+        @GetMapping("/test/business-error-with-details")
+        void businessErrorWithDetails() {
+            throw new BusinessException(
+                    ErrorCode.VALIDATION_ERROR,
+                    List.of(new com.daon.rewrite.global.response.ErrorResponse.ErrorDetail(
+                            "title",
+                            "제목은 필수입니다."
+                    ))
+            );
+        }
+
+        @GetMapping("/test/cover-letter-not-draft")
+        void coverLetterNotDraft() {
+            throw new BusinessException(ErrorCode.COVER_LETTER_NOT_DRAFT);
         }
     }
 
