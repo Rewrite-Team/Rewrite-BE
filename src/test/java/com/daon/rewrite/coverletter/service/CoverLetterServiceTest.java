@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.time.Clock;
@@ -162,9 +163,135 @@ class CoverLetterServiceTest {
                 .isEqualTo(ErrorCode.NOT_FOUND);
     }
 
+    @Test
+    void saveBasicInfoStoresTrimmedValuesAndUpdatesTimestamp() {
+        Instant createdAt = Instant.parse("2026-06-20T01:00:00Z");
+        Instant updatedAt = Instant.parse("2026-06-20T05:00:00Z");
+        given(currentUserProvider.currentUser()).willReturn(new CurrentUser("user_1", "테스트", null));
+        given(clock.instant()).willReturn(updatedAt);
+        repository.save(CoverLetter.draft("cl_basic", "user_1", createdAt));
+
+        CoverLetter result = service.saveBasicInfo(
+                "cl_basic",
+                " 제목 ",
+                " 회사 ",
+                " 직무 ",
+                " https://example.com/jobs/1 "
+        );
+
+        assertThat(result.getTitle()).isEqualTo("제목");
+        assertThat(result.getCompanyName()).isEqualTo("회사");
+        assertThat(result.getPositionTitle()).isEqualTo("직무");
+        assertThat(result.getJobPostingUrl()).isEqualTo("https://example.com/jobs/1");
+        assertThat(result.getUpdatedAt()).isEqualTo(updatedAt);
+        assertThat(repository.findById("cl_basic")).hasValueSatisfying(saved -> {
+            assertThat(saved.getTitle()).isEqualTo("제목");
+            assertThat(saved.getCompanyName()).isEqualTo("회사");
+            assertThat(saved.getPositionTitle()).isEqualTo("직무");
+            assertThat(saved.getJobPostingUrl()).isEqualTo("https://example.com/jobs/1");
+            assertThat(saved.getUpdatedAt()).isEqualTo(updatedAt);
+        });
+    }
+
+    @Test
+    void saveBasicInfoStoresBlankJobPostingUrlAsNull() {
+        Instant now = Instant.parse("2026-06-20T01:00:00Z");
+        given(currentUserProvider.currentUser()).willReturn(new CurrentUser("user_1", "테스트", null));
+        given(clock.instant()).willReturn(now.plusSeconds(60));
+        repository.save(CoverLetter.draft("cl_basic", "user_1", now));
+
+        CoverLetter result = service.saveBasicInfo(
+                "cl_basic",
+                "제목",
+                "회사",
+                "직무",
+                " "
+        );
+
+        assertThat(result.getJobPostingUrl()).isNull();
+    }
+
+    @Test
+    void saveBasicInfoThrowsNotFoundWhenCoverLetterIsMissingOtherOwnerOrAlreadyDeleted() {
+        Instant now = Instant.parse("2026-06-20T01:00:00Z");
+        CoverLetter deleted = CoverLetter.draft("cl_deleted", "user_1", now);
+        deleted.markDeleted(now.plusSeconds(60));
+        repository.saveAll(List.of(
+                CoverLetter.draft("cl_other", "user_2", now),
+                deleted
+        ));
+        given(currentUserProvider.currentUser()).willReturn(new CurrentUser("user_1", "테스트", null));
+
+        assertThatThrownBy(() -> service.saveBasicInfo("cl_missing", "제목", "회사", "직무", null))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.NOT_FOUND);
+        assertThatThrownBy(() -> service.saveBasicInfo("cl_other", "제목", "회사", "직무", null))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.NOT_FOUND);
+        assertThatThrownBy(() -> service.saveBasicInfo("cl_deleted", "제목", "회사", "직무", null))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.NOT_FOUND);
+    }
+
+    @Test
+    void saveBasicInfoThrowsCoverLetterNotDraftWhenStatusIsNotDraft() {
+        Instant now = Instant.parse("2026-06-20T01:00:00Z");
+        given(currentUserProvider.currentUser()).willReturn(new CurrentUser("user_1", "테스트", null));
+        repository.saveAll(List.of(
+                coverLetterWithStatus("cl_reviewing", CoverLetterStatus.REVIEWING, now),
+                coverLetterWithStatus("cl_reviewed", CoverLetterStatus.REVIEWED, now),
+                coverLetterWithStatus("cl_failed", CoverLetterStatus.REVIEW_FAILED, now)
+        ));
+
+        assertThatThrownBy(() -> service.saveBasicInfo("cl_reviewing", "제목", "회사", "직무", null))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.COVER_LETTER_NOT_DRAFT);
+        assertThatThrownBy(() -> service.saveBasicInfo("cl_reviewed", "제목", "회사", "직무", null))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.COVER_LETTER_NOT_DRAFT);
+        assertThatThrownBy(() -> service.saveBasicInfo("cl_failed", "제목", "회사", "직무", null))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.COVER_LETTER_NOT_DRAFT);
+    }
+
+    @Test
+    void saveBasicInfoThrowsValidationErrorWithDetails() {
+        Instant now = Instant.parse("2026-06-20T01:00:00Z");
+        given(currentUserProvider.currentUser()).willReturn(new CurrentUser("user_1", "테스트", null));
+        repository.save(CoverLetter.draft("cl_basic", "user_1", now));
+
+        assertThatThrownBy(() -> service.saveBasicInfo(
+                "cl_basic",
+                " ",
+                "회사",
+                "직무",
+                "not-a-url"
+        ))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(error -> {
+                    BusinessException businessException = (BusinessException) error;
+                    assertThat(businessException.getErrorCode()).isEqualTo(ErrorCode.VALIDATION_ERROR);
+                    assertThat(businessException.getDetails())
+                            .extracting("field")
+                            .containsExactly("title", "jobPostingUrl");
+                });
+    }
+
     private CoverLetter draft(String id, String ownerId, String title, Instant now) {
         CoverLetter coverLetter = CoverLetter.draft(id, ownerId, now);
         coverLetter.fillBasicInfo(title, "Rewrite Corp", "백엔드 개발자", null, now);
+        return coverLetter;
+    }
+
+    private CoverLetter coverLetterWithStatus(String id, CoverLetterStatus status, Instant now) {
+        CoverLetter coverLetter = CoverLetter.draft(id, "user_1", now);
+        ReflectionTestUtils.setField(coverLetter, "status", status);
         return coverLetter;
     }
 }

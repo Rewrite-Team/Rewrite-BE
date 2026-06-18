@@ -19,7 +19,8 @@ public class GlobalExceptionHandler {
                 .status(errorCode.getStatus())
                 .body(ErrorResponse.of(
                         errorCode.getCode(),
-                        e.getMessage()
+                        e.getMessage(),
+                        e.getDetails()
                 ));
     }
 

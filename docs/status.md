@@ -21,7 +21,7 @@ API 계약과 API별 상태는 `docs/api/README.md`와 `docs/api/` 하위 도메
 | REQ-001 | 공통 예외 응답 기반 | Verified | High | 공통 에러 응답 | [#2](https://github.com/Rewrite-Team/Rewrite-BE/issues/2), [PR #3](https://github.com/Rewrite-Team/Rewrite-BE/pull/3) | `GlobalExceptionHandlerTest`, `./gradlew test` | `BusinessException`, `ErrorCode`, `GlobalExceptionHandler`, `ErrorResponse` 구현됨 |
 | REQ-002 | 개발용 현재 사용자 Provider | Verified | High | 인증 필요 API 공통 | [#4](https://github.com/Rewrite-Team/Rewrite-BE/issues/4), [PR #6](https://github.com/Rewrite-Team/Rewrite-BE/pull/6) | `DevCurrentUserProviderTest`, `./gradlew test` | `CurrentUserProvider`, `DevCurrentUserProvider` 구현됨 |
 | REQ-003 | 자기소개서 기본 CRUD | In Progress | High | API-007, API-008, API-012, API-013 | [#5](https://github.com/Rewrite-Team/Rewrite-BE/issues/5), [#18](https://github.com/Rewrite-Team/Rewrite-BE/issues/18), [#28](https://github.com/Rewrite-Team/Rewrite-BE/issues/28), [#30](https://github.com/Rewrite-Team/Rewrite-BE/issues/30), [PR #15](https://github.com/Rewrite-Team/Rewrite-BE/pull/15) | `CoverLetterServiceTest`, `CoverLetterControllerTest`, `CoverLetterRepositoryTest`, `./gradlew test`, `./gradlew check` | API-007 현재 사용자 자기소개서 목록 조회, API-008 자기소개서 초안 생성, API-013 soft delete 계약 구현됨. 진행 중 Job cancel은 `llm_jobs` 구현 이후 연결 |
-| REQ-004 | 자기소개서 등록 step 저장 | Planned | High | API-009, API-010, API-011 | - | - | DB/JPA 전환 이후 진행 권장 |
+| REQ-004 | 자기소개서 등록 step 저장 | In Progress | High | API-009, API-010, API-011 | [#32](https://github.com/Rewrite-Team/Rewrite-BE/issues/32) | `CoverLetterServiceTest`, `CoverLetterControllerTest`, `GlobalExceptionHandlerTest`, `./gradlew test`, `./gradlew check` | API-009 등록 step1 기본 정보 저장 계약 구현됨. API-010/API-011은 후속 slice 후보 기준으로 분리 진행 |
 | REQ-005 | 자기소개서 제출과 LLM Job 생성 | Planned | High | API-014, API-015, API-016 | - | - | LLM provider 호출 전 skeleton 우선 |
 | REQ-006 | 첨삭 버전 조회와 최종 작성본 저장 | Planned | High | API-017, API-018, API-019, API-024 | - | - | 제출/Job skeleton 이후 진행 권장 |
 | REQ-007 | DB/JPA 전환 | Implemented | High | API-008 내부 persistence, persistence 내부 변경 | [#22](https://github.com/Rewrite-Team/Rewrite-BE/issues/22), [#24](https://github.com/Rewrite-Team/Rewrite-BE/issues/24), [#25](https://github.com/Rewrite-Team/Rewrite-BE/issues/25), [PR #26](https://github.com/Rewrite-Team/Rewrite-BE/pull/26) | `CoverLetterRepositoryTest`, `CoverLetterServiceTest`, `CoverLetterControllerTest`, `./gradlew test`, `./gradlew check` | API-008 공개 계약은 유지하고 `cover_letters` persistence를 DB/JPA로 전환. H2 file 로컬 DB, H2 in-memory 테스트 DB 사용. Flyway는 별도 이슈로 분리 |
@@ -59,7 +59,6 @@ API 계약과 API별 상태는 `docs/api/README.md`와 `docs/api/` 하위 도메
 | Candidate | Related REQ | Related APIs | Suggested Scope |
 |---|---|---|---|
 | 자기소개서 상세 조회 | REQ-003 | API-012 | DB/JPA repository 기반 owner 검증, deletedAt 제외, 질문/최신 Job 요약 포함 skeleton, service/web/repository test |
-| 등록 step1 저장 | REQ-004 | API-009 | basic info replace, trim, URL validation, DRAFT 상태 검증, service/web test |
 | 등록 step2 저장 | REQ-004 | API-010 | preferences replace, trim, empty validation, DRAFT 상태 검증, service/web test |
 | 등록 step3 저장 | REQ-004 | API-011 | questions replace, order 재부여, 글자 수 검증, service/web test |
 

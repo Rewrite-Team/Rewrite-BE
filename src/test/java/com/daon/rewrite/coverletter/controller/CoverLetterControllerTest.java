@@ -11,6 +11,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -21,6 +22,7 @@ import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -142,5 +144,131 @@ class CoverLetterControllerTest {
         mockMvc.perform(delete("/cover-letters/{coverLetterId}", "cl_missing"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error.code").value("NOT_FOUND"));
+    }
+
+    @Test
+    void saveBasicInfoReturnsUpdatedBasicInfo() throws Exception {
+        CoverLetter updated = CoverLetter.draft(
+                "cl_basic",
+                "user_1",
+                Instant.parse("2026-06-20T05:00:00Z")
+        );
+        updated.fillBasicInfo(
+                "2026 상반기 백엔드 개발자 자기소개서",
+                "Rewrite Corp",
+                "백엔드 개발자",
+                "https://example.com/jobs/1",
+                Instant.parse("2026-06-20T05:05:00Z")
+        );
+        given(coverLetterService.saveBasicInfo(
+                "cl_basic",
+                " 2026 상반기 백엔드 개발자 자기소개서 ",
+                " Rewrite Corp ",
+                " 백엔드 개발자 ",
+                " https://example.com/jobs/1 "
+        )).willReturn(updated);
+
+        mockMvc.perform(put("/cover-letters/{coverLetterId}/basic-info", "cl_basic")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": " 2026 상반기 백엔드 개발자 자기소개서 ",
+                                  "companyName": " Rewrite Corp ",
+                                  "positionTitle": " 백엔드 개발자 ",
+                                  "jobPostingUrl": " https://example.com/jobs/1 "
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("cl_basic"))
+                .andExpect(jsonPath("$.title").value("2026 상반기 백엔드 개발자 자기소개서"))
+                .andExpect(jsonPath("$.companyName").value("Rewrite Corp"))
+                .andExpect(jsonPath("$.positionTitle").value("백엔드 개발자"))
+                .andExpect(jsonPath("$.jobPostingUrl").value("https://example.com/jobs/1"))
+                .andExpect(jsonPath("$.status").value("DRAFT"))
+                .andExpect(jsonPath("$.updatedAt").value("2026-06-20T14:05:00"));
+    }
+
+    @Test
+    void saveBasicInfoReturnsValidationDetails() throws Exception {
+        given(coverLetterService.saveBasicInfo(
+                "cl_basic",
+                " ",
+                "Rewrite Corp",
+                "백엔드 개발자",
+                "not-a-url"
+        )).willThrow(new BusinessException(
+                ErrorCode.VALIDATION_ERROR,
+                List.of(
+                        new com.daon.rewrite.global.response.ErrorResponse.ErrorDetail(
+                                "title",
+                                "자기소개서 제목은 필수입니다."
+                        ),
+                        new com.daon.rewrite.global.response.ErrorResponse.ErrorDetail(
+                                "jobPostingUrl",
+                                "공고 링크 형식이 올바르지 않습니다."
+                        )
+                )
+        ));
+
+        mockMvc.perform(put("/cover-letters/{coverLetterId}/basic-info", "cl_basic")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": " ",
+                                  "companyName": "Rewrite Corp",
+                                  "positionTitle": "백엔드 개발자",
+                                  "jobPostingUrl": "not-a-url"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.error.details[0].field").value("title"))
+                .andExpect(jsonPath("$.error.details[1].field").value("jobPostingUrl"));
+    }
+
+    @Test
+    void saveBasicInfoReturnsNotFound() throws Exception {
+        given(coverLetterService.saveBasicInfo(
+                "cl_missing",
+                "제목",
+                "회사",
+                "직무",
+                null
+        )).willThrow(new BusinessException(ErrorCode.NOT_FOUND));
+
+        mockMvc.perform(put("/cover-letters/{coverLetterId}/basic-info", "cl_missing")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "제목",
+                                  "companyName": "회사",
+                                  "positionTitle": "직무"
+                                }
+                                """))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("NOT_FOUND"));
+    }
+
+    @Test
+    void saveBasicInfoReturnsCoverLetterNotDraft() throws Exception {
+        given(coverLetterService.saveBasicInfo(
+                "cl_reviewing",
+                "제목",
+                "회사",
+                "직무",
+                null
+        )).willThrow(new BusinessException(ErrorCode.COVER_LETTER_NOT_DRAFT));
+
+        mockMvc.perform(put("/cover-letters/{coverLetterId}/basic-info", "cl_reviewing")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "제목",
+                                  "companyName": "회사",
+                                  "positionTitle": "직무"
+                                }
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("COVER_LETTER_NOT_DRAFT"));
     }
 }
