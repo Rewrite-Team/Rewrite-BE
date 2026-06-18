@@ -199,6 +199,18 @@ preferences: 필수, trim 후 Unicode code point 기준 1~3000자
 
 서버는 `preferences`의 앞뒤 공백을 제거한 뒤 길이를 검증하고, 공백이 제거된 값을 저장한다. trim 후 빈 문자열이면 `VALIDATION_ERROR`를 반환한다.
 
+Conflict Response:
+
+```json
+{
+  "error": {
+    "code": "COVER_LETTER_NOT_DRAFT",
+    "message": "제출된 자기소개서의 원본 정보는 수정할 수 없습니다.",
+    "details": []
+  }
+}
+```
+
 Response:
 
 ```json
