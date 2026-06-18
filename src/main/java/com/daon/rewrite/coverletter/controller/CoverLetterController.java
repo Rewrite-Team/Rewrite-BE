@@ -5,6 +5,8 @@ import com.daon.rewrite.coverletter.dto.CreateCoverLetterResponse;
 import com.daon.rewrite.coverletter.dto.DeleteCoverLetterResponse;
 import com.daon.rewrite.coverletter.dto.SaveBasicInfoRequest;
 import com.daon.rewrite.coverletter.dto.SaveBasicInfoResponse;
+import com.daon.rewrite.coverletter.dto.SavePreferencesRequest;
+import com.daon.rewrite.coverletter.dto.SavePreferencesResponse;
 import com.daon.rewrite.coverletter.entity.CoverLetter;
 import com.daon.rewrite.coverletter.entity.CoverLetterStatus;
 import com.daon.rewrite.coverletter.service.CoverLetterService;
@@ -61,5 +63,17 @@ public class CoverLetterController {
                 request.jobPostingUrl()
         );
         return SaveBasicInfoResponse.from(result);
+    }
+
+    @PutMapping("/cover-letters/{coverLetterId}/preferences")
+    public SavePreferencesResponse savePreferences(
+            @PathVariable String coverLetterId,
+            @RequestBody SavePreferencesRequest request
+    ) {
+        CoverLetter result = coverLetterService.savePreferences(
+                coverLetterId,
+                request.preferences()
+        );
+        return SavePreferencesResponse.from(result);
     }
 }

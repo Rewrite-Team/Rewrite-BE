@@ -34,6 +34,7 @@ public class CoverLetterService {
     private static final int MAX_COMPANY_NAME_LENGTH = 30;
     private static final int MAX_POSITION_TITLE_LENGTH = 30;
     private static final int MAX_JOB_POSTING_URL_LENGTH = 500;
+    private static final int MAX_PREFERENCES_LENGTH = 3000;
 
     private final CurrentUserProvider currentUserProvider;
     private final CoverLetterRepository coverLetterRepository;
@@ -119,6 +120,23 @@ public class CoverLetterService {
         return coverLetter;
     }
 
+    @Transactional
+    public CoverLetter savePreferences(String coverLetterId, String preferences) {
+        CurrentUser currentUser = currentUserProvider.currentUser();
+        CoverLetter coverLetter = coverLetterRepository
+                .findByIdAndOwnerIdAndDeletedAtIsNull(coverLetterId, currentUser.id())
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
+
+        if (coverLetter.getStatus() != CoverLetterStatus.DRAFT) {
+            throw new BusinessException(ErrorCode.COVER_LETTER_NOT_DRAFT);
+        }
+
+        String normalizedPreferences = validateAndNormalizePreferences(preferences);
+        coverLetter.fillPreferences(normalizedPreferences, Instant.now(clock));
+
+        return coverLetter;
+    }
+
     private void validateListQuery(int page, int size) {
         if (page < 1 || size < 1 || size > MAX_LIST_SIZE) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR);
@@ -187,6 +205,24 @@ public class CoverLetterService {
             details.add(new ErrorResponse.ErrorDetail(field, tooLongMessage));
         }
         return normalized;
+    }
+
+    private String validateAndNormalizePreferences(String preferences) {
+        List<ErrorResponse.ErrorDetail> details = new ArrayList<>();
+        String normalizedPreferences = normalizeRequiredText(
+                "preferences",
+                preferences,
+                MAX_PREFERENCES_LENGTH,
+                "채용 우대사항은 필수입니다.",
+                "채용 우대사항은 최대 3000자까지 입력할 수 있습니다.",
+                details
+        );
+
+        if (!details.isEmpty()) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, details);
+        }
+
+        return normalizedPreferences;
     }
 
     private String normalizeOptionalJobPostingUrl(

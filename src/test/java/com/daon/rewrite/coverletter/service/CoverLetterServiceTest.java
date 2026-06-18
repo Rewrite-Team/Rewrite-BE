@@ -283,6 +283,116 @@ class CoverLetterServiceTest {
                 });
     }
 
+    @Test
+    void savePreferencesStoresTrimmedValueAndUpdatesTimestamp() {
+        Instant createdAt = Instant.parse("2026-06-20T01:00:00Z");
+        Instant updatedAt = Instant.parse("2026-06-20T05:00:00Z");
+        given(currentUserProvider.currentUser()).willReturn(new CurrentUser("user_1", "테스트", null));
+        given(clock.instant()).willReturn(updatedAt);
+        repository.save(CoverLetter.draft("cl_preferences", "user_1", createdAt));
+
+        CoverLetter result = service.savePreferences(
+                "cl_preferences",
+                " Spring Boot 경험, 대용량 트래픽 처리 경험 우대 "
+        );
+
+        assertThat(result.getPreferences()).isEqualTo("Spring Boot 경험, 대용량 트래픽 처리 경험 우대");
+        assertThat(result.getUpdatedAt()).isEqualTo(updatedAt);
+        assertThat(repository.findById("cl_preferences")).hasValueSatisfying(saved -> {
+            assertThat(saved.getPreferences()).isEqualTo("Spring Boot 경험, 대용량 트래픽 처리 경험 우대");
+            assertThat(saved.getUpdatedAt()).isEqualTo(updatedAt);
+        });
+    }
+
+    @Test
+    void savePreferencesThrowsNotFoundWhenCoverLetterIsMissingOtherOwnerOrAlreadyDeleted() {
+        Instant now = Instant.parse("2026-06-20T01:00:00Z");
+        CoverLetter deleted = CoverLetter.draft("cl_deleted", "user_1", now);
+        deleted.markDeleted(now.plusSeconds(60));
+        repository.saveAll(List.of(
+                CoverLetter.draft("cl_other", "user_2", now),
+                deleted
+        ));
+        given(currentUserProvider.currentUser()).willReturn(new CurrentUser("user_1", "테스트", null));
+
+        assertThatThrownBy(() -> service.savePreferences("cl_missing", "Spring Boot 경험"))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.NOT_FOUND);
+        assertThatThrownBy(() -> service.savePreferences("cl_other", "Spring Boot 경험"))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.NOT_FOUND);
+        assertThatThrownBy(() -> service.savePreferences("cl_deleted", "Spring Boot 경험"))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.NOT_FOUND);
+    }
+
+    @Test
+    void savePreferencesThrowsCoverLetterNotDraftWhenStatusIsNotDraft() {
+        Instant now = Instant.parse("2026-06-20T01:00:00Z");
+        given(currentUserProvider.currentUser()).willReturn(new CurrentUser("user_1", "테스트", null));
+        repository.saveAll(List.of(
+                coverLetterWithStatus("cl_reviewing", CoverLetterStatus.REVIEWING, now),
+                coverLetterWithStatus("cl_reviewed", CoverLetterStatus.REVIEWED, now),
+                coverLetterWithStatus("cl_failed", CoverLetterStatus.REVIEW_FAILED, now)
+        ));
+
+        assertThatThrownBy(() -> service.savePreferences("cl_reviewing", "Spring Boot 경험"))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.COVER_LETTER_NOT_DRAFT);
+        assertThatThrownBy(() -> service.savePreferences("cl_reviewed", "Spring Boot 경험"))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.COVER_LETTER_NOT_DRAFT);
+        assertThatThrownBy(() -> service.savePreferences("cl_failed", "Spring Boot 경험"))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.COVER_LETTER_NOT_DRAFT);
+    }
+
+    @Test
+    void savePreferencesThrowsValidationErrorWithDetails() {
+        Instant now = Instant.parse("2026-06-20T01:00:00Z");
+        given(currentUserProvider.currentUser()).willReturn(new CurrentUser("user_1", "테스트", null));
+        repository.save(CoverLetter.draft("cl_preferences", "user_1", now));
+
+        assertThatThrownBy(() -> service.savePreferences(
+                "cl_preferences",
+                " "
+        ))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(error -> {
+                    BusinessException businessException = (BusinessException) error;
+                    assertThat(businessException.getErrorCode()).isEqualTo(ErrorCode.VALIDATION_ERROR);
+                    assertThat(businessException.getDetails())
+                            .extracting("field")
+                            .containsExactly("preferences");
+                });
+    }
+
+    @Test
+    void savePreferencesRejectsTooLongPreferences() {
+        Instant now = Instant.parse("2026-06-20T01:00:00Z");
+        given(currentUserProvider.currentUser()).willReturn(new CurrentUser("user_1", "테스트", null));
+        repository.save(CoverLetter.draft("cl_preferences", "user_1", now));
+
+        assertThatThrownBy(() -> service.savePreferences(
+                "cl_preferences",
+                "가".repeat(3001)
+        ))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(error -> {
+                    BusinessException businessException = (BusinessException) error;
+                    assertThat(businessException.getErrorCode()).isEqualTo(ErrorCode.VALIDATION_ERROR);
+                    assertThat(businessException.getDetails())
+                            .extracting("field")
+                            .containsExactly("preferences");
+                });
+    }
+
     private CoverLetter draft(String id, String ownerId, String title, Instant now) {
         CoverLetter coverLetter = CoverLetter.draft(id, ownerId, now);
         coverLetter.fillBasicInfo(title, "Rewrite Corp", "백엔드 개발자", null, now);

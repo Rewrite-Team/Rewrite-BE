@@ -271,4 +271,95 @@ class CoverLetterControllerTest {
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error.code").value("COVER_LETTER_NOT_DRAFT"));
     }
+
+    @Test
+    void savePreferencesReturnsUpdatedPreferences() throws Exception {
+        CoverLetter updated = CoverLetter.draft(
+                "cl_preferences",
+                "user_1",
+                Instant.parse("2026-06-20T05:00:00Z")
+        );
+        updated.fillPreferences(
+                "Spring Boot 경험, 대용량 트래픽 처리 경험 우대",
+                Instant.parse("2026-06-20T05:08:00Z")
+        );
+        given(coverLetterService.savePreferences(
+                "cl_preferences",
+                " Spring Boot 경험, 대용량 트래픽 처리 경험 우대 "
+        )).willReturn(updated);
+
+        mockMvc.perform(put("/cover-letters/{coverLetterId}/preferences", "cl_preferences")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "preferences": " Spring Boot 경험, 대용량 트래픽 처리 경험 우대 "
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("cl_preferences"))
+                .andExpect(jsonPath("$.preferences").value("Spring Boot 경험, 대용량 트래픽 처리 경험 우대"))
+                .andExpect(jsonPath("$.status").value("DRAFT"))
+                .andExpect(jsonPath("$.updatedAt").value("2026-06-20T14:08:00"));
+    }
+
+    @Test
+    void savePreferencesReturnsValidationDetails() throws Exception {
+        given(coverLetterService.savePreferences(
+                "cl_preferences",
+                " "
+        )).willThrow(new BusinessException(
+                ErrorCode.VALIDATION_ERROR,
+                List.of(new com.daon.rewrite.global.response.ErrorResponse.ErrorDetail(
+                        "preferences",
+                        "채용 우대사항은 필수입니다."
+                ))
+        ));
+
+        mockMvc.perform(put("/cover-letters/{coverLetterId}/preferences", "cl_preferences")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "preferences": " "
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.error.details[0].field").value("preferences"));
+    }
+
+    @Test
+    void savePreferencesReturnsNotFound() throws Exception {
+        given(coverLetterService.savePreferences(
+                "cl_missing",
+                "Spring Boot 경험"
+        )).willThrow(new BusinessException(ErrorCode.NOT_FOUND));
+
+        mockMvc.perform(put("/cover-letters/{coverLetterId}/preferences", "cl_missing")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "preferences": "Spring Boot 경험"
+                                }
+                                """))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("NOT_FOUND"));
+    }
+
+    @Test
+    void savePreferencesReturnsCoverLetterNotDraft() throws Exception {
+        given(coverLetterService.savePreferences(
+                "cl_reviewing",
+                "Spring Boot 경험"
+        )).willThrow(new BusinessException(ErrorCode.COVER_LETTER_NOT_DRAFT));
+
+        mockMvc.perform(put("/cover-letters/{coverLetterId}/preferences", "cl_reviewing")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "preferences": "Spring Boot 경험"
+                                }
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("COVER_LETTER_NOT_DRAFT"));
+    }
 }

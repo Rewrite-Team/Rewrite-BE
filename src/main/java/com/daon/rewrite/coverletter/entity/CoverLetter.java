@@ -80,6 +80,11 @@ public class CoverLetter {
         this.updatedAt = now;
     }
 
+    public void fillPreferences(String preferences, Instant now) {
+        this.preferences = preferences;
+        this.updatedAt = now;
+    }
+
     public void markDeleted(Instant now) {
         this.deletedAt = now;
         this.updatedAt = now;
