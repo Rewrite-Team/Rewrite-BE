@@ -85,6 +85,10 @@ public class CoverLetter {
         this.updatedAt = now;
     }
 
+    public void touch(Instant now) {
+        this.updatedAt = now;
+    }
+
     public void markDeleted(Instant now) {
         this.deletedAt = now;
         this.updatedAt = now;

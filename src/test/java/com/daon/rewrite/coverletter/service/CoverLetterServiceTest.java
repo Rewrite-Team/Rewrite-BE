@@ -3,8 +3,10 @@ package com.daon.rewrite.coverletter.service;
 import com.daon.rewrite.auth.CurrentUser;
 import com.daon.rewrite.auth.CurrentUserProvider;
 import com.daon.rewrite.coverletter.entity.CoverLetter;
+import com.daon.rewrite.coverletter.entity.CoverLetterQuestion;
 import com.daon.rewrite.coverletter.entity.CoverLetterStatus;
 import com.daon.rewrite.coverletter.repository.CoverLetterRepository;
+import com.daon.rewrite.coverletter.repository.CoverLetterQuestionRepository;
 import com.daon.rewrite.global.exception.BusinessException;
 import com.daon.rewrite.global.exception.ErrorCode;
 import com.daon.rewrite.global.util.IdGenerator;
@@ -36,6 +38,9 @@ class CoverLetterServiceTest {
     @Autowired
     private CoverLetterRepository repository;
 
+    @Autowired
+    private CoverLetterQuestionRepository questionRepository;
+
     @MockitoBean
     private CurrentUserProvider currentUserProvider;
 
@@ -47,6 +52,7 @@ class CoverLetterServiceTest {
 
     @AfterEach
     void cleanUp() {
+        questionRepository.deleteAll();
         repository.deleteAll();
     }
 
@@ -390,6 +396,145 @@ class CoverLetterServiceTest {
                     assertThat(businessException.getDetails())
                             .extracting("field")
                             .containsExactly("preferences");
+                });
+    }
+
+    @Test
+    void saveQuestionsReplacesQuestionsWithServerAssignedOrderAndUpdatesTimestamp() {
+        Instant createdAt = Instant.parse("2026-06-20T01:00:00Z");
+        Instant updatedAt = Instant.parse("2026-06-20T05:00:00Z");
+        given(currentUserProvider.currentUser()).willReturn(new CurrentUser("user_1", "테스트", null));
+        given(idGenerator.generate("clq")).willReturn("clq_1", "clq_2");
+        given(clock.instant()).willReturn(updatedAt);
+        CoverLetter coverLetter = repository.save(CoverLetter.draft("cl_questions", "user_1", createdAt));
+        questionRepository.save(CoverLetterQuestion.create(
+                "clq_old",
+                coverLetter,
+                1,
+                "기존 질문",
+                1000,
+                "기존 답변"
+        ));
+
+        SaveQuestionsResult result = service.saveQuestions(
+                "cl_questions",
+                List.of(
+                        new SaveQuestionInput(" 지원 동기를 작성해주세요. ", 1000, " 제가 지원한 이유는... "),
+                        new SaveQuestionInput(" 직무 관련 경험을 작성해주세요. ", 1500, " 저는 프로젝트에서... ")
+                )
+        );
+
+        assertThat(result.coverLetter().getUpdatedAt()).isEqualTo(updatedAt);
+        assertThat(result.questions()).extracting(CoverLetterQuestion::getId)
+                .containsExactly("clq_1", "clq_2");
+        assertThat(result.questions()).extracting(CoverLetterQuestion::getQuestionOrder)
+                .containsExactly(1, 2);
+        assertThat(result.questions()).extracting(CoverLetterQuestion::getQuestion)
+                .containsExactly("지원 동기를 작성해주세요.", "직무 관련 경험을 작성해주세요.");
+        assertThat(result.questions()).extracting(CoverLetterQuestion::getOriginalAnswer)
+                .containsExactly("제가 지원한 이유는...", "저는 프로젝트에서...");
+        assertThat(repository.findById("cl_questions")).hasValueSatisfying(saved ->
+                assertThat(saved.getUpdatedAt()).isEqualTo(updatedAt)
+        );
+        assertThat(questionRepository.findByCoverLetterIdOrderByQuestionOrderAsc("cl_questions"))
+                .extracting(CoverLetterQuestion::getId)
+                .containsExactly("clq_1", "clq_2");
+        assertThat(questionRepository.findById("clq_old")).isEmpty();
+    }
+
+    @Test
+    void saveQuestionsThrowsNotFoundWhenCoverLetterIsMissingOtherOwnerOrAlreadyDeleted() {
+        Instant now = Instant.parse("2026-06-20T01:00:00Z");
+        CoverLetter deleted = CoverLetter.draft("cl_deleted", "user_1", now);
+        deleted.markDeleted(now.plusSeconds(60));
+        repository.saveAll(List.of(
+                CoverLetter.draft("cl_other", "user_2", now),
+                deleted
+        ));
+        given(currentUserProvider.currentUser()).willReturn(new CurrentUser("user_1", "테스트", null));
+        List<SaveQuestionInput> questions = List.of(
+                new SaveQuestionInput("질문", 1000, "답변")
+        );
+
+        assertThatThrownBy(() -> service.saveQuestions("cl_missing", questions))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.NOT_FOUND);
+        assertThatThrownBy(() -> service.saveQuestions("cl_other", questions))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.NOT_FOUND);
+        assertThatThrownBy(() -> service.saveQuestions("cl_deleted", questions))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.NOT_FOUND);
+    }
+
+    @Test
+    void saveQuestionsThrowsCoverLetterNotDraftWhenStatusIsNotDraft() {
+        Instant now = Instant.parse("2026-06-20T01:00:00Z");
+        given(currentUserProvider.currentUser()).willReturn(new CurrentUser("user_1", "테스트", null));
+        repository.saveAll(List.of(
+                coverLetterWithStatus("cl_reviewing", CoverLetterStatus.REVIEWING, now),
+                coverLetterWithStatus("cl_reviewed", CoverLetterStatus.REVIEWED, now),
+                coverLetterWithStatus("cl_failed", CoverLetterStatus.REVIEW_FAILED, now)
+        ));
+        List<SaveQuestionInput> questions = List.of(
+                new SaveQuestionInput("질문", 1000, "답변")
+        );
+
+        assertThatThrownBy(() -> service.saveQuestions("cl_reviewing", questions))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.COVER_LETTER_NOT_DRAFT);
+        assertThatThrownBy(() -> service.saveQuestions("cl_reviewed", questions))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.COVER_LETTER_NOT_DRAFT);
+        assertThatThrownBy(() -> service.saveQuestions("cl_failed", questions))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.COVER_LETTER_NOT_DRAFT);
+    }
+
+    @Test
+    void saveQuestionsThrowsValidationErrorWithDetails() {
+        Instant now = Instant.parse("2026-06-20T01:00:00Z");
+        given(currentUserProvider.currentUser()).willReturn(new CurrentUser("user_1", "테스트", null));
+        repository.save(CoverLetter.draft("cl_questions", "user_1", now));
+
+        assertThatThrownBy(() -> service.saveQuestions(
+                "cl_questions",
+                List.of(new SaveQuestionInput(" ", 99, " "))
+        ))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(error -> {
+                    BusinessException businessException = (BusinessException) error;
+                    assertThat(businessException.getErrorCode()).isEqualTo(ErrorCode.VALIDATION_ERROR);
+                    assertThat(businessException.getDetails())
+                            .extracting("field")
+                            .containsExactly(
+                                    "questions[0].question",
+                                    "questions[0].maxAnswerLength",
+                                    "questions[0].originalAnswer"
+                            );
+                });
+    }
+
+    @Test
+    void saveQuestionsRequiresAtLeastOneQuestion() {
+        Instant now = Instant.parse("2026-06-20T01:00:00Z");
+        given(currentUserProvider.currentUser()).willReturn(new CurrentUser("user_1", "테스트", null));
+        repository.save(CoverLetter.draft("cl_questions", "user_1", now));
+
+        assertThatThrownBy(() -> service.saveQuestions("cl_questions", List.of()))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(error -> {
+                    BusinessException businessException = (BusinessException) error;
+                    assertThat(businessException.getErrorCode()).isEqualTo(ErrorCode.VALIDATION_ERROR);
+                    assertThat(businessException.getDetails())
+                            .extracting("field")
+                            .containsExactly("questions");
                 });
     }
 

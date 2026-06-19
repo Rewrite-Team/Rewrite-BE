@@ -285,6 +285,43 @@ Response:
 }
 ```
 
+Validation Error Response:
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "요청 값이 올바르지 않습니다.",
+    "details": [
+      {
+        "field": "questions[0].question",
+        "reason": "질문을 입력해야 합니다."
+      },
+      {
+        "field": "questions[0].maxAnswerLength",
+        "reason": "최대 답변 글자 수는 100자 이상 5000자 이하여야 합니다."
+      },
+      {
+        "field": "questions[0].originalAnswer",
+        "reason": "답변을 입력해야 합니다."
+      }
+    ]
+  }
+}
+```
+
+Conflict Response:
+
+```json
+{
+  "error": {
+    "code": "COVER_LETTER_NOT_DRAFT",
+    "message": "제출 이후에는 원본 자기소개서를 수정할 수 없습니다.",
+    "details": []
+  }
+}
+```
+
 ### 자기소개서 상세 조회
 
 등록 step4 확인 화면과 AI 첨삭 페이지 상단 정보에서 사용한다.
