@@ -8,6 +8,10 @@
 GET /llm-jobs/{jobId}
 ```
 
+현재 구현된 skeleton 범위에서는 저장된 Job 상태를 조회할 수 있다. `partialResult`는 아직 서버 메모리/cache 저장소와 실제 LLM 실행 흐름이 없으므로 항상 `null`이다.
+
+`targetType=COVER_LETTER`인 Job은 연결된 자기소개서의 owner와 soft delete 상태를 기준으로 접근 권한을 검증한다. 존재하지 않는 Job, 다른 사용자 소유 자기소개서에 연결된 Job, 삭제된 자기소개서에 연결된 Job은 모두 `NOT_FOUND`를 반환한다.
+
 Response:
 
 ```json
@@ -24,22 +28,7 @@ Response:
   },
   "attempt": 1,
   "maxAttempts": 2,
-  "partialResult": {
-    "questions": [
-      {
-        "questionId": "clq_01HZ_1",
-        "order": 1,
-        "aiReport": "지원 동기는 구체적이지만 직무 경험과의 연결이 더 필요합니다.",
-        "rewrittenAnswer": "저는 백엔드 개발자로서..."
-      },
-      {
-        "questionId": "clq_01HZ_2",
-        "order": 2,
-        "aiReport": "프로젝트 경험의 문제 상황은 잘 드러나지만",
-        "rewrittenAnswer": ""
-      }
-    ]
-  },
+  "partialResult": null,
   "resultRef": null,
   "error": null,
   "createdAt": "2026-06-20T14:10:00",
@@ -104,6 +93,8 @@ Response:
 ```http
 GET /llm-jobs/{jobId}/stream
 ```
+
+아직 구현되지 않았다. API-016 SSE stream은 실제 LLM 실행 흐름과 partial result 저장소가 준비되는 후속 이슈에서 구현한다.
 
 SSE는 LLM 작업의 실시간 표시 채널이다. 서버는 `Last-Event-ID` 기반 이벤트 replay를 지원하지 않는다.
 

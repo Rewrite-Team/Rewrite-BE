@@ -63,7 +63,7 @@ API 설계 결정과 트레이드오프는 `../decisions/README.md`를 함께 �
 | API-012 | GET | `/cover-letters/{coverLetterId}` | Planned | REQ-003 | 자기소개서 상세 |
 | API-013 | DELETE | `/cover-letters/{coverLetterId}` | Implemented | REQ-003 | 자기소개서 soft delete |
 | API-014 | POST | `/cover-letters/{coverLetterId}/submit` | Planned | REQ-005 | 첨삭 Job 생성 |
-| API-015 | GET | `/llm-jobs/{jobId}` | Planned | REQ-005 | LLM Job 상태 조회 |
+| API-015 | GET | `/llm-jobs/{jobId}` | Implemented | REQ-005 | LLM Job 상태 조회 |
 | API-016 | GET | `/llm-jobs/{jobId}/stream` | Planned | REQ-005 | SSE 스트리밍 |
 | API-017 | GET | `/cover-letters/{coverLetterId}/review-versions` | Planned | REQ-006 | 첨삭 버전 목록 |
 | API-018 | GET | `/cover-letters/{coverLetterId}/review-versions/{versionId}` | Planned | REQ-006 | 첨삭 버전 상세 |

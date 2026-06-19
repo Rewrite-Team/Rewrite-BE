@@ -1,0 +1,9 @@
+package com.daon.rewrite.llmjob.entity;
+
+public enum LlmJobType {
+    COVER_LETTER_REVIEW,
+    COVER_LETTER_RE_REVIEW,
+    KEYWORD_ANALYSIS,
+    INTERVIEW_QUESTION_GENERATION,
+    INTERVIEW_MESSAGE_FEEDBACK
+}
