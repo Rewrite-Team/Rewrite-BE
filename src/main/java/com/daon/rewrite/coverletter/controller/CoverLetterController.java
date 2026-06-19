@@ -7,9 +7,12 @@ import com.daon.rewrite.coverletter.dto.SaveBasicInfoRequest;
 import com.daon.rewrite.coverletter.dto.SaveBasicInfoResponse;
 import com.daon.rewrite.coverletter.dto.SavePreferencesRequest;
 import com.daon.rewrite.coverletter.dto.SavePreferencesResponse;
+import com.daon.rewrite.coverletter.dto.SaveQuestionsRequest;
+import com.daon.rewrite.coverletter.dto.SaveQuestionsResponse;
 import com.daon.rewrite.coverletter.entity.CoverLetter;
 import com.daon.rewrite.coverletter.entity.CoverLetterStatus;
 import com.daon.rewrite.coverletter.service.CoverLetterService;
+import com.daon.rewrite.coverletter.service.SaveQuestionsResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
@@ -75,5 +78,17 @@ public class CoverLetterController {
                 request.preferences()
         );
         return SavePreferencesResponse.from(result);
+    }
+
+    @PutMapping("/cover-letters/{coverLetterId}/questions")
+    public SaveQuestionsResponse saveQuestions(
+            @PathVariable String coverLetterId,
+            @RequestBody SaveQuestionsRequest request
+    ) {
+        SaveQuestionsResult result = coverLetterService.saveQuestions(
+                coverLetterId,
+                request.toInputs()
+        );
+        return SaveQuestionsResponse.from(result);
     }
 }

@@ -1,7 +1,10 @@
 package com.daon.rewrite.coverletter.controller;
 
 import com.daon.rewrite.coverletter.entity.CoverLetter;
+import com.daon.rewrite.coverletter.entity.CoverLetterQuestion;
 import com.daon.rewrite.coverletter.entity.CoverLetterStatus;
+import com.daon.rewrite.coverletter.service.SaveQuestionInput;
+import com.daon.rewrite.coverletter.service.SaveQuestionsResult;
 import com.daon.rewrite.coverletter.service.CoverLetterService;
 import com.daon.rewrite.global.exception.BusinessException;
 import com.daon.rewrite.global.exception.ErrorCode;
@@ -357,6 +360,161 @@ class CoverLetterControllerTest {
                         .content("""
                                 {
                                   "preferences": "Spring Boot 경험"
+                                }
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("COVER_LETTER_NOT_DRAFT"));
+    }
+
+    @Test
+    void saveQuestionsReturnsSavedQuestions() throws Exception {
+        CoverLetter updated = CoverLetter.draft(
+                "cl_questions",
+                "user_1",
+                Instant.parse("2026-06-20T05:00:00Z")
+        );
+        updated.touch(Instant.parse("2026-06-20T05:10:00Z"));
+        List<CoverLetterQuestion> questions = List.of(
+                CoverLetterQuestion.create(
+                        "clq_1",
+                        updated,
+                        1,
+                        "지원 동기를 작성해주세요.",
+                        1000,
+                        "제가 지원한 이유는..."
+                ),
+                CoverLetterQuestion.create(
+                        "clq_2",
+                        updated,
+                        2,
+                        "직무 관련 경험을 작성해주세요.",
+                        1500,
+                        "저는 프로젝트에서..."
+                )
+        );
+        given(coverLetterService.saveQuestions(
+                "cl_questions",
+                List.of(
+                        new SaveQuestionInput(" 지원 동기를 작성해주세요. ", 1000, " 제가 지원한 이유는... "),
+                        new SaveQuestionInput(" 직무 관련 경험을 작성해주세요. ", 1500, " 저는 프로젝트에서... ")
+                )
+        )).willReturn(new SaveQuestionsResult(updated, questions));
+
+        mockMvc.perform(put("/cover-letters/{coverLetterId}/questions", "cl_questions")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "questions": [
+                                    {
+                                      "question": " 지원 동기를 작성해주세요. ",
+                                      "maxAnswerLength": 1000,
+                                      "originalAnswer": " 제가 지원한 이유는... "
+                                    },
+                                    {
+                                      "question": " 직무 관련 경험을 작성해주세요. ",
+                                      "maxAnswerLength": 1500,
+                                      "originalAnswer": " 저는 프로젝트에서... "
+                                    }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.coverLetterId").value("cl_questions"))
+                .andExpect(jsonPath("$.questions[0].id").value("clq_1"))
+                .andExpect(jsonPath("$.questions[0].order").value(1))
+                .andExpect(jsonPath("$.questions[0].question").value("지원 동기를 작성해주세요."))
+                .andExpect(jsonPath("$.questions[0].maxAnswerLength").value(1000))
+                .andExpect(jsonPath("$.questions[0].originalAnswer").value("제가 지원한 이유는..."))
+                .andExpect(jsonPath("$.questions[1].id").value("clq_2"))
+                .andExpect(jsonPath("$.questions[1].order").value(2))
+                .andExpect(jsonPath("$.updatedAt").value("2026-06-20T14:10:00"));
+    }
+
+    @Test
+    void saveQuestionsReturnsValidationDetails() throws Exception {
+        given(coverLetterService.saveQuestions(
+                "cl_questions",
+                List.of(new SaveQuestionInput(" ", 99, " "))
+        )).willThrow(new BusinessException(
+                ErrorCode.VALIDATION_ERROR,
+                List.of(
+                        new com.daon.rewrite.global.response.ErrorResponse.ErrorDetail(
+                                "questions[0].question",
+                                "질문을 입력해야 합니다."
+                        ),
+                        new com.daon.rewrite.global.response.ErrorResponse.ErrorDetail(
+                                "questions[0].maxAnswerLength",
+                                "최대 답변 글자 수는 100자 이상 5000자 이하여야 합니다."
+                        ),
+                        new com.daon.rewrite.global.response.ErrorResponse.ErrorDetail(
+                                "questions[0].originalAnswer",
+                                "답변을 입력해야 합니다."
+                        )
+                )
+        ));
+
+        mockMvc.perform(put("/cover-letters/{coverLetterId}/questions", "cl_questions")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "questions": [
+                                    {
+                                      "question": " ",
+                                      "maxAnswerLength": 99,
+                                      "originalAnswer": " "
+                                    }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.error.details[0].field").value("questions[0].question"))
+                .andExpect(jsonPath("$.error.details[1].field").value("questions[0].maxAnswerLength"))
+                .andExpect(jsonPath("$.error.details[2].field").value("questions[0].originalAnswer"));
+    }
+
+    @Test
+    void saveQuestionsReturnsNotFound() throws Exception {
+        given(coverLetterService.saveQuestions(
+                "cl_missing",
+                List.of(new SaveQuestionInput("질문", 1000, "답변"))
+        )).willThrow(new BusinessException(ErrorCode.NOT_FOUND));
+
+        mockMvc.perform(put("/cover-letters/{coverLetterId}/questions", "cl_missing")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "questions": [
+                                    {
+                                      "question": "질문",
+                                      "maxAnswerLength": 1000,
+                                      "originalAnswer": "답변"
+                                    }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("NOT_FOUND"));
+    }
+
+    @Test
+    void saveQuestionsReturnsCoverLetterNotDraft() throws Exception {
+        given(coverLetterService.saveQuestions(
+                "cl_reviewing",
+                List.of(new SaveQuestionInput("질문", 1000, "답변"))
+        )).willThrow(new BusinessException(ErrorCode.COVER_LETTER_NOT_DRAFT));
+
+        mockMvc.perform(put("/cover-letters/{coverLetterId}/questions", "cl_reviewing")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "questions": [
+                                    {
+                                      "question": "질문",
+                                      "maxAnswerLength": 1000,
+                                      "originalAnswer": "답변"
+                                    }
+                                  ]
                                 }
                                 """))
                 .andExpect(status().isConflict())
