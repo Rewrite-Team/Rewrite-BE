@@ -94,6 +94,14 @@ public class CoverLetter {
         this.updatedAt = now;
     }
 
+    public void startReview(Instant now) {
+        this.status = CoverLetterStatus.REVIEWING;
+        if (this.submittedAt == null) {
+            this.submittedAt = now;
+        }
+        this.updatedAt = now;
+    }
+
     public void setLatestReviewVersionId(String latestReviewVersionId) {
         this.latestReviewVersionId = latestReviewVersionId;
     }

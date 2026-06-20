@@ -11,6 +11,11 @@ import com.daon.rewrite.global.exception.BusinessException;
 import com.daon.rewrite.global.exception.ErrorCode;
 import com.daon.rewrite.global.response.ErrorResponse;
 import com.daon.rewrite.global.util.IdGenerator;
+import com.daon.rewrite.llmjob.entity.LlmJob;
+import com.daon.rewrite.llmjob.entity.LlmJobStatus;
+import com.daon.rewrite.llmjob.entity.LlmJobTargetType;
+import com.daon.rewrite.llmjob.entity.LlmJobType;
+import com.daon.rewrite.llmjob.repository.LlmJobRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -42,10 +47,16 @@ public class CoverLetterService {
     private static final int MIN_MAX_ANSWER_LENGTH = 100;
     private static final int MAX_MAX_ANSWER_LENGTH = 5000;
     private static final int MAX_ORIGINAL_ANSWER_LENGTH = 5000;
+    private static final String LLM_JOB_ID_PREFIX = "job";
+    private static final List<LlmJobStatus> RUNNING_JOB_STATUSES = List.of(
+            LlmJobStatus.PENDING,
+            LlmJobStatus.PROCESSING
+    );
 
     private final CurrentUserProvider currentUserProvider;
     private final CoverLetterRepository coverLetterRepository;
     private final CoverLetterQuestionRepository coverLetterQuestionRepository;
+    private final LlmJobRepository llmJobRepository;
     private final IdGenerator idGenerator;
     private final Clock clock;
 
@@ -176,6 +187,115 @@ public class CoverLetterService {
 
         coverLetter.touch(Instant.now(clock));
         return new SaveQuestionsResult(coverLetter, savedQuestions);
+    }
+
+    @Transactional
+    public SubmitCoverLetterResult submit(String coverLetterId) {
+        CurrentUser currentUser = currentUserProvider.currentUser();
+        CoverLetter coverLetter = coverLetterRepository
+                .findActiveByIdAndOwnerIdForUpdate(coverLetterId, currentUser.id())
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
+
+        // 이미 최초 AI 첨삭이 완료된 자소서에 submit 이 다시 호출된다면 새로운 첨삭 job 생성 없이 coverLetter 반환
+        if (coverLetter.getStatus() == CoverLetterStatus.REVIEWED) {
+            if (coverLetter.getLatestReviewVersionId() == null) {
+                throw new BusinessException(ErrorCode.INTERNAL_ERROR);
+            }
+            return new SubmitCoverLetterResult(coverLetter, null);
+        }
+
+        LlmJob runningJob = findRunningJob(coverLetter.getId());
+        // 최소첨삭 진행 중인 자소서가 있는 경우
+        if (coverLetter.getStatus() == CoverLetterStatus.REVIEWING) {
+            // 실제 진행중인 COVER_LETTER_REVIEW Job이 없는것은 모순, 예외처리
+            if (runningJob == null || runningJob.getType() != LlmJobType.COVER_LETTER_REVIEW) {
+                throw new BusinessException(ErrorCode.INTERNAL_ERROR);
+            }
+            // 기존 첨삭중인 job 반환
+            return new SubmitCoverLetterResult(coverLetter, runningJob);
+        }
+        // 자소서 status 가 REVIEWING 이 아닌데 첨삭 진행중인 job 이 있는것은 모순, 추가 job 생성 방지
+        if (runningJob != null) {
+            throw new BusinessException(ErrorCode.LLM_JOB_ALREADY_RUNNING);
+        }
+
+        List<CoverLetterQuestion> questions = coverLetterQuestionRepository
+                .findByCoverLetterIdOrderByQuestionOrderAsc(coverLetter.getId());
+        validateSubmit(coverLetter, questions);
+
+        Instant now = Instant.now(clock);
+        LlmJob job = llmJobRepository.save(LlmJob.pendingReview(
+                idGenerator.generate(LLM_JOB_ID_PREFIX),
+                coverLetter.getId(),
+                now,
+                questions.size()
+        ));
+        coverLetter.startReview(now);
+
+        return new SubmitCoverLetterResult(coverLetter, job);
+    }
+
+    private LlmJob findRunningJob(String coverLetterId) {
+        return llmJobRepository
+                .findFirstByTargetTypeAndTargetIdAndStatusInOrderByCreatedAtDesc(
+                        LlmJobTargetType.COVER_LETTER,
+                        coverLetterId,
+                        RUNNING_JOB_STATUSES
+                )
+                .orElse(null);
+    }
+
+    private void validateSubmit(CoverLetter coverLetter, List<CoverLetterQuestion> questions) {
+        List<ErrorResponse.ErrorDetail> details = new ArrayList<>();
+        addMissingDetail("title", coverLetter.getTitle(), "자기소개서 제목을 입력해야 합니다.", details);
+        addMissingDetail("companyName", coverLetter.getCompanyName(), "회사명을 입력해야 합니다.", details);
+        addMissingDetail("positionTitle", coverLetter.getPositionTitle(), "직무명을 입력해야 합니다.", details);
+        addMissingDetail("preferences", coverLetter.getPreferences(), "채용 우대사항을 입력해야 합니다.", details);
+
+        if (questions.isEmpty()) {
+            details.add(new ErrorResponse.ErrorDetail(
+                    "questions",
+                    "질문과 답변을 1개 이상 입력해야 합니다."
+            ));
+        } else {
+            for (int index = 0; index < questions.size(); index++) {
+                CoverLetterQuestion question = questions.get(index);
+                addMissingDetail(
+                        "questions[" + index + "].question",
+                        question.getQuestion(),
+                        "질문을 입력해야 합니다.",
+                        details
+                );
+                if (question.getMaxAnswerLength() < MIN_MAX_ANSWER_LENGTH
+                        || question.getMaxAnswerLength() > MAX_MAX_ANSWER_LENGTH) {
+                    details.add(new ErrorResponse.ErrorDetail(
+                            "questions[" + index + "].maxAnswerLength",
+                            "최대 답변 글자 수는 100자 이상 5000자 이하여야 합니다."
+                    ));
+                }
+                addMissingDetail(
+                        "questions[" + index + "].originalAnswer",
+                        question.getOriginalAnswer(),
+                        "답변을 입력해야 합니다.",
+                        details
+                );
+            }
+        }
+
+        if (!details.isEmpty()) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, details);
+        }
+    }
+
+    private void addMissingDetail(
+            String field,
+            String value,
+            String reason,
+            List<ErrorResponse.ErrorDetail> details
+    ) {
+        if (value == null || value.isBlank()) {
+            details.add(new ErrorResponse.ErrorDetail(field, reason));
+        }
     }
 
     private void validateListQuery(int page, int size) {

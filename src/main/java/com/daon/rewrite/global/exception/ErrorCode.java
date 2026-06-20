@@ -32,6 +32,12 @@ public enum ErrorCode {
             "제출된 자기소개서의 원본 정보는 수정할 수 없습니다."
     ),
 
+    LLM_JOB_ALREADY_RUNNING(
+            HttpStatus.CONFLICT,
+            "LLM_JOB_ALREADY_RUNNING",
+            "이미 진행 중인 LLM 작업이 있습니다."
+    ),
+
     INTERNAL_ERROR(
             HttpStatus.INTERNAL_SERVER_ERROR,
             "INTERNAL_ERROR",
