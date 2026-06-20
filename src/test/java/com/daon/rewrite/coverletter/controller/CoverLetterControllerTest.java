@@ -5,9 +5,12 @@ import com.daon.rewrite.coverletter.entity.CoverLetterQuestion;
 import com.daon.rewrite.coverletter.entity.CoverLetterStatus;
 import com.daon.rewrite.coverletter.service.SaveQuestionInput;
 import com.daon.rewrite.coverletter.service.SaveQuestionsResult;
+import com.daon.rewrite.coverletter.service.SubmitCoverLetterResult;
 import com.daon.rewrite.coverletter.service.CoverLetterService;
 import com.daon.rewrite.global.exception.BusinessException;
 import com.daon.rewrite.global.exception.ErrorCode;
+import com.daon.rewrite.global.response.ErrorResponse;
+import com.daon.rewrite.llmjob.entity.LlmJob;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -17,11 +20,13 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
 import java.util.List;
 
 import static org.mockito.BDDMockito.given;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -519,5 +524,90 @@ class CoverLetterControllerTest {
                                 """))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error.code").value("COVER_LETTER_NOT_DRAFT"));
+    }
+
+    @Test
+    void submitReturnsPendingReviewJob() throws Exception {
+        Instant submittedAt = Instant.parse("2026-06-20T05:10:00Z");
+        CoverLetter coverLetter = CoverLetter.draft("cl_submit", "user_1", submittedAt.minusSeconds(60));
+        coverLetter.startReview(submittedAt);
+        LlmJob job = LlmJob.pendingReview("job_1", coverLetter.getId(), submittedAt, 2);
+        given(coverLetterService.submit("cl_submit"))
+                .willReturn(new SubmitCoverLetterResult(coverLetter, job));
+
+        mockMvc.perform(post("/cover-letters/{coverLetterId}/submit", "cl_submit")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.coverLetterId").value("cl_submit"))
+                .andExpect(jsonPath("$.status").value("REVIEWING"))
+                .andExpect(jsonPath("$.jobId").value("job_1"))
+                .andExpect(jsonPath("$.latestReviewVersionId").value(nullValue()));
+    }
+
+    @Test
+    void submitReturnsLatestReviewVersionWhenAlreadyReviewed() throws Exception {
+        CoverLetter coverLetter = CoverLetter.draft(
+                "cl_reviewed",
+                "user_1",
+                Instant.parse("2026-06-20T05:00:00Z")
+        );
+        ReflectionTestUtils.setField(coverLetter, "status", CoverLetterStatus.REVIEWED);
+        coverLetter.setLatestReviewVersionId("rv_1");
+        given(coverLetterService.submit("cl_reviewed"))
+                .willReturn(new SubmitCoverLetterResult(coverLetter, null));
+
+        mockMvc.perform(post("/cover-letters/{coverLetterId}/submit", "cl_reviewed")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.coverLetterId").value("cl_reviewed"))
+                .andExpect(jsonPath("$.status").value("REVIEWED"))
+                .andExpect(jsonPath("$.jobId").value(nullValue()))
+                .andExpect(jsonPath("$.latestReviewVersionId").value("rv_1"));
+    }
+
+    @Test
+    void submitReturnsValidationDetails() throws Exception {
+        given(coverLetterService.submit("cl_incomplete")).willThrow(new BusinessException(
+                ErrorCode.VALIDATION_ERROR,
+                List.of(
+                        new ErrorResponse.ErrorDetail("preferences", "채용 우대사항을 입력해야 합니다."),
+                        new ErrorResponse.ErrorDetail("questions", "질문과 답변을 1개 이상 입력해야 합니다.")
+                )
+        ));
+
+        mockMvc.perform(post("/cover-letters/{coverLetterId}/submit", "cl_incomplete")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.error.details[0].field").value("preferences"))
+                .andExpect(jsonPath("$.error.details[0].reason").value("채용 우대사항을 입력해야 합니다."))
+                .andExpect(jsonPath("$.error.details[1].field").value("questions"));
+    }
+
+    @Test
+    void submitReturnsNotFound() throws Exception {
+        given(coverLetterService.submit("cl_missing"))
+                .willThrow(new BusinessException(ErrorCode.NOT_FOUND));
+
+        mockMvc.perform(post("/cover-letters/{coverLetterId}/submit", "cl_missing")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("NOT_FOUND"));
+    }
+
+    @Test
+    void submitReturnsLlmJobAlreadyRunning() throws Exception {
+        given(coverLetterService.submit("cl_busy"))
+                .willThrow(new BusinessException(ErrorCode.LLM_JOB_ALREADY_RUNNING));
+
+        mockMvc.perform(post("/cover-letters/{coverLetterId}/submit", "cl_busy")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("LLM_JOB_ALREADY_RUNNING"));
     }
 }

@@ -410,6 +410,12 @@ Response:
 POST /cover-letters/{coverLetterId}/submit
 ```
 
+Success Status:
+
+```text
+200 OK
+```
+
 Request:
 
 ```json
@@ -422,7 +428,8 @@ Response:
 {
   "coverLetterId": "cl_01HZ...",
   "status": "REVIEWING",
-  "jobId": "job_01HZ..."
+  "jobId": "job_01HZ...",
+  "latestReviewVersionId": null
 }
 ```
 
@@ -453,7 +460,7 @@ Validation Error Response:
 {
   "error": {
     "code": "VALIDATION_ERROR",
-    "message": "자기소개서 제출에 필요한 정보가 누락되었습니다.",
+    "message": "입력값이 올바르지 않습니다.",
     "details": [
       {
         "field": "preferences",
@@ -468,13 +475,16 @@ Validation Error Response:
 }
 ```
 
+다른 종류의 LLM Job이 이미 해당 자기소개서에서 `PENDING` 또는 `PROCESSING` 상태이면 `409 Conflict`와 `LLM_JOB_ALREADY_RUNNING`을 반환한다. 동일한 최초 첨삭 Job에 대한 중복 submit은 예외로 처리하지 않고 기존 Job을 반환한다.
+
 Already Reviewing Response:
 
 ```json
 {
   "coverLetterId": "cl_01HZ...",
   "status": "REVIEWING",
-  "jobId": "job_existing_01HZ..."
+  "jobId": "job_existing_01HZ...",
+  "latestReviewVersionId": null
 }
 ```
 

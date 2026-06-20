@@ -7,12 +7,24 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -26,6 +38,9 @@ class CoverLetterRepositoryTest {
 
     @Autowired
     private EntityManager entityManager;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
 
     @Test
     void saveAndFindDraftRoundTripsThroughJpa() {
@@ -132,6 +147,53 @@ class CoverLetterRepositoryTest {
         );
         assertThat(repository.findByIdAndOwnerIdAndDeletedAtIsNull("cl_deleted", "user_1")).isEmpty();
         assertThat(repository.findByIdAndOwnerIdAndDeletedAtIsNull("cl_other", "user_1")).isEmpty();
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void findActiveForUpdateBlocksConcurrentTransaction() throws Exception {
+        TransactionTemplate transaction = new TransactionTemplate(transactionManager);
+        transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        transaction.executeWithoutResult(status -> repository.save(
+                CoverLetter.draft("cl_locked", "user_1", Instant.parse("2026-06-20T01:00:00Z"))
+        ));
+
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        CountDownLatch firstLocked = new CountDownLatch(1);
+        CountDownLatch releaseFirst = new CountDownLatch(1);
+
+        try {
+            Future<?> first = executor.submit(() -> transaction.executeWithoutResult(status -> {
+                repository.findActiveByIdAndOwnerIdForUpdate("cl_locked", "user_1").orElseThrow();
+                firstLocked.countDown();
+                await(releaseFirst);
+            }));
+            assertThat(firstLocked.await(2, TimeUnit.SECONDS)).isTrue();
+
+            Future<?> second = executor.submit(() -> transaction.executeWithoutResult(status ->
+                    repository.findActiveByIdAndOwnerIdForUpdate("cl_locked", "user_1").orElseThrow()
+            ));
+
+            assertThatThrownBy(() -> second.get(200, TimeUnit.MILLISECONDS))
+                    .isInstanceOf(TimeoutException.class);
+
+            releaseFirst.countDown();
+            first.get(2, TimeUnit.SECONDS);
+            second.get(2, TimeUnit.SECONDS);
+        } finally {
+            releaseFirst.countDown();
+            executor.shutdownNow();
+            transaction.executeWithoutResult(status -> repository.deleteAll());
+        }
+    }
+
+    private void await(CountDownLatch latch) {
+        try {
+            latch.await();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(e);
+        }
     }
 
     private CoverLetter draft(String id, String ownerId, String title, String createdAt) {

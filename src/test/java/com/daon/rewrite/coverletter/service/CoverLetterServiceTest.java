@@ -10,6 +10,10 @@ import com.daon.rewrite.coverletter.repository.CoverLetterQuestionRepository;
 import com.daon.rewrite.global.exception.BusinessException;
 import com.daon.rewrite.global.exception.ErrorCode;
 import com.daon.rewrite.global.util.IdGenerator;
+import com.daon.rewrite.llmjob.entity.LlmJob;
+import com.daon.rewrite.llmjob.entity.LlmJobStatus;
+import com.daon.rewrite.llmjob.entity.LlmJobType;
+import com.daon.rewrite.llmjob.repository.LlmJobRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,6 +45,9 @@ class CoverLetterServiceTest {
     @Autowired
     private CoverLetterQuestionRepository questionRepository;
 
+    @Autowired
+    private LlmJobRepository llmJobRepository;
+
     @MockitoBean
     private CurrentUserProvider currentUserProvider;
 
@@ -52,6 +59,7 @@ class CoverLetterServiceTest {
 
     @AfterEach
     void cleanUp() {
+        llmJobRepository.deleteAll();
         questionRepository.deleteAll();
         repository.deleteAll();
     }
@@ -538,6 +546,177 @@ class CoverLetterServiceTest {
                 });
     }
 
+    @Test
+    void submitCreatesPendingReviewJobAndMarksDraftReviewing() {
+        Instant createdAt = Instant.parse("2026-06-20T01:00:00Z");
+        Instant submittedAt = Instant.parse("2026-06-20T05:00:00Z");
+        given(currentUserProvider.currentUser()).willReturn(new CurrentUser("user_1", "테스트", null));
+        given(idGenerator.generate("job")).willReturn("job_1");
+        given(clock.instant()).willReturn(submittedAt);
+        saveCompleteCoverLetter("cl_submit", "user_1", createdAt, 2);
+
+        SubmitCoverLetterResult result = service.submit("cl_submit");
+
+        assertThat(result.coverLetter().getStatus()).isEqualTo(CoverLetterStatus.REVIEWING);
+        assertThat(result.coverLetter().getSubmittedAt()).isEqualTo(submittedAt);
+        assertThat(result.coverLetter().getUpdatedAt()).isEqualTo(submittedAt);
+        assertThat(result.job()).isNotNull();
+        assertThat(result.job().getId()).isEqualTo("job_1");
+        assertThat(result.job().getType()).isEqualTo(LlmJobType.COVER_LETTER_REVIEW);
+        assertThat(result.job().getStatus()).isEqualTo(LlmJobStatus.PENDING);
+        assertThat(result.job().getTargetId()).isEqualTo("cl_submit");
+        assertThat(result.job().getProgressTotal()).isEqualTo(2);
+        assertThat(llmJobRepository.count()).isEqualTo(1);
+    }
+
+    @Test
+    void submitReturnsValidationDetailsWithoutChangingDraft() {
+        Instant now = Instant.parse("2026-06-20T01:00:00Z");
+        given(currentUserProvider.currentUser()).willReturn(new CurrentUser("user_1", "테스트", null));
+        repository.save(CoverLetter.draft("cl_incomplete", "user_1", now));
+
+        assertThatThrownBy(() -> service.submit("cl_incomplete"))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(error -> {
+                    BusinessException businessException = (BusinessException) error;
+                    assertThat(businessException.getErrorCode()).isEqualTo(ErrorCode.VALIDATION_ERROR);
+                    assertThat(businessException.getDetails())
+                            .extracting("field")
+                            .containsExactly("title", "companyName", "positionTitle", "preferences", "questions");
+                });
+
+        assertThat(repository.findById("cl_incomplete")).hasValueSatisfying(coverLetter -> {
+            assertThat(coverLetter.getStatus()).isEqualTo(CoverLetterStatus.DRAFT);
+            assertThat(coverLetter.getSubmittedAt()).isNull();
+        });
+        assertThat(llmJobRepository.count()).isZero();
+    }
+
+    @Test
+    void submitReturnsExistingJobWhenCoverLetterIsReviewing() {
+        Instant now = Instant.parse("2026-06-20T01:00:00Z");
+        given(currentUserProvider.currentUser()).willReturn(new CurrentUser("user_1", "테스트", null));
+        CoverLetter coverLetter = saveCompleteCoverLetter("cl_reviewing", "user_1", now, 1);
+        ReflectionTestUtils.setField(coverLetter, "status", CoverLetterStatus.REVIEWING);
+        repository.saveAndFlush(coverLetter);
+        LlmJob existingJob = llmJobRepository.save(LlmJob.pendingReview(
+                "job_existing",
+                coverLetter.getId(),
+                now.plusSeconds(60),
+                1
+        ));
+
+        SubmitCoverLetterResult result = service.submit("cl_reviewing");
+
+        assertThat(result.coverLetter().getStatus()).isEqualTo(CoverLetterStatus.REVIEWING);
+        assertThat(result.job().getId()).isEqualTo(existingJob.getId());
+        assertThat(llmJobRepository.count()).isEqualTo(1);
+    }
+
+    @Test
+    void submitReturnsLatestReviewVersionWhenCoverLetterIsReviewed() {
+        Instant now = Instant.parse("2026-06-20T01:00:00Z");
+        given(currentUserProvider.currentUser()).willReturn(new CurrentUser("user_1", "테스트", null));
+        CoverLetter coverLetter = saveCompleteCoverLetter("cl_reviewed", "user_1", now, 1);
+        ReflectionTestUtils.setField(coverLetter, "status", CoverLetterStatus.REVIEWED);
+        coverLetter.setLatestReviewVersionId("rv_1");
+        repository.saveAndFlush(coverLetter);
+
+        SubmitCoverLetterResult result = service.submit("cl_reviewed");
+
+        assertThat(result.coverLetter().getLatestReviewVersionId()).isEqualTo("rv_1");
+        assertThat(result.job()).isNull();
+        assertThat(llmJobRepository.count()).isZero();
+    }
+
+    @Test
+    void submitThrowsInternalErrorWhenReviewingJobIsMissing() {
+        Instant now = Instant.parse("2026-06-20T01:00:00Z");
+        given(currentUserProvider.currentUser()).willReturn(new CurrentUser("user_1", "테스트", null));
+        CoverLetter coverLetter = saveCompleteCoverLetter("cl_broken_reviewing", "user_1", now, 1);
+        ReflectionTestUtils.setField(coverLetter, "status", CoverLetterStatus.REVIEWING);
+        repository.saveAndFlush(coverLetter);
+
+        assertThatThrownBy(() -> service.submit("cl_broken_reviewing"))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.INTERNAL_ERROR);
+    }
+
+    @Test
+    void submitThrowsInternalErrorWhenReviewedVersionIsMissing() {
+        Instant now = Instant.parse("2026-06-20T01:00:00Z");
+        given(currentUserProvider.currentUser()).willReturn(new CurrentUser("user_1", "테스트", null));
+        CoverLetter coverLetter = saveCompleteCoverLetter("cl_broken_reviewed", "user_1", now, 1);
+        ReflectionTestUtils.setField(coverLetter, "status", CoverLetterStatus.REVIEWED);
+        repository.saveAndFlush(coverLetter);
+
+        assertThatThrownBy(() -> service.submit("cl_broken_reviewed"))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.INTERNAL_ERROR);
+    }
+
+    @Test
+    void submitRetriesFailedReviewWithoutChangingFirstSubmittedAt() {
+        Instant firstSubmittedAt = Instant.parse("2026-06-20T02:00:00Z");
+        Instant retriedAt = Instant.parse("2026-06-20T05:00:00Z");
+        given(currentUserProvider.currentUser()).willReturn(new CurrentUser("user_1", "테스트", null));
+        given(idGenerator.generate("job")).willReturn("job_retry");
+        given(clock.instant()).willReturn(retriedAt);
+        CoverLetter coverLetter = saveCompleteCoverLetter("cl_failed", "user_1", firstSubmittedAt, 1);
+        ReflectionTestUtils.setField(coverLetter, "status", CoverLetterStatus.REVIEW_FAILED);
+        ReflectionTestUtils.setField(coverLetter, "submittedAt", firstSubmittedAt);
+        repository.saveAndFlush(coverLetter);
+
+        SubmitCoverLetterResult result = service.submit("cl_failed");
+
+        assertThat(result.coverLetter().getStatus()).isEqualTo(CoverLetterStatus.REVIEWING);
+        assertThat(result.coverLetter().getSubmittedAt()).isEqualTo(firstSubmittedAt);
+        assertThat(result.coverLetter().getUpdatedAt()).isEqualTo(retriedAt);
+        assertThat(result.job().getId()).isEqualTo("job_retry");
+    }
+
+    @Test
+    void submitRejectsOtherRunningJob() {
+        Instant now = Instant.parse("2026-06-20T01:00:00Z");
+        given(currentUserProvider.currentUser()).willReturn(new CurrentUser("user_1", "테스트", null));
+        CoverLetter coverLetter = saveCompleteCoverLetter("cl_busy", "user_1", now, 1);
+        LlmJob otherJob = LlmJob.pendingReview("job_other", coverLetter.getId(), now, 1);
+        ReflectionTestUtils.setField(otherJob, "type", LlmJobType.KEYWORD_ANALYSIS);
+        llmJobRepository.save(otherJob);
+
+        assertThatThrownBy(() -> service.submit("cl_busy"))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.LLM_JOB_ALREADY_RUNNING);
+
+        assertThat(llmJobRepository.count()).isEqualTo(1);
+    }
+
+    @Test
+    void submitThrowsNotFoundWhenCoverLetterIsMissingOtherOwnerOrDeleted() {
+        Instant now = Instant.parse("2026-06-20T01:00:00Z");
+        given(currentUserProvider.currentUser()).willReturn(new CurrentUser("user_1", "테스트", null));
+        saveCompleteCoverLetter("cl_other", "user_2", now, 1);
+        CoverLetter deleted = saveCompleteCoverLetter("cl_deleted", "user_1", now, 1);
+        deleted.markDeleted(now.plusSeconds(60));
+        repository.saveAndFlush(deleted);
+
+        assertThatThrownBy(() -> service.submit("cl_missing"))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.NOT_FOUND);
+        assertThatThrownBy(() -> service.submit("cl_other"))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.NOT_FOUND);
+        assertThatThrownBy(() -> service.submit("cl_deleted"))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.NOT_FOUND);
+    }
+
     private CoverLetter draft(String id, String ownerId, String title, Instant now) {
         CoverLetter coverLetter = CoverLetter.draft(id, ownerId, now);
         coverLetter.fillBasicInfo(title, "Rewrite Corp", "백엔드 개발자", null, now);
@@ -547,6 +726,30 @@ class CoverLetterServiceTest {
     private CoverLetter coverLetterWithStatus(String id, CoverLetterStatus status, Instant now) {
         CoverLetter coverLetter = CoverLetter.draft(id, "user_1", now);
         ReflectionTestUtils.setField(coverLetter, "status", status);
+        return coverLetter;
+    }
+
+    private CoverLetter saveCompleteCoverLetter(
+            String id,
+            String ownerId,
+            Instant now,
+            int questionCount
+    ) {
+        CoverLetter coverLetter = CoverLetter.draft(id, ownerId, now);
+        coverLetter.fillBasicInfo("제목", "회사", "직무", null, now);
+        coverLetter.fillPreferences("Spring Boot 경험", now);
+        repository.save(coverLetter);
+
+        for (int index = 0; index < questionCount; index++) {
+            questionRepository.save(CoverLetterQuestion.create(
+                    "clq_" + id + "_" + index,
+                    coverLetter,
+                    index + 1,
+                    "질문 " + (index + 1),
+                    1000,
+                    "답변 " + (index + 1)
+            ));
+        }
         return coverLetter;
     }
 }

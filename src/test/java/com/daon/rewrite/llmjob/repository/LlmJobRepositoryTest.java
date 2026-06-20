@@ -12,6 +12,7 @@ import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.time.Instant;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -105,5 +106,24 @@ class LlmJobRepositoryTest {
         assertThat(found.getErrorCode()).isEqualTo("LLM_PROVIDER_ERROR");
         assertThat(found.getErrorMessage()).isEqualTo("LLM 응답 생성에 실패했습니다.");
         assertThat(found.getCompletedAt()).isEqualTo(now.plusSeconds(60));
+    }
+
+    @Test
+    void findLatestRunningJobByCoverLetter() {
+        Instant now = Instant.parse("2026-06-20T05:10:00Z");
+        LlmJob oldJob = LlmJob.pendingReview("job_old", "cl_1", now, 3);
+        oldJob.markFailed(0, "실패", "ERROR", "실패", now.plusSeconds(30));
+        LlmJob runningJob = LlmJob.pendingReview("job_running", "cl_1", now.plusSeconds(60), 3);
+        repository.saveAll(List.of(oldJob, runningJob));
+        entityManager.flush();
+        entityManager.clear();
+
+        LlmJob found = repository.findFirstByTargetTypeAndTargetIdAndStatusInOrderByCreatedAtDesc(
+                LlmJobTargetType.COVER_LETTER,
+                "cl_1",
+                List.of(LlmJobStatus.PENDING, LlmJobStatus.PROCESSING)
+        ).orElseThrow();
+
+        assertThat(found.getId()).isEqualTo("job_running");
     }
 }
