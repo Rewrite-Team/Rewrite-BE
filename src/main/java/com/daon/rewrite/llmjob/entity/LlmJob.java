@@ -107,6 +107,14 @@ public class LlmJob {
         );
     }
 
+    public void startProcessing(String progressMessage) {
+        if (this.status != LlmJobStatus.PENDING) {
+            throw new IllegalStateException("PENDING Job만 처리를 시작할 수 있습니다.");
+        }
+        this.status = LlmJobStatus.PROCESSING;
+        this.progressMessage = progressMessage;
+    }
+
     public void markCompleted(
             int progressCurrent,
             String progressMessage,
