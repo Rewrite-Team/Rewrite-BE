@@ -37,4 +37,13 @@ public interface CoverLetterRepository extends JpaRepository<CoverLetter, String
             @Param("id") String id,
             @Param("ownerId") String ownerId
     );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select coverLetter
+            from CoverLetter coverLetter
+            where coverLetter.id = :id
+              and coverLetter.deletedAt is null
+            """)
+    Optional<CoverLetter> findActiveByIdForUpdate(@Param("id") String id);
 }

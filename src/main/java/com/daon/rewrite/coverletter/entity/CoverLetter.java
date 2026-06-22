@@ -102,6 +102,12 @@ public class CoverLetter {
         this.updatedAt = now;
     }
 
+    public void completeReview(String reviewVersionId, Instant now) {
+        this.status = CoverLetterStatus.REVIEWED;
+        this.latestReviewVersionId = reviewVersionId;
+        this.updatedAt = now;
+    }
+
     public void setLatestReviewVersionId(String latestReviewVersionId) {
         this.latestReviewVersionId = latestReviewVersionId;
     }
