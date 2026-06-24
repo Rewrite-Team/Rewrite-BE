@@ -36,6 +36,7 @@ API 계약과 API별 상태는 `docs/api/README.md`와 `docs/api/` 하위 도메
 | Issue | Scope | Status | Notes |
 |---|---|---|---|
 | [#16](https://github.com/Rewrite-Team/Rewrite-BE/issues/16) | Backend 문서 구조 및 개발 규칙 정리 | Open | 현재 문서 구조와 작업 규칙 정리 범위 |
+| [#46](https://github.com/Rewrite-Team/Rewrite-BE/issues/46) | Codecov 및 PR CI 리포트 개선 | Open | Codecov informational status, JaCoCo 수치와 PR별 sunburst를 포함한 고정 CI 댓글 구성 |
 
 ## Current Recommended Next Work
 
