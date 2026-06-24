@@ -19,6 +19,8 @@ spring:
       enabled: false
 
   ai:
+    retry:
+      max-attempts: 1
     openai:
       api-key: test-key
       chat:
