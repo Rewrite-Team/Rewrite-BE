@@ -66,6 +66,12 @@ jobs:
     runs-on: ubuntu-latest
     needs: test
     if: always()
+    outputs:
+      line_coverage: ${{ steps.coverage-summary.outputs.line_coverage }}
+      covered_lines: ${{ steps.coverage-summary.outputs.covered_lines }}
+      total_lines: ${{ steps.coverage-summary.outputs.total_lines }}
+      coverage_report_outcome: ${{ steps.download-coverage.outcome }}
+      codecov_outcome: ${{ steps.codecov.outcome }}
 
     steps:
       - name: Checkout
@@ -78,6 +84,42 @@ jobs:
         with:
           name: backend-coverage-report
           path: build/reports/jacoco/test
+
+      - name: Calculate line coverage
+        id: coverage-summary
+        if: steps.download-coverage.outcome == 'success'
+        shell: python
+        run: |
+          import os
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+
+          report = Path("build/reports/jacoco/test/jacocoTestReport.xml")
+          output = Path(os.environ["GITHUB_OUTPUT"])
+
+          line_coverage = "N/A"
+          covered_lines = "0"
+          total_lines = "0"
+
+          if report.exists():
+              root = ET.parse(report).getroot()
+              counter = next(
+                  (item for item in root.findall("counter") if item.get("type") == "LINE"),
+                  None,
+              )
+              if counter is not None:
+                  covered = int(counter.get("covered", "0"))
+                  missed = int(counter.get("missed", "0"))
+                  total = covered + missed
+                  covered_lines = str(covered)
+                  total_lines = str(total)
+                  if total > 0:
+                      line_coverage = f"{covered / total * 100:.2f}%"
+
+          with output.open("a", encoding="utf-8") as stream:
+              stream.write(f"line_coverage={line_coverage}\n")
+              stream.write(f"covered_lines={covered_lines}\n")
+              stream.write(f"total_lines={total_lines}\n")
 
       - name: Upload coverage to Codecov
         id: codecov
@@ -102,3 +144,91 @@ jobs:
             echo "| Codecov upload | ${{ steps.codecov.outcome }} |"
             echo "| Commit | \`${{ github.sha }}\` |"
           } >> "$GITHUB_STEP_SUMMARY"
+
+  pr-report:
+    name: PR report
+    runs-on: ubuntu-latest
+    needs:
+      - test
+      - coverage
+    if: >-
+      always() &&
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Update PR CI report comment
+        uses: actions/github-script@v9
+        env:
+          TEST_RESULT: ${{ needs.test.result }}
+          LINE_COVERAGE: ${{ needs.coverage.outputs.line_coverage }}
+          COVERED_LINES: ${{ needs.coverage.outputs.covered_lines }}
+          TOTAL_LINES: ${{ needs.coverage.outputs.total_lines }}
+          COVERAGE_REPORT_OUTCOME: ${{ needs.coverage.outputs.coverage_report_outcome }}
+          CODECOV_OUTCOME: ${{ needs.coverage.outputs.codecov_outcome }}
+          WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          CODECOV_PR_URL: https://app.codecov.io/gh/${{ github.repository }}/pull/${{ github.event.pull_request.number }}
+        with:
+          script: |
+            const marker = '<!-- backend-ci-report -->';
+
+            const jobResult = (value) => ({
+              success: '✅ Passed',
+              failure: '❌ Failed',
+              cancelled: '⚪ Cancelled',
+              skipped: '⚪ Skipped',
+            })[value] ?? '⚪ Unknown';
+
+            const stepResult = (value, successLabel) => ({
+              success: `✅ ${successLabel}`,
+              failure: '⚠️ Failed',
+              cancelled: '⚪ Cancelled',
+              skipped: '⚪ Skipped',
+            })[value] ?? '⚪ Not available';
+
+            const lineCoverage = process.env.LINE_COVERAGE || 'N/A';
+            const coveredLines = process.env.COVERED_LINES || '0';
+            const totalLines = process.env.TOTAL_LINES || '0';
+
+            const body = [
+              marker,
+              '## Backend CI Report',
+              '',
+              '| Item | Result |',
+              '| --- | --- |',
+              `| Tests | ${jobResult(process.env.TEST_RESULT)} |`,
+              `| JaCoCo line coverage | ${lineCoverage} (${coveredLines}/${totalLines} lines) |`,
+              `| Coverage report | ${stepResult(process.env.COVERAGE_REPORT_OUTCOME, 'Generated')} |`,
+              `| Codecov upload | ${stepResult(process.env.CODECOV_OUTCOME, 'Uploaded')} |`,
+              '',
+              `[View workflow run](${process.env.WORKFLOW_URL}) | [View coverage details](${process.env.CODECOV_PR_URL})`,
+            ].join('\n');
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              per_page: 100,
+            });
+            const existing = comments.find((comment) =>
+              comment.user?.login === 'github-actions[bot]' && comment.body?.includes(marker)
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
