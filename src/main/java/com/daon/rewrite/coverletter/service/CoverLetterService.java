@@ -16,7 +16,9 @@ import com.daon.rewrite.llmjob.entity.LlmJobStatus;
 import com.daon.rewrite.llmjob.entity.LlmJobTargetType;
 import com.daon.rewrite.llmjob.entity.LlmJobType;
 import com.daon.rewrite.llmjob.repository.LlmJobRepository;
+import com.daon.rewrite.llmjob.service.LlmJobCreatedEvent;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -59,6 +61,7 @@ public class CoverLetterService {
     private final LlmJobRepository llmJobRepository;
     private final IdGenerator idGenerator;
     private final Clock clock;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public CoverLetter createDraft() {
@@ -231,6 +234,7 @@ public class CoverLetterService {
                 questions.size()
         ));
         coverLetter.startReview(now);
+        eventPublisher.publishEvent(new LlmJobCreatedEvent(job.getId()));
 
         return new SubmitCoverLetterResult(coverLetter, job);
     }

@@ -9,7 +9,7 @@ public class FirstReviewClientException extends RuntimeException {
         this.reason = reason;
     }
 
-    static FirstReviewClientException outputValidationFailed() {
+    public static FirstReviewClientException outputValidationFailed() {
         return new FirstReviewClientException(
                 Reason.OUTPUT_VALIDATION_FAILED,
                 "최초 첨삭 결과 구조가 올바르지 않습니다.",
@@ -17,7 +17,7 @@ public class FirstReviewClientException extends RuntimeException {
         );
     }
 
-    static FirstReviewClientException outputValidationFailed(Throwable cause) {
+    public static FirstReviewClientException outputValidationFailed(Throwable cause) {
         return new FirstReviewClientException(
                 Reason.OUTPUT_VALIDATION_FAILED,
                 "최초 첨삭 결과를 변환할 수 없습니다.",
@@ -25,7 +25,7 @@ public class FirstReviewClientException extends RuntimeException {
         );
     }
 
-    static FirstReviewClientException providerError(Throwable cause) {
+    public static FirstReviewClientException providerError(Throwable cause) {
         return new FirstReviewClientException(
                 Reason.PROVIDER_ERROR,
                 "최초 첨삭 provider 호출에 실패했습니다.",

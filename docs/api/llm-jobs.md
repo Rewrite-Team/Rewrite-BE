@@ -8,7 +8,7 @@
 GET /llm-jobs/{jobId}
 ```
 
-현재 구현된 skeleton 범위에서는 저장된 Job 상태를 조회할 수 있다. `partialResult`는 아직 서버 메모리/cache 저장소와 실제 LLM 실행 흐름이 없으므로 항상 `null`이다.
+현재 구현 범위에서는 최초 첨삭 Job이 submit 이후 비동기 worker로 실행될 수 있다. `partialResult`는 아직 서버 메모리/cache 저장소가 없으므로 항상 `null`이다.
 
 `targetType=COVER_LETTER`인 Job은 연결된 자기소개서의 owner와 soft delete 상태를 기준으로 접근 권한을 검증한다. 존재하지 않는 Job, 다른 사용자 소유 자기소개서에 연결된 Job, 삭제된 자기소개서에 연결된 Job은 모두 `NOT_FOUND`를 반환한다.
 
@@ -76,7 +76,7 @@ Response:
     "total": 3,
     "message": "LLM 첨삭에 실패했습니다."
   },
-  "attempt": 2,
+  "attempt": 1,
   "maxAttempts": 2,
   "resultRef": null,
   "error": {
@@ -94,7 +94,7 @@ Response:
 GET /llm-jobs/{jobId}/stream
 ```
 
-아직 구현되지 않았다. API-016 SSE stream은 실제 LLM 실행 흐름과 partial result 저장소가 준비되는 후속 이슈에서 구현한다.
+아직 구현되지 않았다. API-016 SSE stream은 partial result 저장소와 스트리밍 이벤트 발행이 준비되는 후속 이슈에서 구현한다.
 
 SSE는 LLM 작업의 실시간 표시 채널이다. 서버는 `Last-Event-ID` 기반 이벤트 replay를 지원하지 않는다.
 
