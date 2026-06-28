@@ -448,6 +448,8 @@ questions는 1개 이상이어야 한다.
 
 `REVIEW_FAILED` 상태의 사용자 수동 재시도에는 제품 도메인상 횟수 제한을 두지 않는다. 단, LLM 비용과 남용 방지를 위한 rate limit, 사용자 quota, 운영 정책은 별도로 적용할 수 있다.
 
+새 Job이 생성되면 submit transaction commit 이후 최초 첨삭 worker가 비동기로 실행된다. worker 성공 시 `ReviewVersion`이 생성되고 `CoverLetter.status`는 `REVIEWED`가 된다. worker 실패 시 `LlmJob.status`는 `FAILED`, `CoverLetter.status`는 `REVIEW_FAILED`가 된다.
+
 이미 최초 첨삭 Job이 `PENDING` 또는 `PROCESSING` 상태이면 새 Job을 만들지 않고 기존 진행 중 Job을 반환한다.
 
 이미 `REVIEWED` 상태이면 새 Job을 만들지 않고 기존 최신 `ReviewVersion` 정보를 반환한다.
