@@ -1,0 +1,163 @@
+package com.daon.rewrite.reviewversion.controller;
+
+import com.daon.rewrite.coverletter.entity.CoverLetter;
+import com.daon.rewrite.coverletter.entity.CoverLetterQuestion;
+import com.daon.rewrite.global.exception.BusinessException;
+import com.daon.rewrite.global.exception.ErrorCode;
+import com.daon.rewrite.reviewversion.entity.ReviewVersion;
+import com.daon.rewrite.reviewversion.entity.ReviewVersionQuestionResult;
+import com.daon.rewrite.reviewversion.service.ReviewVersionDetail;
+import com.daon.rewrite.reviewversion.service.ReviewVersionQueryService;
+import com.daon.rewrite.reviewversion.service.ReviewVersionSummary;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.test.web.servlet.MockMvc;
+
+import java.time.Instant;
+import java.util.List;
+
+import static org.mockito.BDDMockito.given;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+@WebMvcTest(ReviewVersionController.class)
+class ReviewVersionControllerTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @MockitoBean
+    private ReviewVersionQueryService reviewVersionQueryService;
+
+    @Test
+    void findReviewVersionsReturnsItems() throws Exception {
+        CoverLetter coverLetter = CoverLetter.draft(
+                "cl_1",
+                "user_1",
+                Instant.parse("2026-06-21T01:00:00Z")
+        );
+        ReviewVersion reviewVersion = ReviewVersion.first(
+                "rv_1",
+                coverLetter,
+                Instant.parse("2026-06-21T05:00:00Z")
+        );
+        given(reviewVersionQueryService.findMyReviewVersions("cl_1"))
+                .willReturn(List.of(new ReviewVersionSummary(reviewVersion, true)));
+
+        mockMvc.perform(get("/cover-letters/{coverLetterId}/review-versions", "cl_1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].id").value("rv_1"))
+                .andExpect(jsonPath("$.items[0].version").value("v0.1"))
+                .andExpect(jsonPath("$.items[0].isLatest").value(true))
+                .andExpect(jsonPath("$.items[0].createdAt").value("2026-06-21T14:00:00"));
+    }
+
+    @Test
+    void findReviewVersionReturnsQuestionResults() throws Exception {
+        CoverLetter coverLetter = CoverLetter.draft(
+                "cl_1",
+                "user_1",
+                Instant.parse("2026-06-21T01:00:00Z")
+        );
+        CoverLetterQuestion question = CoverLetterQuestion.create(
+                "clq_1",
+                coverLetter,
+                1,
+                "지원 동기는?",
+                1000,
+                "원본 답변"
+        );
+        ReviewVersion reviewVersion = ReviewVersion.first(
+                "rv_1",
+                coverLetter,
+                Instant.parse("2026-06-21T05:00:00Z")
+        );
+        ReviewVersionQuestionResult questionResult = ReviewVersionQuestionResult.create(
+                "rvqr_1",
+                reviewVersion,
+                question,
+                "AI 리포트",
+                "수정 답변"
+        );
+        given(reviewVersionQueryService.findMyReviewVersion("cl_1", "rv_1"))
+                .willReturn(new ReviewVersionDetail("cl_1", reviewVersion, true, List.of(questionResult)));
+
+        mockMvc.perform(get(
+                        "/cover-letters/{coverLetterId}/review-versions/{versionId}",
+                        "cl_1",
+                        "rv_1"
+                ))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("rv_1"))
+                .andExpect(jsonPath("$.coverLetterId").value("cl_1"))
+                .andExpect(jsonPath("$.version").value("v0.1"))
+                .andExpect(jsonPath("$.isLatest").value(true))
+                .andExpect(jsonPath("$.requestInstruction").doesNotExist())
+                .andExpect(jsonPath("$.createdAt").value("2026-06-21T14:00:00"))
+                .andExpect(jsonPath("$.questionResults[0].questionResultId").value("rvqr_1"))
+                .andExpect(jsonPath("$.questionResults[0].questionId").value("clq_1"))
+                .andExpect(jsonPath("$.questionResults[0].order").value(1))
+                .andExpect(jsonPath("$.questionResults[0].question").value("지원 동기는?"))
+                .andExpect(jsonPath("$.questionResults[0].maxAnswerLength").value(1000))
+                .andExpect(jsonPath("$.questionResults[0].originalAnswer").value("원본 답변"))
+                .andExpect(jsonPath("$.questionResults[0].originalAnswerLength").value(5))
+                .andExpect(jsonPath("$.questionResults[0].aiReport").value("AI 리포트"))
+                .andExpect(jsonPath("$.questionResults[0].rewrittenAnswer").value("수정 답변"))
+                .andExpect(jsonPath("$.questionResults[0].rewrittenAnswerLength").value(5))
+                .andExpect(jsonPath("$.questionResults[0].finalAnswer").value("수정 답변"))
+                .andExpect(jsonPath("$.questionResults[0].finalAnswerLength").value(5));
+    }
+
+    @Test
+    void findReviewVersionReturnsRequestInstructionWhenPresent() throws Exception {
+        CoverLetter coverLetter = CoverLetter.draft(
+                "cl_1",
+                "user_1",
+                Instant.parse("2026-06-21T01:00:00Z")
+        );
+        ReviewVersion reviewVersion = ReviewVersion.first(
+                "rv_1",
+                coverLetter,
+                Instant.parse("2026-06-21T05:00:00Z")
+        );
+        ReflectionTestUtils.setField(reviewVersion, "requestInstruction", "직무 키워드를 강조해주세요.");
+        given(reviewVersionQueryService.findMyReviewVersion("cl_1", "rv_1"))
+                .willReturn(new ReviewVersionDetail("cl_1", reviewVersion, true, List.of()));
+
+        mockMvc.perform(get(
+                        "/cover-letters/{coverLetterId}/review-versions/{versionId}",
+                        "cl_1",
+                        "rv_1"
+                ))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.requestInstruction").value("직무 키워드를 강조해주세요."));
+    }
+
+    @Test
+    void findReviewVersionsReturnsNotFound() throws Exception {
+        given(reviewVersionQueryService.findMyReviewVersions("cl_missing"))
+                .willThrow(new BusinessException(ErrorCode.NOT_FOUND));
+
+        mockMvc.perform(get("/cover-letters/{coverLetterId}/review-versions", "cl_missing"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("NOT_FOUND"));
+    }
+
+    @Test
+    void findReviewVersionReturnsNotFound() throws Exception {
+        given(reviewVersionQueryService.findMyReviewVersion("cl_1", "rv_missing"))
+                .willThrow(new BusinessException(ErrorCode.NOT_FOUND));
+
+        mockMvc.perform(get(
+                        "/cover-letters/{coverLetterId}/review-versions/{versionId}",
+                        "cl_1",
+                        "rv_missing"
+                ))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("NOT_FOUND"));
+    }
+}

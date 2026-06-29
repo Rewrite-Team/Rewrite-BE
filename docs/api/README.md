@@ -65,8 +65,8 @@ API 설계 결정과 트레이드오프는 `../decisions/README.md`를 함께 �
 | API-014 | POST | `/cover-letters/{coverLetterId}/submit` | Implemented | REQ-005 | 첨삭 Job 생성 |
 | API-015 | GET | `/llm-jobs/{jobId}` | Implemented | REQ-005 | LLM Job 상태 조회 |
 | API-016 | GET | `/llm-jobs/{jobId}/stream` | Planned | REQ-005 | SSE 스트리밍 |
-| API-017 | GET | `/cover-letters/{coverLetterId}/review-versions` | Planned | REQ-006 | 첨삭 버전 목록 |
-| API-018 | GET | `/cover-letters/{coverLetterId}/review-versions/{versionId}` | Planned | REQ-006 | 첨삭 버전 상세 |
+| API-017 | GET | `/cover-letters/{coverLetterId}/review-versions` | Implemented | REQ-006 | 첨삭 버전 목록 |
+| API-018 | GET | `/cover-letters/{coverLetterId}/review-versions/{versionId}` | Implemented | REQ-006 | 첨삭 버전 상세 |
 | API-019 | PUT | `/cover-letters/{coverLetterId}/review-versions/{versionId}/final-answers` | Planned | REQ-006 | 최종 작성본 일괄 저장 |
 | API-020 | POST | `/cover-letters/{coverLetterId}/keyword-analysis` | Planned | REQ-009 | 키워드 분석 시작/재분석 |
 | API-021 | GET | `/cover-letters/{coverLetterId}/keyword-analysis/latest` | Planned | REQ-009 | 최신 키워드 분석 조회 |
