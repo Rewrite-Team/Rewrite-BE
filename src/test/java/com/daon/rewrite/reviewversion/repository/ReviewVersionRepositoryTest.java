@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
 import java.util.List;
@@ -87,5 +88,42 @@ class ReviewVersionRepositoryTest {
         assertThat(foundResults.getFirst().getRewrittenAnswerLength()).isEqualTo(6);
         assertThat(foundResults.getFirst().getFinalAnswer()).isEqualTo("수정 답변😀");
         assertThat(foundResults.getFirst().getFinalAnswerLength()).isEqualTo(6);
+    }
+
+    @Test
+    void findByCoverLetterIdOrdersByCreatedAtDesc() {
+        Instant now = Instant.parse("2026-06-21T01:00:00Z");
+        CoverLetter coverLetter = coverLetterRepository.save(CoverLetter.draft("cl_1", "user_1", now));
+        ReviewVersion oldVersion = reviewVersionRepository.save(ReviewVersion.first(
+                "rv_old",
+                coverLetter,
+                now.plusSeconds(60)
+        ));
+        ReviewVersion newVersion = ReviewVersion.first(
+                "rv_new",
+                coverLetter,
+                now.plusSeconds(120)
+        );
+        ReflectionTestUtils.setField(newVersion, "version", "v0.2");
+        reviewVersionRepository.save(newVersion);
+
+        List<ReviewVersion> result = reviewVersionRepository.findByCoverLetterIdOrderByCreatedAtDesc("cl_1");
+
+        assertThat(result).extracting(ReviewVersion::getId)
+                .containsExactly("rv_new", "rv_old");
+    }
+
+    @Test
+    void findByIdAndCoverLetterIdReturnsOnlyMatchingCoverLetterVersion() {
+        Instant now = Instant.parse("2026-06-21T01:00:00Z");
+        CoverLetter myCoverLetter = coverLetterRepository.save(CoverLetter.draft("cl_1", "user_1", now));
+        CoverLetter otherCoverLetter = coverLetterRepository.save(CoverLetter.draft("cl_2", "user_1", now));
+        reviewVersionRepository.save(ReviewVersion.first("rv_1", myCoverLetter, now.plusSeconds(60)));
+        reviewVersionRepository.save(ReviewVersion.first("rv_other", otherCoverLetter, now.plusSeconds(60)));
+
+        assertThat(reviewVersionRepository.findByIdAndCoverLetterId("rv_1", "cl_1"))
+                .hasValueSatisfying(version -> assertThat(version.getId()).isEqualTo("rv_1"));
+        assertThat(reviewVersionRepository.findByIdAndCoverLetterId("rv_other", "cl_1"))
+                .isEmpty();
     }
 }
