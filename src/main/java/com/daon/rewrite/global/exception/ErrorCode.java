@@ -38,6 +38,12 @@ public enum ErrorCode {
             "이미 진행 중인 LLM 작업이 있습니다."
     ),
 
+    REVIEW_VERSION_NOT_LATEST(
+            HttpStatus.CONFLICT,
+            "REVIEW_VERSION_NOT_LATEST",
+            "최신 첨삭 버전의 최종 작성본만 수정할 수 있습니다."
+    ),
+
     INTERNAL_ERROR(
             HttpStatus.INTERNAL_SERVER_ERROR,
             "INTERNAL_ERROR",
