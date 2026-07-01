@@ -4,14 +4,20 @@ import com.daon.rewrite.coverletter.entity.CoverLetter;
 import com.daon.rewrite.coverletter.entity.CoverLetterQuestion;
 import com.daon.rewrite.global.exception.BusinessException;
 import com.daon.rewrite.global.exception.ErrorCode;
+import com.daon.rewrite.global.response.ErrorResponse;
 import com.daon.rewrite.reviewversion.entity.ReviewVersion;
 import com.daon.rewrite.reviewversion.entity.ReviewVersionQuestionResult;
+import com.daon.rewrite.reviewversion.service.SaveFinalAnswerInput;
+import com.daon.rewrite.reviewversion.service.SaveFinalAnswersResult;
+import com.daon.rewrite.reviewversion.service.ReviewVersionCommandService;
 import com.daon.rewrite.reviewversion.service.ReviewVersionDetail;
 import com.daon.rewrite.reviewversion.service.ReviewVersionQueryService;
 import com.daon.rewrite.reviewversion.service.ReviewVersionSummary;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
@@ -21,6 +27,7 @@ import java.util.List;
 
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -32,6 +39,9 @@ class ReviewVersionControllerTest {
 
     @MockitoBean
     private ReviewVersionQueryService reviewVersionQueryService;
+
+    @MockitoBean
+    private ReviewVersionCommandService reviewVersionCommandService;
 
     @Test
     void findReviewVersionsReturnsItems() throws Exception {
@@ -159,5 +169,136 @@ class ReviewVersionControllerTest {
                 ))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error.code").value("NOT_FOUND"));
+    }
+
+    @Nested
+    class SaveFinalAnswers {
+
+        @Test
+        void saveFinalAnswersReturnsUpdatedQuestionResults() throws Exception {
+            CoverLetter coverLetter = CoverLetter.draft(
+                    "cl_1",
+                    "user_1",
+                    Instant.parse("2026-06-21T01:00:00Z")
+            );
+            CoverLetterQuestion question = CoverLetterQuestion.create(
+                    "clq_1",
+                    coverLetter,
+                    1,
+                    "지원 동기는?",
+                    1000,
+                    "원본 답변"
+            );
+            ReviewVersion reviewVersion = ReviewVersion.first(
+                    "rv_1",
+                    coverLetter,
+                    Instant.parse("2026-06-21T05:00:00Z")
+            );
+            ReviewVersionQuestionResult questionResult = ReviewVersionQuestionResult.create(
+                    "rvqr_1",
+                    reviewVersion,
+                    question,
+                    "AI 리포트",
+                    "수정 답변"
+            );
+            questionResult.updateFinalAnswer("최종 답변😀");
+            given(reviewVersionCommandService.saveMyFinalAnswers(
+                    "cl_1",
+                    "rv_1",
+                    List.of(new SaveFinalAnswerInput("rvqr_1", " 최종 답변😀 "))
+            )).willReturn(new SaveFinalAnswersResult(
+                    "cl_1",
+                    "rv_1",
+                    List.of(questionResult),
+                    Instant.parse("2026-06-21T05:40:00Z")
+            ));
+
+            mockMvc.perform(put(
+                            "/cover-letters/{coverLetterId}/review-versions/{versionId}/final-answers",
+                            "cl_1",
+                            "rv_1"
+                    )
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {
+                                      "answers": [
+                                        {
+                                          "questionResultId": "rvqr_1",
+                                          "finalAnswer": " 최종 답변😀 "
+                                        }
+                                      ]
+                                    }
+                                    """))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.coverLetterId").value("cl_1"))
+                    .andExpect(jsonPath("$.reviewVersionId").value("rv_1"))
+                    .andExpect(jsonPath("$.questionResults[0].questionResultId").value("rvqr_1"))
+                    .andExpect(jsonPath("$.questionResults[0].finalAnswer").value("최종 답변😀"))
+                    .andExpect(jsonPath("$.questionResults[0].finalAnswerLength").value(6))
+                    .andExpect(jsonPath("$.updatedAt").value("2026-06-21T14:40:00"));
+        }
+
+        @Test
+        void saveFinalAnswersReturnsConflictWhenVersionIsNotLatest() throws Exception {
+            given(reviewVersionCommandService.saveMyFinalAnswers(
+                    "cl_1",
+                    "rv_old",
+                    List.of(new SaveFinalAnswerInput("rvqr_1", "최종 답변"))
+            )).willThrow(new BusinessException(ErrorCode.REVIEW_VERSION_NOT_LATEST));
+
+            mockMvc.perform(put(
+                            "/cover-letters/{coverLetterId}/review-versions/{versionId}/final-answers",
+                            "cl_1",
+                            "rv_old"
+                    )
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {
+                                      "answers": [
+                                        {
+                                          "questionResultId": "rvqr_1",
+                                          "finalAnswer": "최종 답변"
+                                        }
+                                      ]
+                                    }
+                                    """))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.error.code").value("REVIEW_VERSION_NOT_LATEST"));
+        }
+
+        @Test
+        void saveFinalAnswersReturnsValidationDetails() throws Exception {
+            given(reviewVersionCommandService.saveMyFinalAnswers(
+                    "cl_1",
+                    "rv_1",
+                    List.of(new SaveFinalAnswerInput("rvqr_1", " "))
+            )).willThrow(new BusinessException(
+                    ErrorCode.VALIDATION_ERROR,
+                    List.of(new ErrorResponse.ErrorDetail(
+                            "answers[0].finalAnswer",
+                            "최종 작성본을 입력해야 합니다."
+                    ))
+            ));
+
+            mockMvc.perform(put(
+                            "/cover-letters/{coverLetterId}/review-versions/{versionId}/final-answers",
+                            "cl_1",
+                            "rv_1"
+                    )
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {
+                                      "answers": [
+                                        {
+                                          "questionResultId": "rvqr_1",
+                                          "finalAnswer": " "
+                                        }
+                                      ]
+                                    }
+                                    """))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"))
+                    .andExpect(jsonPath("$.error.details[0].field").value("answers[0].finalAnswer"));
+        }
     }
 }

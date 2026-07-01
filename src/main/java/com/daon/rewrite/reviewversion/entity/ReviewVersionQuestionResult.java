@@ -105,6 +105,11 @@ public class ReviewVersionQuestionResult {
         return new ReviewVersionQuestionResult(id, reviewVersion, question, aiReport, rewrittenAnswer);
     }
 
+    public void updateFinalAnswer(String finalAnswer) {
+        this.finalAnswer = finalAnswer;
+        this.finalAnswerLength = countCodePoints(finalAnswer);
+    }
+
     private static int countCodePoints(String value) {
         return value.codePointCount(0, value.length());
     }
