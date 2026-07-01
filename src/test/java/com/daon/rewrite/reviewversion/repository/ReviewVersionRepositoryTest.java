@@ -126,4 +126,39 @@ class ReviewVersionRepositoryTest {
         assertThat(reviewVersionRepository.findByIdAndCoverLetterId("rv_other", "cl_1"))
                 .isEmpty();
     }
+
+    @Test
+    void updateFinalAnswerRoundTripsUpdatedAnswerAndLength() {
+        Instant now = Instant.parse("2026-06-21T01:00:00Z");
+        CoverLetter coverLetter = coverLetterRepository.save(CoverLetter.draft("cl_1", "user_1", now));
+        CoverLetterQuestion question = coverLetterQuestionRepository.save(CoverLetterQuestion.create(
+                "clq_1",
+                coverLetter,
+                1,
+                "지원 동기를 작성해주세요.",
+                1000,
+                "원본 답변"
+        ));
+        ReviewVersion reviewVersion = reviewVersionRepository.save(ReviewVersion.first(
+                "rv_1",
+                coverLetter,
+                now.plusSeconds(60)
+        ));
+        ReviewVersionQuestionResult questionResult = questionResultRepository.save(ReviewVersionQuestionResult.create(
+                "rvqr_1",
+                reviewVersion,
+                question,
+                "AI 리포트",
+                "수정 답변"
+        ));
+
+        questionResult.updateFinalAnswer("최종 답변😀");
+        entityManager.flush();
+        entityManager.clear();
+
+        ReviewVersionQuestionResult found = questionResultRepository.findById("rvqr_1").orElseThrow();
+
+        assertThat(found.getFinalAnswer()).isEqualTo("최종 답변😀");
+        assertThat(found.getFinalAnswerLength()).isEqualTo(6);
+    }
 }

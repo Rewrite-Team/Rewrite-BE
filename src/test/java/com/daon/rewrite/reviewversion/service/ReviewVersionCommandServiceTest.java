@@ -25,6 +25,7 @@ import java.time.Instant;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 
@@ -153,6 +154,28 @@ class ReviewVersionCommandServiceTest {
     }
 
     @Test
+    void saveMyFinalAnswersReportsDuplicateQuestionResultIdEvenWhenFirstAnswerIsBlank() {
+        saveReviewedCoverLetterWithLatestVersion("cl_1", "user_1", "rv_1");
+        given(currentUserProvider.currentUser()).willReturn(new CurrentUser("user_1", "테스트", null));
+
+        assertThatExceptionOfType(BusinessException.class)
+                .isThrownBy(() -> service.saveMyFinalAnswers(
+                        "cl_1",
+                        "rv_1",
+                        List.of(
+                                new SaveFinalAnswerInput("rvqr_1", " "),
+                                new SaveFinalAnswerInput("rvqr_1", "중복 답변")
+                        )
+                ))
+                .satisfies(exception -> {
+                    assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.VALIDATION_ERROR);
+                    assertThat(exception.getDetails())
+                            .extracting("field")
+                            .contains("answers[0].finalAnswer", "answers[1].questionResultId");
+                });
+    }
+
+    @Test
     void saveMyFinalAnswersThrowsNotFoundWhenCoverLetterIsMissingOtherOwnerOrDeleted() {
         Instant now = Instant.parse("2026-06-21T01:00:00Z");
         coverLetterRepository.save(CoverLetter.draft("cl_other", "user_2", now));
@@ -164,6 +187,23 @@ class ReviewVersionCommandServiceTest {
         assertNotFound("cl_missing");
         assertNotFound("cl_other");
         assertNotFound("cl_deleted");
+    }
+
+    @Test
+    void saveMyFinalAnswersThrowsNotFoundWhenReviewVersionIsMissing() {
+        saveReviewedCoverLetterWithLatestVersion("cl_1", "user_1", "rv_1");
+        given(currentUserProvider.currentUser()).willReturn(new CurrentUser("user_1", "테스트", null));
+
+        assertThatThrownBy(() -> service.saveMyFinalAnswers(
+                "cl_1",
+                "rv_missing",
+                List.of(
+                        new SaveFinalAnswerInput("rvqr_1", "첫 번째"),
+                        new SaveFinalAnswerInput("rvqr_2", "두 번째")
+                )
+        )).isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.NOT_FOUND);
     }
 
     private void assertNotFound(String coverLetterId) {

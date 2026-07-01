@@ -91,6 +91,7 @@ public class ReviewVersionCommandService {
             expectedIds.add(questionResult.getId());
         }
 
+        Set<String> seenIds = new HashSet<>();
         Map<String, String> normalizedAnswers = new HashMap<>();
         for (int index = 0; index < inputs.size(); index++) {
             SaveFinalAnswerInput input = inputs.get(index);
@@ -102,10 +103,13 @@ public class ReviewVersionCommandService {
                 continue;
             }
 
-            validateQuestionResultId(index, input.questionResultId(), expectedIds, normalizedAnswers, details);
+            boolean validId = validateQuestionResultId(index, input.questionResultId(), expectedIds, seenIds, details);
             String normalizedFinalAnswer = validateFinalAnswer(index, input.finalAnswer(), details);
-            if (input.questionResultId() != null && normalizedFinalAnswer != null) {
-                normalizedAnswers.putIfAbsent(input.questionResultId(), normalizedFinalAnswer);
+            if (validId) {
+                seenIds.add(input.questionResultId());
+                if (normalizedFinalAnswer != null) {
+                    normalizedAnswers.put(input.questionResultId(), normalizedFinalAnswer);
+                }
             }
         }
 
@@ -122,11 +126,11 @@ public class ReviewVersionCommandService {
         return normalizedAnswers;
     }
 
-    private void validateQuestionResultId(
+    private boolean validateQuestionResultId(
             int index,
             String questionResultId,
             Set<String> expectedIds,
-            Map<String, String> normalizedAnswers,
+            Set<String> seenIds,
             List<ErrorResponse.ErrorDetail> details
     ) {
         if (questionResultId == null || questionResultId.isBlank()) {
@@ -134,21 +138,23 @@ public class ReviewVersionCommandService {
                     "answers[" + index + "].questionResultId",
                     "문항 결과 ID는 필수입니다."
             ));
-            return;
+            return false;
         }
         if (!expectedIds.contains(questionResultId)) {
             details.add(new ErrorResponse.ErrorDetail(
                     "answers[" + index + "].questionResultId",
                     "첨삭 버전에 포함되지 않은 문항 결과입니다."
             ));
-            return;
+            return false;
         }
-        if (normalizedAnswers.containsKey(questionResultId)) {
+        if (seenIds.contains(questionResultId)) {
             details.add(new ErrorResponse.ErrorDetail(
                     "answers[" + index + "].questionResultId",
                     "중복된 문항 결과입니다."
             ));
+            return false;
         }
+        return true;
     }
 
     private String validateFinalAnswer(
