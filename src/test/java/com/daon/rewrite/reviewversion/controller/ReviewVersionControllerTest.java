@@ -5,8 +5,11 @@ import com.daon.rewrite.coverletter.entity.CoverLetterQuestion;
 import com.daon.rewrite.global.exception.BusinessException;
 import com.daon.rewrite.global.exception.ErrorCode;
 import com.daon.rewrite.global.response.ErrorResponse;
+import com.daon.rewrite.llmjob.entity.LlmJob;
+import com.daon.rewrite.llmjob.entity.LlmJobStatus;
 import com.daon.rewrite.reviewversion.entity.ReviewVersion;
 import com.daon.rewrite.reviewversion.entity.ReviewVersionQuestionResult;
+import com.daon.rewrite.reviewversion.service.RequestReReviewResult;
 import com.daon.rewrite.reviewversion.service.SaveFinalAnswerInput;
 import com.daon.rewrite.reviewversion.service.SaveFinalAnswersResult;
 import com.daon.rewrite.reviewversion.service.ReviewVersionCommandService;
@@ -27,6 +30,7 @@ import java.util.List;
 
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -299,6 +303,75 @@ class ReviewVersionControllerTest {
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"))
                     .andExpect(jsonPath("$.error.details[0].field").value("answers[0].finalAnswer"));
+        }
+    }
+
+    @Nested
+    class RequestReReview {
+
+        @Test
+        void requestReReviewReturnsPendingJob() throws Exception {
+            LlmJob job = LlmJob.pendingReReview(
+                    "job_1",
+                    "cl_1",
+                    "직무 키워드를 강조해주세요.",
+                    Instant.parse("2026-06-21T05:50:00Z"),
+                    2
+            );
+            given(reviewVersionCommandService.requestMyReReview(
+                    "cl_1",
+                    " 직무 키워드를 강조해주세요. "
+            )).willReturn(new RequestReReviewResult("cl_1", job));
+
+            mockMvc.perform(post("/cover-letters/{coverLetterId}/review-versions", "cl_1")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {
+                                      "requestInstruction": " 직무 키워드를 강조해주세요. "
+                                    }
+                                    """))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.jobId").value("job_1"))
+                    .andExpect(jsonPath("$.coverLetterId").value("cl_1"))
+                    .andExpect(jsonPath("$.coverLetterStatus").value("REVIEWED"))
+                    .andExpect(jsonPath("$.jobStatus").value(LlmJobStatus.PENDING.name()));
+        }
+
+        @Test
+        void requestReReviewReturnsValidationDetails() throws Exception {
+            given(reviewVersionCommandService.requestMyReReview(
+                    "cl_1",
+                    "가".repeat(1001)
+            )).willThrow(new BusinessException(
+                    ErrorCode.VALIDATION_ERROR,
+                    List.of(new ErrorResponse.ErrorDetail(
+                            "requestInstruction",
+                            "재첨삭 요구사항은 최대 1000자까지 입력할 수 있습니다."
+                    ))
+            ));
+
+            mockMvc.perform(post("/cover-letters/{coverLetterId}/review-versions", "cl_1")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {
+                                      "requestInstruction": "%s"
+                                    }
+                                    """.formatted("가".repeat(1001))))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"))
+                    .andExpect(jsonPath("$.error.details[0].field").value("requestInstruction"));
+        }
+
+        @Test
+        void requestReReviewReturnsConflictWhenJobAlreadyRunning() throws Exception {
+            given(reviewVersionCommandService.requestMyReReview("cl_1", null))
+                    .willThrow(new BusinessException(ErrorCode.LLM_JOB_ALREADY_RUNNING));
+
+            mockMvc.perform(post("/cover-letters/{coverLetterId}/review-versions", "cl_1")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{}"))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.error.code").value("LLM_JOB_ALREADY_RUNNING"));
         }
     }
 }

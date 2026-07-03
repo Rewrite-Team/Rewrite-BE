@@ -72,7 +72,7 @@ API 설계 결정과 트레이드오프는 `../decisions/README.md`를 함께 �
 | API-021 | GET | `/cover-letters/{coverLetterId}/keyword-analysis/latest` | Planned | REQ-009 | 최신 키워드 분석 조회 |
 | API-022 | POST | `/cover-letters/{coverLetterId}/interviews` | Planned | REQ-010 | 면접 세션/질문 생성 |
 | API-023 | POST | `/interview-threads/{threadId}/messages` | Planned | REQ-010 | 면접 답변 전송 |
-| API-024 | POST | `/cover-letters/{coverLetterId}/review-versions` | Planned | REQ-006 | AI 첨삭 다시받기 |
+| API-024 | POST | `/cover-letters/{coverLetterId}/review-versions` | Implemented | REQ-006 | AI 첨삭 다시받기 |
 | API-025 | GET | `/cover-letters/{coverLetterId}/interview` | Planned | REQ-010 | 현재 면접 세션 조회 |
 | API-026 | GET | `/interviews/{interviewSessionId}/questions` | Planned | REQ-010 | 면접 질문 목록 |
 | API-027 | POST | `/interviews/{interviewSessionId}/questions` | Planned | REQ-010 | 면접 질문 추가 생성 |

@@ -287,6 +287,7 @@ LLM 비동기 작업 상태 테이블이다.
 | `status` | No | `PENDING`, `PROCESSING`, `COMPLETED`, `FAILED`, `CANCELED` |
 | `target_type` | No | 작업 대상 타입 |
 | `target_id` | No | 작업 대상 id. Polymorphic reference라 DB FK를 강제하지 않는다 |
+| `request_instruction` | Yes | 재첨삭 요구사항. 최초 첨삭과 요구사항 없는 재첨삭은 null |
 | `progress_current` | No | 진행률 현재값 |
 | `progress_total` | No | 진행률 전체값 |
 | `progress_message` | Yes | 진행 메시지 |

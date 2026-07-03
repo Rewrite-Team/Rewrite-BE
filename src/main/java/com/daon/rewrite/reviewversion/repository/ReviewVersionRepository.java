@@ -11,4 +11,6 @@ public interface ReviewVersionRepository extends JpaRepository<ReviewVersion, St
     List<ReviewVersion> findByCoverLetterIdOrderByCreatedAtDesc(String coverLetterId);
 
     Optional<ReviewVersion> findByIdAndCoverLetterId(String id, String coverLetterId);
+
+    long countByCoverLetterId(String coverLetterId);
 }

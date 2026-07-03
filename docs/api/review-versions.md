@@ -89,6 +89,7 @@ Validation:
 ```text
 requestInstruction: 선택, 최대 1000자
 같은 자기소개서에 PENDING 또는 PROCESSING 상태의 LLM Job이 없어야 한다.
+자기소개서 상태는 REVIEWED여야 한다.
 ```
 
 Response:
@@ -104,9 +105,22 @@ Response:
 
 재첨삭 진행 중에도 `CoverLetter.status`는 `REVIEWED`를 유지한다. 재첨삭 진행 상태는 `jobStatus`와 Job 조회/스트림 API로 확인한다.
 
-재첨삭 Job이 완료되어 새 `ReviewVersion`이 생성되면 기존 키워드 분석 결과는 삭제된다.
+재첨삭 Job은 최신 `ReviewVersion`의 문항별 `finalAnswer`를 새 첨삭 입력 원본으로 사용한다. 새 버전의 `requestInstruction`에는 Job 생성 시 저장한 재첨삭 요구사항을 기록한다.
+
+재첨삭 Job이 완료되어 새 `ReviewVersion`이 생성되면 기존 키워드 분석 결과는 삭제된다. 현재 구현 범위에서는 키워드 분석 persistence가 아직 없으므로 삭제 연결은 키워드 분석 구현 이슈에서 적용한다.
 
 재첨삭 Job 시작 시점에는 `ReviewVersion`을 만들지 않는다. Job이 성공적으로 완료된 경우에만 새 `ReviewVersion`과 문항별 첨삭 결과를 생성한다. Job이 실패하면 새 `ReviewVersion`은 생성하지 않고, 기존 최신 버전은 그대로 유지한다.
+
+Conflict Response:
+
+```json
+{
+  "error": {
+    "code": "LLM_JOB_ALREADY_RUNNING",
+    "message": "이미 진행 중인 LLM 작업이 있습니다."
+  }
+}
+```
 
 ### 최종 작성본 일괄 저장
 

@@ -3,15 +3,23 @@ package com.daon.rewrite.reviewversion.service;
 import com.daon.rewrite.auth.CurrentUser;
 import com.daon.rewrite.auth.CurrentUserProvider;
 import com.daon.rewrite.coverletter.entity.CoverLetter;
+import com.daon.rewrite.coverletter.entity.CoverLetterStatus;
 import com.daon.rewrite.coverletter.repository.CoverLetterRepository;
 import com.daon.rewrite.global.exception.BusinessException;
 import com.daon.rewrite.global.exception.ErrorCode;
 import com.daon.rewrite.global.response.ErrorResponse;
+import com.daon.rewrite.global.util.IdGenerator;
+import com.daon.rewrite.llmjob.entity.LlmJob;
+import com.daon.rewrite.llmjob.entity.LlmJobStatus;
+import com.daon.rewrite.llmjob.entity.LlmJobTargetType;
+import com.daon.rewrite.llmjob.repository.LlmJobRepository;
+import com.daon.rewrite.llmjob.service.LlmJobCreatedEvent;
 import com.daon.rewrite.reviewversion.entity.ReviewVersion;
 import com.daon.rewrite.reviewversion.entity.ReviewVersionQuestionResult;
 import com.daon.rewrite.reviewversion.repository.ReviewVersionQuestionResultRepository;
 import com.daon.rewrite.reviewversion.repository.ReviewVersionRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,12 +37,21 @@ import java.util.Set;
 public class ReviewVersionCommandService {
 
     private static final int MAX_FINAL_ANSWER_LENGTH = 5000;
+    private static final int MAX_REQUEST_INSTRUCTION_LENGTH = 1000;
+    private static final String LLM_JOB_ID_PREFIX = "job";
+    private static final List<LlmJobStatus> RUNNING_JOB_STATUSES = List.of(
+            LlmJobStatus.PENDING,
+            LlmJobStatus.PROCESSING
+    );
 
     private final CurrentUserProvider currentUserProvider;
     private final CoverLetterRepository coverLetterRepository;
     private final ReviewVersionRepository reviewVersionRepository;
     private final ReviewVersionQuestionResultRepository questionResultRepository;
+    private final LlmJobRepository llmJobRepository;
+    private final IdGenerator idGenerator;
     private final Clock clock;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public SaveFinalAnswersResult saveMyFinalAnswers(
@@ -68,6 +85,68 @@ public class ReviewVersionCommandService {
                 questionResults,
                 updatedAt
         );
+    }
+
+    @Transactional
+    public RequestReReviewResult requestMyReReview(String coverLetterId, String requestInstruction) {
+        CurrentUser currentUser = currentUserProvider.currentUser();
+        CoverLetter coverLetter = coverLetterRepository
+                .findActiveByIdAndOwnerIdForUpdate(coverLetterId, currentUser.id())
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
+
+        if (coverLetter.getStatus() != CoverLetterStatus.REVIEWED
+                || coverLetter.getLatestReviewVersionId() == null) {
+            throw new BusinessException(ErrorCode.CONFLICT);
+        }
+
+        if (findRunningJob(coverLetter.getId()) != null) {
+            throw new BusinessException(ErrorCode.LLM_JOB_ALREADY_RUNNING);
+        }
+
+        List<ReviewVersionQuestionResult> latestResults = questionResultRepository
+                .findByReviewVersionIdOrderByQuestionOrderAsc(coverLetter.getLatestReviewVersionId());
+        if (latestResults.isEmpty()) {
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR);
+        }
+
+        String normalizedInstruction = validateAndNormalizeRequestInstruction(requestInstruction);
+        LlmJob job = llmJobRepository.save(LlmJob.pendingReReview(
+                idGenerator.generate(LLM_JOB_ID_PREFIX),
+                coverLetter.getId(),
+                normalizedInstruction,
+                Instant.now(clock),
+                latestResults.size()
+        ));
+        eventPublisher.publishEvent(new LlmJobCreatedEvent(job.getId()));
+
+        return new RequestReReviewResult(coverLetter.getId(), job);
+    }
+
+    private LlmJob findRunningJob(String coverLetterId) {
+        return llmJobRepository
+                .findFirstByTargetTypeAndTargetIdAndStatusInOrderByCreatedAtDesc(
+                        LlmJobTargetType.COVER_LETTER,
+                        coverLetterId,
+                        RUNNING_JOB_STATUSES
+                )
+                .orElse(null);
+    }
+
+    private String validateAndNormalizeRequestInstruction(String requestInstruction) {
+        String normalized = normalize(requestInstruction);
+        if (normalized == null || normalized.isEmpty()) {
+            return null;
+        }
+        if (countCodePoints(normalized) > MAX_REQUEST_INSTRUCTION_LENGTH) {
+            throw new BusinessException(
+                    ErrorCode.VALIDATION_ERROR,
+                    List.of(new ErrorResponse.ErrorDetail(
+                            "requestInstruction",
+                            "재첨삭 요구사항은 최대 1000자까지 입력할 수 있습니다."
+                    ))
+            );
+        }
+        return normalized;
     }
 
     private Map<String, String> validateAndNormalize(
@@ -185,6 +264,13 @@ public class ReviewVersionCommandService {
             ));
         }
         return normalized;
+    }
+
+    private String normalize(String value) {
+        if (value == null) {
+            return null;
+        }
+        return value.strip();
     }
 
     private int countCodePoints(String value) {

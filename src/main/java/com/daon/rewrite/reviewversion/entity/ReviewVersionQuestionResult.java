@@ -77,6 +77,7 @@ public class ReviewVersionQuestionResult {
             String id,
             ReviewVersion reviewVersion,
             CoverLetterQuestion question,
+            String originalAnswer,
             String aiReport,
             String rewrittenAnswer
     ) {
@@ -86,7 +87,7 @@ public class ReviewVersionQuestionResult {
         this.questionOrder = question.getQuestionOrder();
         this.questionText = question.getQuestion();
         this.maxAnswerLength = question.getMaxAnswerLength();
-        this.originalAnswer = question.getOriginalAnswer();
+        this.originalAnswer = originalAnswer;
         this.originalAnswerLength = countCodePoints(originalAnswer);
         this.aiReport = aiReport;
         this.rewrittenAnswer = rewrittenAnswer;
@@ -102,7 +103,25 @@ public class ReviewVersionQuestionResult {
             String aiReport,
             String rewrittenAnswer
     ) {
-        return new ReviewVersionQuestionResult(id, reviewVersion, question, aiReport, rewrittenAnswer);
+        return new ReviewVersionQuestionResult(
+                id,
+                reviewVersion,
+                question,
+                question.getOriginalAnswer(),
+                aiReport,
+                rewrittenAnswer
+        );
+    }
+
+    public static ReviewVersionQuestionResult createFromSnapshot(
+            String id,
+            ReviewVersion reviewVersion,
+            CoverLetterQuestion question,
+            String originalAnswer,
+            String aiReport,
+            String rewrittenAnswer
+    ) {
+        return new ReviewVersionQuestionResult(id, reviewVersion, question, originalAnswer, aiReport, rewrittenAnswer);
     }
 
     public void updateFinalAnswer(String finalAnswer) {
