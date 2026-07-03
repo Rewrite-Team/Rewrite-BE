@@ -10,12 +10,16 @@ import com.daon.rewrite.coverletter.service.CoverLetterService;
 import com.daon.rewrite.global.util.IdGenerator;
 import com.daon.rewrite.llmjob.entity.LlmJob;
 import com.daon.rewrite.llmjob.repository.LlmJobRepository;
+import com.daon.rewrite.llmjob.service.LlmJobCreatedEvent;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -41,8 +45,17 @@ class FirstReviewJobEventIntegrationTest {
     @Autowired
     private LlmJobRepository llmJobRepository;
 
+    @Autowired
+    private ApplicationEventPublisher eventPublisher;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
+
     @MockitoBean
     private FirstReviewJobWorker worker;
+
+    @MockitoBean
+    private ReReviewJobWorker reReviewJobWorker;
 
     @MockitoBean
     private CurrentUserProvider currentUserProvider;
@@ -71,6 +84,7 @@ class FirstReviewJobEventIntegrationTest {
         coverLetterService.submit("cl_1");
 
         then(worker).should(timeout(1000)).execute("job_1");
+        then(reReviewJobWorker).should(never()).execute("job_1");
     }
 
     @Test
@@ -85,6 +99,24 @@ class FirstReviewJobEventIntegrationTest {
         coverLetterService.submit("cl_1");
 
         then(worker).should(never()).execute("job_existing");
+    }
+
+    @Test
+    void reReviewJobEventSchedulesReReviewWorkerAfterCommit() {
+        Instant now = Instant.parse("2026-06-25T01:00:00Z");
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            llmJobRepository.save(LlmJob.pendingReReview(
+                    "job_1",
+                    "cl_1",
+                    "직무 키워드를 강조해주세요.",
+                    now,
+                    1
+            ));
+            eventPublisher.publishEvent(new LlmJobCreatedEvent("job_1"));
+        });
+
+        then(reReviewJobWorker).should(timeout(1000)).execute("job_1");
+        then(worker).should(never()).execute("job_1");
     }
 
     private CoverLetter saveCompleteCoverLetter(String id, String ownerId, Instant now) {

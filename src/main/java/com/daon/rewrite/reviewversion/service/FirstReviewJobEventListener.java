@@ -1,5 +1,7 @@
 package com.daon.rewrite.reviewversion.service;
 
+import com.daon.rewrite.llmjob.entity.LlmJob;
+import com.daon.rewrite.llmjob.repository.LlmJobRepository;
 import com.daon.rewrite.llmjob.service.LlmJobCreatedEvent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Async;
@@ -11,11 +13,22 @@ import org.springframework.transaction.event.TransactionalEventListener;
 @RequiredArgsConstructor
 class FirstReviewJobEventListener {
 
-    private final FirstReviewJobWorker worker;
+    private final LlmJobRepository llmJobRepository;
+    private final FirstReviewJobWorker firstReviewJobWorker;
+    private final ReReviewJobWorker reReviewJobWorker;
 
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handle(LlmJobCreatedEvent event) {
-        worker.execute(event.jobId());
+        llmJobRepository.findById(event.jobId()).ifPresent(this::dispatch);
+    }
+
+    private void dispatch(LlmJob job) {
+        switch (job.getType()) {
+            case COVER_LETTER_REVIEW -> firstReviewJobWorker.execute(job.getId());
+            case COVER_LETTER_RE_REVIEW -> reReviewJobWorker.execute(job.getId());
+            default -> {
+            }
+        }
     }
 }

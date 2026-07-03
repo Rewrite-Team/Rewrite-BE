@@ -40,6 +40,9 @@ public class LlmJob {
     @Column(name = "target_id", nullable = false, length = 64)
     private String targetId;
 
+    @Column(name = "request_instruction", length = 1000)
+    private String requestInstruction;
+
     @Column(name = "progress_current", nullable = false)
     private int progressCurrent;
 
@@ -80,6 +83,7 @@ public class LlmJob {
             LlmJobStatus status,
             LlmJobTargetType targetType,
             String targetId,
+            String requestInstruction,
             int progressTotal,
             Instant createdAt
     ) {
@@ -88,6 +92,7 @@ public class LlmJob {
         this.status = status;
         this.targetType = targetType;
         this.targetId = targetId;
+        this.requestInstruction = requestInstruction;
         this.progressCurrent = 0;
         this.progressTotal = progressTotal;
         this.attempt = DEFAULT_ATTEMPT;
@@ -102,6 +107,26 @@ public class LlmJob {
                 LlmJobStatus.PENDING,
                 LlmJobTargetType.COVER_LETTER,
                 coverLetterId,
+                null,
+                progressTotal,
+                now
+        );
+    }
+
+    public static LlmJob pendingReReview(
+            String id,
+            String coverLetterId,
+            String requestInstruction,
+            Instant now,
+            int progressTotal
+    ) {
+        return new LlmJob(
+                id,
+                LlmJobType.COVER_LETTER_RE_REVIEW,
+                LlmJobStatus.PENDING,
+                LlmJobTargetType.COVER_LETTER,
+                coverLetterId,
+                requestInstruction,
                 progressTotal,
                 now
         );

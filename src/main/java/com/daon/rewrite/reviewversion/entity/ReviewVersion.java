@@ -63,4 +63,14 @@ public class ReviewVersion {
     public static ReviewVersion first(String id, CoverLetter coverLetter, Instant createdAt) {
         return new ReviewVersion(id, coverLetter, FIRST_VERSION, null, createdAt);
     }
+
+    public static ReviewVersion reReview(
+            String id,
+            CoverLetter coverLetter,
+            String version,
+            String requestInstruction,
+            Instant createdAt
+    ) {
+        return new ReviewVersion(id, coverLetter, version, requestInstruction, createdAt);
+    }
 }

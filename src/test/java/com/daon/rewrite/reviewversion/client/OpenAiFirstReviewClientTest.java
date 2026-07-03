@@ -152,6 +152,37 @@ class OpenAiFirstReviewClientTest {
                 });
     }
 
+    @Test
+    void includesReReviewInstructionInPromptWhenPresent() {
+        CapturingChatModel chatModel = new CapturingChatModel("""
+                {
+                  "results": [
+                    {
+                      "questionId": "clq_1",
+                      "aiReport": "리포트",
+                      "rewrittenAnswer": "수정본"
+                    }
+                  ]
+                }
+                """);
+        FirstReviewClient client = new OpenAiFirstReviewClient(ChatClient.builder(chatModel));
+
+        client.review(new FirstReviewRequest(
+                "백엔드 자기소개서",
+                "다온",
+                "백엔드 개발자",
+                "https://example.com/jobs/1",
+                "Spring 경험 우대",
+                "직무 키워드를 더 강조해주세요.",
+                List.of(new FirstReviewQuestion("clq_1", 1, "지원 동기는?", 1000, "최종 작성본"))
+        ));
+
+        assertThat(chatModel.capturedPrompt().getSystemMessage().getText())
+                .contains("재첨삭 요구사항");
+        assertThat(chatModel.capturedPrompt().getUserMessage().getText())
+                .contains("직무 키워드를 더 강조해주세요.", "최종 작성본");
+    }
+
     private FirstReviewClient clientReturning(String response) {
         return new OpenAiFirstReviewClient(ChatClient.builder(new CapturingChatModel(response)));
     }

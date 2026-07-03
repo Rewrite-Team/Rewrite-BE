@@ -4,10 +4,16 @@ import com.daon.rewrite.auth.CurrentUser;
 import com.daon.rewrite.auth.CurrentUserProvider;
 import com.daon.rewrite.coverletter.entity.CoverLetter;
 import com.daon.rewrite.coverletter.entity.CoverLetterQuestion;
+import com.daon.rewrite.coverletter.entity.CoverLetterStatus;
 import com.daon.rewrite.coverletter.repository.CoverLetterQuestionRepository;
 import com.daon.rewrite.coverletter.repository.CoverLetterRepository;
 import com.daon.rewrite.global.exception.BusinessException;
 import com.daon.rewrite.global.exception.ErrorCode;
+import com.daon.rewrite.global.util.IdGenerator;
+import com.daon.rewrite.llmjob.entity.LlmJob;
+import com.daon.rewrite.llmjob.entity.LlmJobStatus;
+import com.daon.rewrite.llmjob.entity.LlmJobType;
+import com.daon.rewrite.llmjob.repository.LlmJobRepository;
 import com.daon.rewrite.reviewversion.entity.ReviewVersion;
 import com.daon.rewrite.reviewversion.entity.ReviewVersionQuestionResult;
 import com.daon.rewrite.reviewversion.repository.ReviewVersionQuestionResultRepository;
@@ -48,8 +54,14 @@ class ReviewVersionCommandServiceTest {
     @Autowired
     private ReviewVersionQuestionResultRepository questionResultRepository;
 
+    @Autowired
+    private LlmJobRepository llmJobRepository;
+
     @MockitoBean
     private CurrentUserProvider currentUserProvider;
+
+    @MockitoBean
+    private IdGenerator idGenerator;
 
     @MockitoBean
     private Clock clock;
@@ -58,6 +70,7 @@ class ReviewVersionCommandServiceTest {
     void cleanUp() {
         questionResultRepository.deleteAll();
         reviewVersionRepository.deleteAll();
+        llmJobRepository.deleteAll();
         questionRepository.deleteAll();
         coverLetterRepository.deleteAll();
     }
@@ -206,12 +219,99 @@ class ReviewVersionCommandServiceTest {
                 .isEqualTo(ErrorCode.NOT_FOUND);
     }
 
+    @Test
+    void requestMyReReviewCreatesPendingReReviewJobWithNormalizedInstruction() {
+        Instant now = Instant.parse("2026-06-21T05:50:00Z");
+        saveReviewedCoverLetterWithLatestVersion("cl_1", "user_1", "rv_1");
+        given(currentUserProvider.currentUser()).willReturn(new CurrentUser("user_1", "테스트", null));
+        given(idGenerator.generate("job")).willReturn("job_1");
+        given(clock.instant()).willReturn(now);
+
+        RequestReReviewResult result = service.requestMyReReview("cl_1", " 직무 키워드를 강조해주세요. ");
+
+        assertThat(result.coverLetterId()).isEqualTo("cl_1");
+        assertThat(result.job().getId()).isEqualTo("job_1");
+        assertThat(result.job().getType()).isEqualTo(LlmJobType.COVER_LETTER_RE_REVIEW);
+        assertThat(result.job().getStatus()).isEqualTo(LlmJobStatus.PENDING);
+        assertThat(result.job().getRequestInstruction()).isEqualTo("직무 키워드를 강조해주세요.");
+        assertThat(result.job().getProgressTotal()).isEqualTo(2);
+        assertThat(coverLetterRepository.findById("cl_1")).hasValueSatisfying(coverLetter ->
+                assertThat(coverLetter.getStatus()).isEqualTo(CoverLetterStatus.REVIEWED));
+    }
+
+    @Test
+    void requestMyReReviewNormalizesBlankInstructionToNull() {
+        Instant now = Instant.parse("2026-06-21T05:50:00Z");
+        saveReviewedCoverLetterWithLatestVersion("cl_1", "user_1", "rv_1");
+        given(currentUserProvider.currentUser()).willReturn(new CurrentUser("user_1", "테스트", null));
+        given(idGenerator.generate("job")).willReturn("job_1");
+        given(clock.instant()).willReturn(now);
+
+        RequestReReviewResult result = service.requestMyReReview("cl_1", " ");
+
+        assertThat(result.job().getRequestInstruction()).isNull();
+    }
+
+    @Test
+    void requestMyReReviewRejectsTooLongInstructionWithDetails() {
+        saveReviewedCoverLetterWithLatestVersion("cl_1", "user_1", "rv_1");
+        given(currentUserProvider.currentUser()).willReturn(new CurrentUser("user_1", "테스트", null));
+
+        assertThatExceptionOfType(BusinessException.class)
+                .isThrownBy(() -> service.requestMyReReview("cl_1", "가".repeat(1001)))
+                .satisfies(exception -> {
+                    assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.VALIDATION_ERROR);
+                    assertThat(exception.getDetails())
+                            .extracting("field")
+                            .containsExactly("requestInstruction");
+                });
+    }
+
+    @Test
+    void requestMyReReviewRejectsMissingOtherOwnerDeletedOrNotReviewedCoverLetter() {
+        Instant now = Instant.parse("2026-06-21T01:00:00Z");
+        coverLetterRepository.save(CoverLetter.draft("cl_other", "user_2", now));
+        CoverLetter deleted = CoverLetter.draft("cl_deleted", "user_1", now);
+        deleted.markDeleted(now.plusSeconds(60));
+        coverLetterRepository.save(deleted);
+        coverLetterRepository.save(CoverLetter.draft("cl_draft", "user_1", now));
+        given(currentUserProvider.currentUser()).willReturn(new CurrentUser("user_1", "테스트", null));
+
+        assertReReviewNotFound("cl_missing");
+        assertReReviewNotFound("cl_other");
+        assertReReviewNotFound("cl_deleted");
+        assertThatThrownBy(() -> service.requestMyReReview("cl_draft", null))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.CONFLICT);
+    }
+
+    @Test
+    void requestMyReReviewRejectsWhenJobAlreadyRunning() {
+        Instant now = Instant.parse("2026-06-21T01:00:00Z");
+        saveReviewedCoverLetterWithLatestVersion("cl_1", "user_1", "rv_1");
+        llmJobRepository.save(LlmJob.pendingReview("job_running", "cl_1", now.plusSeconds(60), 2));
+        given(currentUserProvider.currentUser()).willReturn(new CurrentUser("user_1", "테스트", null));
+
+        assertThatThrownBy(() -> service.requestMyReReview("cl_1", null))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.LLM_JOB_ALREADY_RUNNING);
+    }
+
     private void assertNotFound(String coverLetterId) {
         assertThatThrownBy(() -> service.saveMyFinalAnswers(
                 coverLetterId,
                 "rv_1",
                 List.of(new SaveFinalAnswerInput("rvqr_1", "최종본"))
         )).isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.NOT_FOUND);
+    }
+
+    private void assertReReviewNotFound(String coverLetterId) {
+        assertThatThrownBy(() -> service.requestMyReReview(coverLetterId, null))
+                .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.NOT_FOUND);
     }

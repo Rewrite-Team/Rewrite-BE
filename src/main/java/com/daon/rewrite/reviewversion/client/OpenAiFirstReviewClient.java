@@ -24,6 +24,7 @@ public class OpenAiFirstReviewClient implements FirstReviewClient {
             - 중복 표현을 줄입니다.
             - 각 문항의 최대 글자 수를 준수합니다.
             - 원문에 없는 경험이나 사실을 임의로 만들지 않습니다.
+            - 재첨삭 요구사항이 제공되면 사실을 새로 만들지 않는 범위에서 우선 반영합니다.
 
             응답의 questionId는 입력값을 그대로 사용하고 모든 문항의 결과를 정확히 한 번씩 반환하세요.
             """;

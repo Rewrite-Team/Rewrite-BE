@@ -56,6 +56,34 @@ class LlmJobRepositoryTest {
     }
 
     @Test
+    void saveAndFindPendingReReviewJobRoundTripsInstruction() {
+        Instant now = Instant.parse("2026-06-20T05:10:00Z");
+        LlmJob job = LlmJob.pendingReReview(
+                "job_1",
+                "cl_1",
+                "직무 키워드를 강조해주세요.",
+                now,
+                3
+        );
+
+        repository.save(job);
+        entityManager.flush();
+        entityManager.clear();
+
+        LlmJob found = repository.findById("job_1").orElseThrow();
+
+        assertThat(found.getType()).isEqualTo(LlmJobType.COVER_LETTER_RE_REVIEW);
+        assertThat(found.getStatus()).isEqualTo(LlmJobStatus.PENDING);
+        assertThat(found.getTargetType()).isEqualTo(LlmJobTargetType.COVER_LETTER);
+        assertThat(found.getTargetId()).isEqualTo("cl_1");
+        assertThat(found.getRequestInstruction()).isEqualTo("직무 키워드를 강조해주세요.");
+        assertThat(found.getProgressCurrent()).isZero();
+        assertThat(found.getProgressTotal()).isEqualTo(3);
+        assertThat(found.getCreatedAt()).isEqualTo(now);
+        assertThat(found.getCompletedAt()).isNull();
+    }
+
+    @Test
     void saveAndFindCompletedJobRoundTripsResultReference() {
         Instant now = Instant.parse("2026-06-20T05:10:00Z");
         LlmJob job = LlmJob.pendingReview("job_done", "cl_1", now, 3);
