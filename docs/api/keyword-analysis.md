@@ -24,6 +24,8 @@ Request:
 
 재분석 요청에서는 `sourceReviewVersionId`를 보내지 않는다. 서버는 항상 `CoverLetter.latestReviewVersionId`를 기준으로 다시 분석한다.
 
+현재 구현 범위에서는 `KeywordAnalysis` persistence와 `KEYWORD_ANALYSIS` LLM Job 생성 계약을 제공한다. 실제 LLM 키워드 추출 worker와 완료 결과 저장은 후속 이슈에서 구현한다.
+
 Response:
 
 ```json
@@ -74,7 +76,7 @@ Conflict Response:
 GET /cover-letters/{coverLetterId}/keyword-analysis/latest
 ```
 
-키워드 분석 결과가 없거나 재첨삭 후 삭제된 경우:
+키워드 분석 결과가 없는 경우:
 
 ```json
 {

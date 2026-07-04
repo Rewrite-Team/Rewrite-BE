@@ -50,7 +50,7 @@ API 계약: `../api/README.md`
 | Decision 025 | 삭제된 자기소개서 복구 API는 제공하지 않는다 | `cover-letters.md` | REQ-003, REQ-004, REQ-005 | API-007 - API-014 | Active |
 | Decision 026 | 자기소개서당 AI 면접 세션은 하나만 유지한다 | `interviews.md` | REQ-010 | API-022 - API-023, API-025 - API-029 | Active |
 | Decision 027 | 재첨삭 후에도 기존 AI 면접 세션은 유지한다 | `interviews.md` | REQ-010 | API-022 - API-023, API-025 - API-029 | Active |
-| Decision 028 | 재첨삭 완료 시 기존 키워드 분석 결과를 삭제한다 | `keyword-analysis.md` | REQ-009 | API-020 - API-021 | Active |
+| Decision 028 | 재첨삭 완료 시 기존 키워드 분석 결과를 유지한다 | `keyword-analysis.md` | REQ-009 | API-020 - API-021 | Active |
 | Decision 029 | 키워드 분석 결과 화면에서 재분석을 제공한다 | `keyword-analysis.md` | REQ-009 | API-020 - API-021 | Active |
 | Decision 030 | 면접 답변은 최대 2000자로 제한한다 | `interviews.md` | REQ-010 | API-022 - API-023, API-025 - API-029 | Active |
 | Decision 031 | 면접 꼬리질문은 피드백과 같은 assistant 메시지에 저장한다 | `interviews.md` | REQ-010 | API-022 - API-023, API-025 - API-029 | Active |

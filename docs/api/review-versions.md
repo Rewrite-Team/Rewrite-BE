@@ -107,7 +107,7 @@ Response:
 
 재첨삭 Job은 최신 `ReviewVersion`의 문항별 `finalAnswer`를 새 첨삭 입력 원본으로 사용한다. 새 버전의 `requestInstruction`에는 Job 생성 시 저장한 재첨삭 요구사항을 기록한다.
 
-재첨삭 Job이 완료되어 새 `ReviewVersion`이 생성되면 기존 키워드 분석 결과는 삭제된다. 현재 구현 범위에서는 키워드 분석 persistence가 아직 없으므로 삭제 연결은 키워드 분석 구현 이슈에서 적용한다.
+재첨삭 Job이 완료되어 새 `ReviewVersion`이 생성되어도 기존 키워드 분석 결과는 삭제하지 않는다. 최신 첨삭 버전 기준 키워드 분석이 필요하면 사용자가 `AI 키워드 재분석`을 실행해 기존 `KeywordAnalysis`를 갱신한다.
 
 재첨삭 Job 시작 시점에는 `ReviewVersion`을 만들지 않는다. Job이 성공적으로 완료된 경우에만 새 `ReviewVersion`과 문항별 첨삭 결과를 생성한다. Job이 실패하면 새 `ReviewVersion`은 생성하지 않고, 기존 최신 버전은 그대로 유지한다.
 
