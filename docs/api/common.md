@@ -413,9 +413,7 @@ MVP에서는 partial result를 서버 메모리에 저장한다. 서버 재시�
 
 `keywords`는 중요도 기준 상위 20개를 제공한다. `importance`는 1~100 범위의 정수다.
 
-재첨삭 완료 시 기존 키워드 분석 결과는 삭제된다. 재첨삭 후에는 사용자가 다시 키워드 분석을 실행해야 최신 첨삭 기준 결과가 생성된다.
-
-키워드 분석 결과가 있는 상태에서 사용자가 `AI 키워드 재분석`을 실행하면 같은 `KeywordAnalysis` 리소스를 `PROCESSING`으로 전환하고, 가장 최근 `ReviewVersion`을 기준으로 다시 분석한다. 성공 시 기존 키워드 결과와 `sourceReviewVersionId`를 최신 분석 결과로 덮어쓴다.
+재첨삭 완료만으로 기존 키워드 분석 결과를 삭제하지 않는다. 키워드 분석 결과가 있는 상태에서 사용자가 `AI 키워드 재분석`을 실행하면 같은 `KeywordAnalysis` 리소스를 `PROCESSING`으로 전환하고, 가장 최근 `ReviewVersion`을 기준으로 다시 분석한다. 성공 시 기존 키워드 결과와 `sourceReviewVersionId`를 최신 분석 결과로 덮어쓴다.
 
 상태:
 

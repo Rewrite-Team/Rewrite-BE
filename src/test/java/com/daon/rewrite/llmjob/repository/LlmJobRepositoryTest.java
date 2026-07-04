@@ -84,6 +84,28 @@ class LlmJobRepositoryTest {
     }
 
     @Test
+    void saveAndFindPendingKeywordAnalysisJobRoundTripsThroughJpa() {
+        Instant now = Instant.parse("2026-07-03T05:10:00Z");
+        LlmJob job = LlmJob.pendingKeywordAnalysis("job_keyword", "cl_1", now);
+
+        repository.save(job);
+        entityManager.flush();
+        entityManager.clear();
+
+        LlmJob found = repository.findById("job_keyword").orElseThrow();
+
+        assertThat(found.getType()).isEqualTo(LlmJobType.KEYWORD_ANALYSIS);
+        assertThat(found.getStatus()).isEqualTo(LlmJobStatus.PENDING);
+        assertThat(found.getTargetType()).isEqualTo(LlmJobTargetType.COVER_LETTER);
+        assertThat(found.getTargetId()).isEqualTo("cl_1");
+        assertThat(found.getRequestInstruction()).isNull();
+        assertThat(found.getProgressCurrent()).isZero();
+        assertThat(found.getProgressTotal()).isEqualTo(1);
+        assertThat(found.getCreatedAt()).isEqualTo(now);
+        assertThat(found.getCompletedAt()).isNull();
+    }
+
+    @Test
     void saveAndFindCompletedJobRoundTripsResultReference() {
         Instant now = Instant.parse("2026-06-20T05:10:00Z");
         LlmJob job = LlmJob.pendingReview("job_done", "cl_1", now, 3);
