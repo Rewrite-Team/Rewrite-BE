@@ -26,7 +26,7 @@ API 계약과 API별 상태는 `docs/api/README.md`와 `docs/api/` 하위 도메
 | REQ-006 | 첨삭 버전 조회와 최종 작성본 저장 | In Progress | High | API-017, API-018, API-019, API-024 | [#42](https://github.com/Rewrite-Team/Rewrite-BE/issues/42), [#44](https://github.com/Rewrite-Team/Rewrite-BE/issues/44), [#48](https://github.com/Rewrite-Team/Rewrite-BE/issues/48), [#50](https://github.com/Rewrite-Team/Rewrite-BE/issues/50), [#52](https://github.com/Rewrite-Team/Rewrite-BE/issues/52), [#54](https://github.com/Rewrite-Team/Rewrite-BE/issues/54) | `ReviewVersionRepositoryTest`, `ReviewVersionServiceTest`, `ReviewVersionQueryServiceTest`, `ReviewVersionCommandServiceTest`, `ReviewVersionControllerTest`, `OpenAiFirstReviewClientTest`, `FirstReviewJobWorkerTest`, `ReReviewJobWorkerTest`, `FirstReviewJobEventIntegrationTest`, `./gradlew test`, `./gradlew check` | `ReviewVersion`, 문항별 결과 persistence, 최초 첨삭 성공 저장 경계와 OpenAI 문항별 첨삭 결과 client 및 worker 연결, API-017/018 첨삭 버전 목록/상세 조회, API-019 최종 작성본 일괄 저장, API-024 AI 첨삭 다시받기 구현됨 |
 | REQ-007 | DB/JPA 전환 | Implemented | High | API-008 내부 persistence, persistence 내부 변경 | [#22](https://github.com/Rewrite-Team/Rewrite-BE/issues/22), [#24](https://github.com/Rewrite-Team/Rewrite-BE/issues/24), [#25](https://github.com/Rewrite-Team/Rewrite-BE/issues/25), [PR #26](https://github.com/Rewrite-Team/Rewrite-BE/pull/26) | `CoverLetterRepositoryTest`, `CoverLetterServiceTest`, `CoverLetterControllerTest`, `./gradlew test`, `./gradlew check` | API-008 공개 계약은 유지하고 `cover_letters` persistence를 DB/JPA로 전환. H2 file 로컬 DB, H2 in-memory 테스트 DB 사용. Flyway는 별도 이슈로 분리 |
 | REQ-008 | 실제 인증 경계 | Planned | Medium | API-001 - API-006 | - | - | 카카오 OAuth, cookie, CSRF |
-| REQ-009 | 키워드 분석 | In Progress | Medium | API-020, API-021 | [#56](https://github.com/Rewrite-Team/Rewrite-BE/issues/56) | `KeywordAnalysisRepositoryTest`, `KeywordAnalysisServiceTest`, `KeywordAnalysisControllerTest`, `LlmJobRepositoryTest`, `./gradlew test`, `./gradlew check` | API-020 키워드 분석 시작/재분석 Job 생성과 `KeywordAnalysis` persistence 구현됨. API-021 최신 결과 조회, 실제 LLM 키워드 분석 worker, keyword result 저장은 후속 이슈로 분리 |
+| REQ-009 | 키워드 분석 | In Progress | Medium | API-020, API-021 | [#56](https://github.com/Rewrite-Team/Rewrite-BE/issues/56), [#58](https://github.com/Rewrite-Team/Rewrite-BE/issues/58) | `KeywordAnalysisRepositoryTest`, `KeywordAnalysisKeywordRepositoryTest`, `KeywordAnalysisServiceTest`, `KeywordAnalysisControllerTest`, `LlmJobRepositoryTest`, `./gradlew test`, `./gradlew check` | API-020 키워드 분석 시작/재분석 Job 생성과 `KeywordAnalysis` persistence 구현됨. API-021 최신 결과 조회와 `KeywordAnalysisKeyword` 결과 저장 구조 구현됨. 실제 LLM 키워드 분석 worker는 후속 이슈로 분리 |
 | REQ-010 | AI 면접 | Planned | Medium | API-022, API-023, API-025 - API-029 | - | - | LLM Job/SSE 기반 |
 
 ## Open Maintenance Work
@@ -59,7 +59,7 @@ API 계약과 API별 상태는 `docs/api/README.md`와 `docs/api/` 하위 도메
 
 | Candidate | Related REQ | Related APIs | Suggested Scope |
 |---|---|---|---|
-| 최신 키워드 분석 조회 API | REQ-009 | API-021 | `KeywordAnalysis` 최신 상태와 완료 결과 조회 계약 구현 |
+| 키워드 분석 worker 구현 | REQ-009 | API-020 이후 내부 실행 | OpenAI 키워드 분석 client/worker를 연결하고 완료 결과를 `KeywordAnalysisKeyword`로 저장 |
 | LLM Job 자동 재시도 | REQ-005, REQ-006 | API-014 이후 내부 실행 | provider/output 실패 시 Decision 017 기준 1회 자동 재시도 처리 |
 
 ## Update Rules

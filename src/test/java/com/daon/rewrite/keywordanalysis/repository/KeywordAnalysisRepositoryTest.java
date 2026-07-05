@@ -52,4 +52,26 @@ class KeywordAnalysisRepositoryTest {
         assertThat(found.getCompletedAt()).isNull();
     }
 
+    @Test
+    void saveAndFindFailedKeywordAnalysisRoundTripsThroughJpa() {
+        Instant now = Instant.parse("2026-07-03T01:00:00Z");
+        CoverLetter coverLetter = coverLetterRepository.save(CoverLetter.draft("cl_1", "user_1", now));
+        KeywordAnalysis keywordAnalysis = KeywordAnalysis.processing(
+                "ka_1",
+                coverLetter,
+                "rv_1",
+                now.plusSeconds(60)
+        );
+        keywordAnalysis.fail(now.plusSeconds(90));
+
+        repository.save(keywordAnalysis);
+        entityManager.flush();
+        entityManager.clear();
+
+        KeywordAnalysis found = repository.findByCoverLetterId("cl_1").orElseThrow();
+
+        assertThat(found.getStatus()).isEqualTo(KeywordAnalysisStatus.FAILED);
+        assertThat(found.getCompletedAt()).isEqualTo(now.plusSeconds(90));
+    }
+
 }

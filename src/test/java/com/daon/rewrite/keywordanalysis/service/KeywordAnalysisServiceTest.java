@@ -8,7 +8,9 @@ import com.daon.rewrite.global.exception.BusinessException;
 import com.daon.rewrite.global.exception.ErrorCode;
 import com.daon.rewrite.global.util.IdGenerator;
 import com.daon.rewrite.keywordanalysis.entity.KeywordAnalysis;
+import com.daon.rewrite.keywordanalysis.entity.KeywordAnalysisKeyword;
 import com.daon.rewrite.keywordanalysis.entity.KeywordAnalysisStatus;
+import com.daon.rewrite.keywordanalysis.repository.KeywordAnalysisKeywordRepository;
 import com.daon.rewrite.keywordanalysis.repository.KeywordAnalysisRepository;
 import com.daon.rewrite.llmjob.entity.LlmJob;
 import com.daon.rewrite.llmjob.entity.LlmJobStatus;
@@ -41,6 +43,9 @@ class KeywordAnalysisServiceTest {
     private KeywordAnalysisRepository keywordAnalysisRepository;
 
     @Autowired
+    private KeywordAnalysisKeywordRepository keywordAnalysisKeywordRepository;
+
+    @Autowired
     private LlmJobRepository llmJobRepository;
 
     @Autowired
@@ -60,6 +65,7 @@ class KeywordAnalysisServiceTest {
 
     @AfterEach
     void cleanUp() {
+        keywordAnalysisKeywordRepository.deleteAll();
         keywordAnalysisRepository.deleteAll();
         reviewVersionRepository.deleteAll();
         llmJobRepository.deleteAll();
@@ -170,8 +176,90 @@ class KeywordAnalysisServiceTest {
                 .isEqualTo(ErrorCode.LLM_JOB_ALREADY_RUNNING);
     }
 
+    @Test
+    void findMyLatestKeywordAnalysisReturnsEmptyWhenAnalysisDoesNotExist() {
+        Instant now = Instant.parse("2026-07-03T01:00:00Z");
+        saveReviewedCoverLetter("cl_1", "user_1", "rv_1", now);
+        given(currentUserProvider.currentUser()).willReturn(new CurrentUser("user_1", "테스트", null));
+
+        LatestKeywordAnalysisResult result = service.findMyLatestKeywordAnalysis("cl_1");
+
+        assertThat(result.coverLetterId()).isEqualTo("cl_1");
+        assertThat(result.keywordAnalysis()).isNull();
+        assertThat(result.keywords()).isEmpty();
+    }
+
+    @Test
+    void findMyLatestKeywordAnalysisReturnsCompletedAnalysisWithOrderedKeywords() {
+        Instant now = Instant.parse("2026-07-03T01:00:00Z");
+        CoverLetter coverLetter = saveReviewedCoverLetter("cl_1", "user_1", "rv_1", now);
+        KeywordAnalysis keywordAnalysis = keywordAnalysisRepository.save(KeywordAnalysis.processing(
+                "ka_1",
+                coverLetter,
+                "rv_1",
+                now.plusSeconds(120)
+        ));
+        keywordAnalysis.complete(now.plusSeconds(180));
+        keywordAnalysisRepository.save(keywordAnalysis);
+        keywordAnalysisKeywordRepository.save(KeywordAnalysisKeyword.of("kak_2", keywordAnalysis, 2, "Spring", 88));
+        keywordAnalysisKeywordRepository.save(KeywordAnalysisKeyword.of("kak_1", keywordAnalysis, 1, "백엔드", 95));
+        given(currentUserProvider.currentUser()).willReturn(new CurrentUser("user_1", "테스트", null));
+
+        LatestKeywordAnalysisResult result = service.findMyLatestKeywordAnalysis("cl_1");
+
+        assertThat(result.keywordAnalysis().getId()).isEqualTo("ka_1");
+        assertThat(result.keywordAnalysis().getStatus()).isEqualTo(KeywordAnalysisStatus.COMPLETED);
+        assertThat(result.keywords())
+                .extracting(KeywordAnalysisKeyword::getKeyword, KeywordAnalysisKeyword::getImportance)
+                .containsExactly(
+                        org.assertj.core.groups.Tuple.tuple("백엔드", 95),
+                        org.assertj.core.groups.Tuple.tuple("Spring", 88)
+                );
+    }
+
+    @Test
+    void findMyLatestKeywordAnalysisReturnsFailedAnalysisWithError() {
+        Instant now = Instant.parse("2026-07-03T01:00:00Z");
+        CoverLetter coverLetter = saveReviewedCoverLetter("cl_1", "user_1", "rv_1", now);
+        KeywordAnalysis keywordAnalysis = KeywordAnalysis.processing(
+                "ka_1",
+                coverLetter,
+                "rv_1",
+                now.plusSeconds(120)
+        );
+        keywordAnalysis.fail(now.plusSeconds(180));
+        keywordAnalysisRepository.save(keywordAnalysis);
+        given(currentUserProvider.currentUser()).willReturn(new CurrentUser("user_1", "테스트", null));
+
+        LatestKeywordAnalysisResult result = service.findMyLatestKeywordAnalysis("cl_1");
+
+        assertThat(result.keywordAnalysis().getStatus()).isEqualTo(KeywordAnalysisStatus.FAILED);
+        assertThat(result.keywords()).isEmpty();
+    }
+
+    @Test
+    void findMyLatestKeywordAnalysisRejectsMissingOtherOwnerOrDeletedCoverLetter() {
+        Instant now = Instant.parse("2026-07-03T01:00:00Z");
+        saveReviewedCoverLetter("cl_other", "user_2", "rv_other", now);
+        CoverLetter deleted = saveReviewedCoverLetter("cl_deleted", "user_1", "rv_deleted", now);
+        deleted.markDeleted(now.plusSeconds(120));
+        coverLetterRepository.save(deleted);
+        given(currentUserProvider.currentUser()).willReturn(new CurrentUser("user_1", "테스트", null));
+
+        assertLatestNotFound("cl_missing");
+        assertLatestNotFound("cl_other");
+        assertLatestNotFound("cl_deleted");
+    }
+
     private void assertNotFound(String coverLetterId) {
         assertThatThrownBy(() -> service.startMyKeywordAnalysis(coverLetterId, null))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.NOT_FOUND);
+    }
+
+    private void assertLatestNotFound(String coverLetterId) {
+        assertThatThrownBy(() -> service.findMyLatestKeywordAnalysis(coverLetterId))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.NOT_FOUND);

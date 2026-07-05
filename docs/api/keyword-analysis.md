@@ -76,12 +76,24 @@ Conflict Response:
 GET /cover-letters/{coverLetterId}/keyword-analysis/latest
 ```
 
+`status`는 `NOT_STARTED`, `PROCESSING`, `COMPLETED`, `FAILED` 중 하나다.
+`keywords`는 완료 상태에서만 분석 결과를 담고, 그 외 상태에서는 빈 배열이다.
+
 키워드 분석 결과가 없는 경우:
 
 ```json
 {
-  "coverLetterId": "cl_01HZ...",
-  "keywordAnalysis": null
+  "status": "NOT_STARTED",
+  "keywords": []
+}
+```
+
+진행 중인 키워드 분석 결과가 있는 경우:
+
+```json
+{
+  "status": "PROCESSING",
+  "keywords": []
 }
 ```
 
@@ -89,9 +101,6 @@ Response:
 
 ```json
 {
-  "id": "ka_01HZ...",
-  "coverLetterId": "cl_01HZ...",
-  "sourceReviewVersionId": "rv_01HZ...",
   "status": "COMPLETED",
   "keywords": [
     {
@@ -102,9 +111,7 @@ Response:
       "keyword": "Spring",
       "importance": 88
     }
-  ],
-  "createdAt": "2026-06-20T15:00:00",
-  "completedAt": "2026-06-20T15:00:30"
+  ]
 }
 ```
 
@@ -112,16 +119,7 @@ Response:
 
 ```json
 {
-  "id": "ka_01HZ...",
-  "coverLetterId": "cl_01HZ...",
-  "sourceReviewVersionId": "rv_01HZ...",
   "status": "FAILED",
-  "keywords": [],
-  "error": {
-    "code": "LLM_PROVIDER_ERROR",
-    "message": "키워드 분석에 실패했습니다."
-  },
-  "createdAt": "2026-06-20T15:00:00",
-  "completedAt": "2026-06-20T15:01:00"
+  "keywords": []
 }
 ```

@@ -84,4 +84,14 @@ public class KeywordAnalysis {
         this.status = KeywordAnalysisStatus.PROCESSING;
         this.completedAt = null;
     }
+
+    public void complete(Instant completedAt) {
+        this.status = KeywordAnalysisStatus.COMPLETED;
+        this.completedAt = completedAt;
+    }
+
+    public void fail(Instant completedAt) {
+        this.status = KeywordAnalysisStatus.FAILED;
+        this.completedAt = completedAt;
+    }
 }
