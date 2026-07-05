@@ -53,7 +53,7 @@ class KeywordAnalysisRepositoryTest {
     }
 
     @Test
-    void saveAndFindFailedKeywordAnalysisRoundTripsErrorFieldsThroughJpa() {
+    void saveAndFindFailedKeywordAnalysisRoundTripsThroughJpa() {
         Instant now = Instant.parse("2026-07-03T01:00:00Z");
         CoverLetter coverLetter = coverLetterRepository.save(CoverLetter.draft("cl_1", "user_1", now));
         KeywordAnalysis keywordAnalysis = KeywordAnalysis.processing(
@@ -62,7 +62,7 @@ class KeywordAnalysisRepositoryTest {
                 "rv_1",
                 now.plusSeconds(60)
         );
-        keywordAnalysis.fail("LLM_PROVIDER_ERROR", "키워드 분석에 실패했습니다.", now.plusSeconds(90));
+        keywordAnalysis.fail(now.plusSeconds(90));
 
         repository.save(keywordAnalysis);
         entityManager.flush();
@@ -71,8 +71,6 @@ class KeywordAnalysisRepositoryTest {
         KeywordAnalysis found = repository.findByCoverLetterId("cl_1").orElseThrow();
 
         assertThat(found.getStatus()).isEqualTo(KeywordAnalysisStatus.FAILED);
-        assertThat(found.getErrorCode()).isEqualTo("LLM_PROVIDER_ERROR");
-        assertThat(found.getErrorMessage()).isEqualTo("키워드 분석에 실패했습니다.");
         assertThat(found.getCompletedAt()).isEqualTo(now.plusSeconds(90));
     }
 

@@ -109,13 +109,15 @@ class KeywordAnalysisControllerTest {
     }
 
     @Test
-    void getLatestKeywordAnalysisReturnsNullWhenAnalysisDoesNotExist() throws Exception {
+    void getLatestKeywordAnalysisReturnsNotStartedStatusWhenAnalysisDoesNotExist() throws Exception {
         given(keywordAnalysisService.findMyLatestKeywordAnalysis("cl_1"))
                 .willReturn(LatestKeywordAnalysisResult.empty("cl_1"));
 
         mockMvc.perform(get("/cover-letters/{coverLetterId}/keyword-analysis/latest", "cl_1"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.coverLetterId").value("cl_1"))
+                .andExpect(jsonPath("$.status").value("NOT_STARTED"))
+                .andExpect(jsonPath("$.keywords").isEmpty())
+                .andExpect(jsonPath("$.coverLetterId").doesNotExist())
                 .andExpect(jsonPath("$.keywordAnalysis").doesNotExist());
     }
 
@@ -139,21 +141,16 @@ class KeywordAnalysisControllerTest {
 
         mockMvc.perform(get("/cover-letters/{coverLetterId}/keyword-analysis/latest", "cl_1"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.coverLetterId").value("cl_1"))
-                .andExpect(jsonPath("$.keywordAnalysis.id").value("ka_1"))
-                .andExpect(jsonPath("$.keywordAnalysis.coverLetterId").value("cl_1"))
-                .andExpect(jsonPath("$.keywordAnalysis.sourceReviewVersionId").value("rv_1"))
-                .andExpect(jsonPath("$.keywordAnalysis.status").value("COMPLETED"))
-                .andExpect(jsonPath("$.keywordAnalysis.keywords[0].keyword").value("백엔드"))
-                .andExpect(jsonPath("$.keywordAnalysis.keywords[0].importance").value(95))
-                .andExpect(jsonPath("$.keywordAnalysis.keywords[1].keyword").value("Spring"))
-                .andExpect(jsonPath("$.keywordAnalysis.error").doesNotExist())
-                .andExpect(jsonPath("$.keywordAnalysis.createdAt").value("2026-07-03T10:01:00"))
-                .andExpect(jsonPath("$.keywordAnalysis.completedAt").value("2026-07-03T10:01:30"));
+                .andExpect(jsonPath("$.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.keywords[0].keyword").value("백엔드"))
+                .andExpect(jsonPath("$.keywords[0].importance").value(95))
+                .andExpect(jsonPath("$.keywords[1].keyword").value("Spring"))
+                .andExpect(jsonPath("$.coverLetterId").doesNotExist())
+                .andExpect(jsonPath("$.keywordAnalysis").doesNotExist());
     }
 
     @Test
-    void getLatestKeywordAnalysisReturnsFailedAnalysisWithError() throws Exception {
+    void getLatestKeywordAnalysisReturnsFailedStatus() throws Exception {
         Instant now = Instant.parse("2026-07-03T01:00:00Z");
         CoverLetter coverLetter = CoverLetter.draft("cl_1", "user_1", now);
         KeywordAnalysis keywordAnalysis = KeywordAnalysis.processing(
@@ -162,16 +159,15 @@ class KeywordAnalysisControllerTest {
                 "rv_1",
                 now.plusSeconds(60)
         );
-        keywordAnalysis.fail("LLM_PROVIDER_ERROR", "키워드 분석에 실패했습니다.", now.plusSeconds(90));
+        keywordAnalysis.fail(now.plusSeconds(90));
         given(keywordAnalysisService.findMyLatestKeywordAnalysis("cl_1"))
                 .willReturn(LatestKeywordAnalysisResult.of("cl_1", keywordAnalysis, List.of()));
 
         mockMvc.perform(get("/cover-letters/{coverLetterId}/keyword-analysis/latest", "cl_1"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.keywordAnalysis.status").value("FAILED"))
-                .andExpect(jsonPath("$.keywordAnalysis.keywords").isEmpty())
-                .andExpect(jsonPath("$.keywordAnalysis.error.code").value("LLM_PROVIDER_ERROR"))
-                .andExpect(jsonPath("$.keywordAnalysis.error.message").value("키워드 분석에 실패했습니다."));
+                .andExpect(jsonPath("$.status").value("FAILED"))
+                .andExpect(jsonPath("$.keywords").isEmpty())
+                .andExpect(jsonPath("$.keywordAnalysis").doesNotExist());
     }
 
     @Test

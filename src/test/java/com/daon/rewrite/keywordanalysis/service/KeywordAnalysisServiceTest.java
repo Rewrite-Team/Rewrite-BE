@@ -227,15 +227,13 @@ class KeywordAnalysisServiceTest {
                 "rv_1",
                 now.plusSeconds(120)
         );
-        keywordAnalysis.fail("LLM_PROVIDER_ERROR", "키워드 분석에 실패했습니다.", now.plusSeconds(180));
+        keywordAnalysis.fail(now.plusSeconds(180));
         keywordAnalysisRepository.save(keywordAnalysis);
         given(currentUserProvider.currentUser()).willReturn(new CurrentUser("user_1", "테스트", null));
 
         LatestKeywordAnalysisResult result = service.findMyLatestKeywordAnalysis("cl_1");
 
         assertThat(result.keywordAnalysis().getStatus()).isEqualTo(KeywordAnalysisStatus.FAILED);
-        assertThat(result.keywordAnalysis().getErrorCode()).isEqualTo("LLM_PROVIDER_ERROR");
-        assertThat(result.keywordAnalysis().getErrorMessage()).isEqualTo("키워드 분석에 실패했습니다.");
         assertThat(result.keywords()).isEmpty();
     }
 
