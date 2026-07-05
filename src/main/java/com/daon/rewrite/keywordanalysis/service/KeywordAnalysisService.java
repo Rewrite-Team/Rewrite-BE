@@ -9,6 +9,8 @@ import com.daon.rewrite.global.exception.BusinessException;
 import com.daon.rewrite.global.exception.ErrorCode;
 import com.daon.rewrite.global.util.IdGenerator;
 import com.daon.rewrite.keywordanalysis.entity.KeywordAnalysis;
+import com.daon.rewrite.keywordanalysis.entity.KeywordAnalysisKeyword;
+import com.daon.rewrite.keywordanalysis.repository.KeywordAnalysisKeywordRepository;
 import com.daon.rewrite.keywordanalysis.repository.KeywordAnalysisRepository;
 import com.daon.rewrite.llmjob.entity.LlmJob;
 import com.daon.rewrite.llmjob.entity.LlmJobStatus;
@@ -40,6 +42,7 @@ public class KeywordAnalysisService {
     private final CoverLetterRepository coverLetterRepository;
     private final ReviewVersionRepository reviewVersionRepository;
     private final KeywordAnalysisRepository keywordAnalysisRepository;
+    private final KeywordAnalysisKeywordRepository keywordAnalysisKeywordRepository;
     private final LlmJobRepository llmJobRepository;
     private final IdGenerator idGenerator;
     private final Clock clock;
@@ -85,6 +88,22 @@ public class KeywordAnalysisService {
         eventPublisher.publishEvent(new LlmJobCreatedEvent(job.getId()));
 
         return new StartKeywordAnalysisResult(keywordAnalysis, job);
+    }
+
+    @Transactional(readOnly = true)
+    public LatestKeywordAnalysisResult findMyLatestKeywordAnalysis(String coverLetterId) {
+        CurrentUser currentUser = currentUserProvider.currentUser();
+        CoverLetter coverLetter = coverLetterRepository
+                .findByIdAndOwnerIdAndDeletedAtIsNull(coverLetterId, currentUser.id())
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
+
+        return keywordAnalysisRepository.findByCoverLetterId(coverLetter.getId())
+                .map(keywordAnalysis -> {
+                    List<KeywordAnalysisKeyword> keywords = keywordAnalysisKeywordRepository
+                            .findByKeywordAnalysisIdOrderByKeywordOrderAsc(keywordAnalysis.getId());
+                    return LatestKeywordAnalysisResult.of(coverLetter.getId(), keywordAnalysis, keywords);
+                })
+                .orElseGet(() -> LatestKeywordAnalysisResult.empty(coverLetter.getId()));
     }
 
     private String selectSourceReviewVersionId(CoverLetter coverLetter, String sourceReviewVersionId) {

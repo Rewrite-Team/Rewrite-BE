@@ -317,6 +317,8 @@ Policy:
 | `status` | No | `PROCESSING`, `COMPLETED`, `FAILED` |
 | `created_at` | No | 생성 시각 |
 | `completed_at` | Yes | 완료 또는 실패 전까지 null |
+| `error_code` | Yes | 실패 상태의 에러 코드 |
+| `error_message` | Yes | 실패 상태의 사용자 표시 가능 메시지 |
 
 Policy:
 
@@ -324,6 +326,7 @@ Policy:
 - 재분석은 같은 row를 갱신한다.
 - 재첨삭 완료만으로 기존 키워드 분석 결과를 삭제하지 않는다.
 - 사용자가 재분석을 실행하면 같은 row를 최신 첨삭 버전 기준으로 갱신한다.
+- 재분석을 시작하면 이전 실패 메타데이터는 지운다.
 
 ### keyword_analysis_keywords
 

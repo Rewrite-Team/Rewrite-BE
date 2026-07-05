@@ -50,6 +50,12 @@ public class KeywordAnalysis {
     @Column(name = "completed_at")
     private Instant completedAt;
 
+    @Column(name = "error_code", length = 64)
+    private String errorCode;
+
+    @Column(name = "error_message", length = 500)
+    private String errorMessage;
+
     private KeywordAnalysis(
             String id,
             CoverLetter coverLetter,
@@ -83,5 +89,21 @@ public class KeywordAnalysis {
         this.sourceReviewVersionId = sourceReviewVersionId;
         this.status = KeywordAnalysisStatus.PROCESSING;
         this.completedAt = null;
+        this.errorCode = null;
+        this.errorMessage = null;
+    }
+
+    public void complete(Instant completedAt) {
+        this.status = KeywordAnalysisStatus.COMPLETED;
+        this.completedAt = completedAt;
+        this.errorCode = null;
+        this.errorMessage = null;
+    }
+
+    public void fail(String errorCode, String errorMessage, Instant completedAt) {
+        this.status = KeywordAnalysisStatus.FAILED;
+        this.completedAt = completedAt;
+        this.errorCode = errorCode;
+        this.errorMessage = errorMessage;
     }
 }

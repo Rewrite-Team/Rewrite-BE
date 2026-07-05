@@ -4,7 +4,9 @@ import com.daon.rewrite.coverletter.entity.CoverLetter;
 import com.daon.rewrite.global.exception.BusinessException;
 import com.daon.rewrite.global.exception.ErrorCode;
 import com.daon.rewrite.keywordanalysis.entity.KeywordAnalysis;
+import com.daon.rewrite.keywordanalysis.entity.KeywordAnalysisKeyword;
 import com.daon.rewrite.keywordanalysis.entity.KeywordAnalysisStatus;
+import com.daon.rewrite.keywordanalysis.service.LatestKeywordAnalysisResult;
 import com.daon.rewrite.keywordanalysis.service.KeywordAnalysisService;
 import com.daon.rewrite.keywordanalysis.service.StartKeywordAnalysisResult;
 import com.daon.rewrite.llmjob.entity.LlmJob;
@@ -16,8 +18,10 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
+import java.util.List;
 
 import static org.mockito.BDDMockito.given;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -102,5 +106,81 @@ class KeywordAnalysisControllerTest {
                         .content("{}"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error.code").value("LLM_JOB_ALREADY_RUNNING"));
+    }
+
+    @Test
+    void getLatestKeywordAnalysisReturnsNullWhenAnalysisDoesNotExist() throws Exception {
+        given(keywordAnalysisService.findMyLatestKeywordAnalysis("cl_1"))
+                .willReturn(LatestKeywordAnalysisResult.empty("cl_1"));
+
+        mockMvc.perform(get("/cover-letters/{coverLetterId}/keyword-analysis/latest", "cl_1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.coverLetterId").value("cl_1"))
+                .andExpect(jsonPath("$.keywordAnalysis").doesNotExist());
+    }
+
+    @Test
+    void getLatestKeywordAnalysisReturnsCompletedAnalysisWithOrderedKeywords() throws Exception {
+        Instant now = Instant.parse("2026-07-03T01:00:00Z");
+        CoverLetter coverLetter = CoverLetter.draft("cl_1", "user_1", now);
+        KeywordAnalysis keywordAnalysis = KeywordAnalysis.processing(
+                "ka_1",
+                coverLetter,
+                "rv_1",
+                now.plusSeconds(60)
+        );
+        keywordAnalysis.complete(now.plusSeconds(90));
+        List<KeywordAnalysisKeyword> keywords = List.of(
+                KeywordAnalysisKeyword.of("kak_1", keywordAnalysis, 1, "백엔드", 95),
+                KeywordAnalysisKeyword.of("kak_2", keywordAnalysis, 2, "Spring", 88)
+        );
+        given(keywordAnalysisService.findMyLatestKeywordAnalysis("cl_1"))
+                .willReturn(LatestKeywordAnalysisResult.of("cl_1", keywordAnalysis, keywords));
+
+        mockMvc.perform(get("/cover-letters/{coverLetterId}/keyword-analysis/latest", "cl_1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.coverLetterId").value("cl_1"))
+                .andExpect(jsonPath("$.keywordAnalysis.id").value("ka_1"))
+                .andExpect(jsonPath("$.keywordAnalysis.coverLetterId").value("cl_1"))
+                .andExpect(jsonPath("$.keywordAnalysis.sourceReviewVersionId").value("rv_1"))
+                .andExpect(jsonPath("$.keywordAnalysis.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.keywordAnalysis.keywords[0].keyword").value("백엔드"))
+                .andExpect(jsonPath("$.keywordAnalysis.keywords[0].importance").value(95))
+                .andExpect(jsonPath("$.keywordAnalysis.keywords[1].keyword").value("Spring"))
+                .andExpect(jsonPath("$.keywordAnalysis.error").doesNotExist())
+                .andExpect(jsonPath("$.keywordAnalysis.createdAt").value("2026-07-03T10:01:00"))
+                .andExpect(jsonPath("$.keywordAnalysis.completedAt").value("2026-07-03T10:01:30"));
+    }
+
+    @Test
+    void getLatestKeywordAnalysisReturnsFailedAnalysisWithError() throws Exception {
+        Instant now = Instant.parse("2026-07-03T01:00:00Z");
+        CoverLetter coverLetter = CoverLetter.draft("cl_1", "user_1", now);
+        KeywordAnalysis keywordAnalysis = KeywordAnalysis.processing(
+                "ka_1",
+                coverLetter,
+                "rv_1",
+                now.plusSeconds(60)
+        );
+        keywordAnalysis.fail("LLM_PROVIDER_ERROR", "키워드 분석에 실패했습니다.", now.plusSeconds(90));
+        given(keywordAnalysisService.findMyLatestKeywordAnalysis("cl_1"))
+                .willReturn(LatestKeywordAnalysisResult.of("cl_1", keywordAnalysis, List.of()));
+
+        mockMvc.perform(get("/cover-letters/{coverLetterId}/keyword-analysis/latest", "cl_1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.keywordAnalysis.status").value("FAILED"))
+                .andExpect(jsonPath("$.keywordAnalysis.keywords").isEmpty())
+                .andExpect(jsonPath("$.keywordAnalysis.error.code").value("LLM_PROVIDER_ERROR"))
+                .andExpect(jsonPath("$.keywordAnalysis.error.message").value("키워드 분석에 실패했습니다."));
+    }
+
+    @Test
+    void getLatestKeywordAnalysisReturnsNotFound() throws Exception {
+        given(keywordAnalysisService.findMyLatestKeywordAnalysis("cl_missing"))
+                .willThrow(new BusinessException(ErrorCode.NOT_FOUND));
+
+        mockMvc.perform(get("/cover-letters/{coverLetterId}/keyword-analysis/latest", "cl_missing"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("NOT_FOUND"));
     }
 }

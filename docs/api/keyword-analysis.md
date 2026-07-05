@@ -85,26 +85,48 @@ GET /cover-letters/{coverLetterId}/keyword-analysis/latest
 }
 ```
 
+진행 중인 키워드 분석 결과가 있는 경우:
+
+```json
+{
+  "coverLetterId": "cl_01HZ...",
+  "keywordAnalysis": {
+    "id": "ka_01HZ...",
+    "coverLetterId": "cl_01HZ...",
+    "sourceReviewVersionId": "rv_01HZ...",
+    "status": "PROCESSING",
+    "keywords": [],
+    "error": null,
+    "createdAt": "2026-06-20T15:00:00",
+    "completedAt": null
+  }
+}
+```
+
 Response:
 
 ```json
 {
-  "id": "ka_01HZ...",
   "coverLetterId": "cl_01HZ...",
-  "sourceReviewVersionId": "rv_01HZ...",
-  "status": "COMPLETED",
-  "keywords": [
-    {
-      "keyword": "백엔드",
-      "importance": 95
-    },
-    {
-      "keyword": "Spring",
-      "importance": 88
-    }
-  ],
-  "createdAt": "2026-06-20T15:00:00",
-  "completedAt": "2026-06-20T15:00:30"
+  "keywordAnalysis": {
+    "id": "ka_01HZ...",
+    "coverLetterId": "cl_01HZ...",
+    "sourceReviewVersionId": "rv_01HZ...",
+    "status": "COMPLETED",
+    "keywords": [
+      {
+        "keyword": "백엔드",
+        "importance": 95
+      },
+      {
+        "keyword": "Spring",
+        "importance": 88
+      }
+    ],
+    "error": null,
+    "createdAt": "2026-06-20T15:00:00",
+    "completedAt": "2026-06-20T15:00:30"
+  }
 }
 ```
 
@@ -112,16 +134,19 @@ Response:
 
 ```json
 {
-  "id": "ka_01HZ...",
   "coverLetterId": "cl_01HZ...",
-  "sourceReviewVersionId": "rv_01HZ...",
-  "status": "FAILED",
-  "keywords": [],
-  "error": {
-    "code": "LLM_PROVIDER_ERROR",
-    "message": "키워드 분석에 실패했습니다."
-  },
-  "createdAt": "2026-06-20T15:00:00",
-  "completedAt": "2026-06-20T15:01:00"
+  "keywordAnalysis": {
+    "id": "ka_01HZ...",
+    "coverLetterId": "cl_01HZ...",
+    "sourceReviewVersionId": "rv_01HZ...",
+    "status": "FAILED",
+    "keywords": [],
+    "error": {
+      "code": "LLM_PROVIDER_ERROR",
+      "message": "키워드 분석에 실패했습니다."
+    },
+    "createdAt": "2026-06-20T15:00:00",
+    "completedAt": "2026-06-20T15:01:00"
+  }
 }
 ```
