@@ -8,4 +8,6 @@ import java.util.List;
 public interface KeywordAnalysisKeywordRepository extends JpaRepository<KeywordAnalysisKeyword, String> {
 
     List<KeywordAnalysisKeyword> findByKeywordAnalysisIdOrderByKeywordOrderAsc(String keywordAnalysisId);
+
+    void deleteByKeywordAnalysisId(String keywordAnalysisId);
 }

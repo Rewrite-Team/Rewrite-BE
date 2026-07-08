@@ -10,6 +10,7 @@ import com.daon.rewrite.global.exception.ErrorCode;
 import com.daon.rewrite.global.util.IdGenerator;
 import com.daon.rewrite.keywordanalysis.entity.KeywordAnalysis;
 import com.daon.rewrite.keywordanalysis.entity.KeywordAnalysisKeyword;
+import com.daon.rewrite.keywordanalysis.entity.KeywordAnalysisStatus;
 import com.daon.rewrite.keywordanalysis.repository.KeywordAnalysisKeywordRepository;
 import com.daon.rewrite.keywordanalysis.repository.KeywordAnalysisRepository;
 import com.daon.rewrite.llmjob.entity.LlmJob;
@@ -99,11 +100,18 @@ public class KeywordAnalysisService {
 
         return keywordAnalysisRepository.findByCoverLetterId(coverLetter.getId())
                 .map(keywordAnalysis -> {
-                    List<KeywordAnalysisKeyword> keywords = keywordAnalysisKeywordRepository
-                            .findByKeywordAnalysisIdOrderByKeywordOrderAsc(keywordAnalysis.getId());
+                    List<KeywordAnalysisKeyword> keywords = findCompletedKeywords(keywordAnalysis);
                     return LatestKeywordAnalysisResult.of(coverLetter.getId(), keywordAnalysis, keywords);
                 })
                 .orElseGet(() -> LatestKeywordAnalysisResult.empty(coverLetter.getId()));
+    }
+
+    private List<KeywordAnalysisKeyword> findCompletedKeywords(KeywordAnalysis keywordAnalysis) {
+        if (keywordAnalysis.getStatus() != KeywordAnalysisStatus.COMPLETED) {
+            return List.of();
+        }
+        return keywordAnalysisKeywordRepository
+                .findByKeywordAnalysisIdOrderByKeywordOrderAsc(keywordAnalysis.getId());
     }
 
     private String selectSourceReviewVersionId(CoverLetter coverLetter, String sourceReviewVersionId) {

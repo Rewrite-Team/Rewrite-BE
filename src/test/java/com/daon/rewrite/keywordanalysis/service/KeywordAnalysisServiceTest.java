@@ -238,6 +238,33 @@ class KeywordAnalysisServiceTest {
     }
 
     @Test
+    void findMyLatestKeywordAnalysisHidesKeywordsWhenAnalysisIsNotCompleted() {
+        Instant now = Instant.parse("2026-07-03T01:00:00Z");
+        CoverLetter coverLetter = saveReviewedCoverLetter("cl_1", "user_1", "rv_1", now);
+        KeywordAnalysis keywordAnalysis = keywordAnalysisRepository.save(KeywordAnalysis.processing(
+                "ka_1",
+                coverLetter,
+                "rv_1",
+                now.plusSeconds(120)
+        ));
+        keywordAnalysisKeywordRepository.save(KeywordAnalysisKeyword.of("kak_1", keywordAnalysis, 1, "백엔드", 95));
+        given(currentUserProvider.currentUser()).willReturn(new CurrentUser("user_1", "테스트", null));
+
+        LatestKeywordAnalysisResult processingResult = service.findMyLatestKeywordAnalysis("cl_1");
+
+        assertThat(processingResult.keywordAnalysis().getStatus()).isEqualTo(KeywordAnalysisStatus.PROCESSING);
+        assertThat(processingResult.keywords()).isEmpty();
+
+        keywordAnalysis.fail(now.plusSeconds(180));
+        keywordAnalysisRepository.save(keywordAnalysis);
+
+        LatestKeywordAnalysisResult failedResult = service.findMyLatestKeywordAnalysis("cl_1");
+
+        assertThat(failedResult.keywordAnalysis().getStatus()).isEqualTo(KeywordAnalysisStatus.FAILED);
+        assertThat(failedResult.keywords()).isEmpty();
+    }
+
+    @Test
     void findMyLatestKeywordAnalysisRejectsMissingOtherOwnerOrDeletedCoverLetter() {
         Instant now = Instant.parse("2026-07-03T01:00:00Z");
         saveReviewedCoverLetter("cl_other", "user_2", "rv_other", now);
