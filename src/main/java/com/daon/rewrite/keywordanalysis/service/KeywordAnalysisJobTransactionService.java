@@ -46,6 +46,8 @@ class KeywordAnalysisJobTransactionService {
     private static final String PROVIDER_ERROR_MESSAGE = "LLM 응답 생성에 실패했습니다.";
     private static final String OUTPUT_VALIDATION_ERROR_CODE = "LLM_OUTPUT_VALIDATION_FAILED";
     private static final String OUTPUT_VALIDATION_ERROR_MESSAGE = "LLM 출력 형식이 올바르지 않습니다.";
+    private static final String UNEXPECTED_ERROR_CODE = "INTERNAL_ERROR";
+    private static final String UNEXPECTED_ERROR_MESSAGE = "키워드 분석 처리 중 오류가 발생했습니다.";
 
     private final LlmJobRepository llmJobRepository;
     private final CoverLetterRepository coverLetterRepository;
@@ -154,6 +156,9 @@ class KeywordAnalysisJobTransactionService {
 
         KeywordAnalysis keywordAnalysis = keywordAnalysisRepository.findByCoverLetterId(job.getTargetId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.INTERNAL_ERROR));
+        if (keywordAnalysis.getStatus() != KeywordAnalysisStatus.PROCESSING) {
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR);
+        }
         Instant now = Instant.now(clock);
         job.markFailed(
                 job.getProgressCurrent(),
@@ -163,6 +168,26 @@ class KeywordAnalysisJobTransactionService {
                 now
         );
         keywordAnalysis.fail(now);
+    }
+
+    @Transactional
+    public void failUnexpected(String jobId) {
+        LlmJob job = findKeywordAnalysisJobForUpdate(jobId);
+        if (job.getStatus() == LlmJobStatus.COMPLETED || job.getStatus() == LlmJobStatus.FAILED) {
+            return;
+        }
+
+        Instant now = Instant.now(clock);
+        job.markFailed(
+                job.getProgressCurrent(),
+                FAILED_MESSAGE,
+                UNEXPECTED_ERROR_CODE,
+                UNEXPECTED_ERROR_MESSAGE,
+                now
+        );
+        keywordAnalysisRepository.findByCoverLetterId(job.getTargetId())
+                .filter(keywordAnalysis -> keywordAnalysis.getStatus() == KeywordAnalysisStatus.PROCESSING)
+                .ifPresent(keywordAnalysis -> keywordAnalysis.fail(now));
     }
 
     private LlmJob findKeywordAnalysisJobForUpdate(String jobId) {

@@ -190,6 +190,49 @@ class KeywordAnalysisJobWorkerTest {
     }
 
     @Test
+    void executeFailsKeywordAnalysisWhenUnexpectedClientExceptionOccurs() {
+        Instant failedAt = Instant.parse("2026-07-05T01:00:00Z");
+        savePendingKeywordAnalysisJob("cl_1", "rv_1", "ka_1", "job_1");
+        given(keywordAnalysisClient.analyze(any()))
+                .willThrow(new IllegalStateException("unexpected"));
+        given(clock.instant()).willReturn(failedAt);
+
+        worker.execute("job_1");
+
+        assertThat(keywordAnalysisRepository.findById("ka_1")).hasValueSatisfying(analysis -> {
+            assertThat(analysis.getStatus()).isEqualTo(KeywordAnalysisStatus.FAILED);
+            assertThat(analysis.getCompletedAt()).isEqualTo(failedAt);
+        });
+        assertThat(llmJobRepository.findById("job_1")).hasValueSatisfying(job -> {
+            assertThat(job.getStatus()).isEqualTo(LlmJobStatus.FAILED);
+            assertThat(job.getErrorCode()).isEqualTo("INTERNAL_ERROR");
+            assertThat(job.getErrorMessage()).isEqualTo("키워드 분석 처리 중 오류가 발생했습니다.");
+            assertThat(job.getCompletedAt()).isEqualTo(failedAt);
+        });
+    }
+
+    @Test
+    void executeFailsKeywordAnalysisWhenStartPreconditionFails() {
+        Instant failedAt = Instant.parse("2026-07-05T01:00:00Z");
+        saveProcessingKeywordAnalysisForDraftCoverLetter("cl_1", "ka_1", "job_1");
+        given(clock.instant()).willReturn(failedAt);
+
+        worker.execute("job_1");
+
+        then(keywordAnalysisClient).shouldHaveNoInteractions();
+        assertThat(keywordAnalysisRepository.findById("ka_1")).hasValueSatisfying(analysis -> {
+            assertThat(analysis.getStatus()).isEqualTo(KeywordAnalysisStatus.FAILED);
+            assertThat(analysis.getCompletedAt()).isEqualTo(failedAt);
+        });
+        assertThat(llmJobRepository.findById("job_1")).hasValueSatisfying(job -> {
+            assertThat(job.getStatus()).isEqualTo(LlmJobStatus.FAILED);
+            assertThat(job.getErrorCode()).isEqualTo("INTERNAL_ERROR");
+            assertThat(job.getErrorMessage()).isEqualTo("키워드 분석 처리 중 오류가 발생했습니다.");
+            assertThat(job.getCompletedAt()).isEqualTo(failedAt);
+        });
+    }
+
+    @Test
     void executeSkipsAlreadyCompletedJob() {
         Instant completedAt = Instant.parse("2026-07-05T01:00:00Z");
         savePendingKeywordAnalysisJob("cl_1", "rv_1", "ka_1", "job_1");
@@ -262,6 +305,22 @@ class KeywordAnalysisJobWorkerTest {
                 keywordAnalysisId,
                 coverLetter,
                 reviewVersion.getId(),
+                now.plusSeconds(120)
+        ));
+        llmJobRepository.save(LlmJob.pendingKeywordAnalysis(jobId, coverLetterId, now.plusSeconds(120)));
+    }
+
+    private void saveProcessingKeywordAnalysisForDraftCoverLetter(
+            String coverLetterId,
+            String keywordAnalysisId,
+            String jobId
+    ) {
+        Instant now = Instant.parse("2026-07-05T00:00:00Z");
+        CoverLetter coverLetter = coverLetterRepository.save(CoverLetter.draft(coverLetterId, "user_1", now));
+        keywordAnalysisRepository.save(KeywordAnalysis.processing(
+                keywordAnalysisId,
+                coverLetter,
+                "rv_1",
                 now.plusSeconds(120)
         ));
         llmJobRepository.save(LlmJob.pendingKeywordAnalysis(jobId, coverLetterId, now.plusSeconds(120)));
