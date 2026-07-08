@@ -97,22 +97,28 @@ class OpenAiKeywordAnalysisClientTest {
     }
 
     @Test
-    void rejectsMoreThanTwentyKeywords() {
+    void trimsMoreThanTwentyKeywordsToTopTwentyByImportance() {
         StringBuilder keywordJson = new StringBuilder();
         for (int index = 1; index <= 21; index++) {
             if (index > 1) {
                 keywordJson.append(",");
             }
             keywordJson.append("""
-                    {"keyword":"키워드%s","importance":80}
-                    """.formatted(index));
+                    {"keyword":"키워드%s","importance":%s}
+                    """.formatted(index, index));
         }
 
         KeywordAnalysisClient client = clientReturning("""
                 {"keywords":[%s]}
                 """.formatted(keywordJson));
 
-        assertOutputValidationFailure(() -> client.analyze(request()));
+        List<KeywordAnalysisResult> results = client.analyze(request());
+
+        assertThat(results).hasSize(20);
+        assertThat(results)
+                .extracting(KeywordAnalysisResult::keyword, KeywordAnalysisResult::importance)
+                .startsWith(org.assertj.core.groups.Tuple.tuple("키워드21", 21))
+                .endsWith(org.assertj.core.groups.Tuple.tuple("키워드2", 2));
     }
 
     @Test

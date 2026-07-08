@@ -61,8 +61,7 @@ public class OpenAiKeywordAnalysisClient implements KeywordAnalysisClient {
 
     private List<KeywordAnalysisResult> validateAndNormalize(OpenAiKeywordAnalysisResponse response) {
         if (response == null || response.keywords() == null
-                || response.keywords().isEmpty()
-                || response.keywords().size() > MAX_KEYWORD_COUNT) {
+                || response.keywords().isEmpty()) {
             throw KeywordAnalysisClientException.outputValidationFailed();
         }
 
@@ -73,6 +72,7 @@ public class OpenAiKeywordAnalysisClient implements KeywordAnalysisClient {
 
         return normalizedResults.stream()
                 .sorted(Comparator.comparingInt(KeywordAnalysisResult::importance).reversed())
+                .limit(MAX_KEYWORD_COUNT)
                 .toList();
     }
 
