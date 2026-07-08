@@ -240,10 +240,23 @@ class KeywordAnalysisJobWorkerTest {
         job.startProcessing("키워드 분석을 시작합니다.");
         job.markCompleted(1, "키워드 분석이 완료되었습니다.", LlmJobResultRefType.KEYWORD_ANALYSIS, "ka_1", completedAt);
         llmJobRepository.save(job);
+        KeywordAnalysis keywordAnalysis = keywordAnalysisRepository.findById("ka_1").orElseThrow();
+        keywordAnalysis.complete(completedAt);
+        keywordAnalysisRepository.save(keywordAnalysis);
 
         worker.execute("job_1");
 
         then(keywordAnalysisClient).shouldHaveNoInteractions();
+        assertThat(keywordAnalysisRepository.findById("ka_1")).hasValueSatisfying(analysis -> {
+            assertThat(analysis.getStatus()).isEqualTo(KeywordAnalysisStatus.COMPLETED);
+            assertThat(analysis.getCompletedAt()).isEqualTo(completedAt);
+        });
+        assertThat(llmJobRepository.findById("job_1")).hasValueSatisfying(reloadedJob -> {
+            assertThat(reloadedJob.getStatus()).isEqualTo(LlmJobStatus.COMPLETED);
+            assertThat(reloadedJob.getResultRefType()).isEqualTo(LlmJobResultRefType.KEYWORD_ANALYSIS);
+            assertThat(reloadedJob.getResultRefId()).isEqualTo("ka_1");
+            assertThat(reloadedJob.getCompletedAt()).isEqualTo(completedAt);
+        });
     }
 
     private void savePendingKeywordAnalysisJob(
