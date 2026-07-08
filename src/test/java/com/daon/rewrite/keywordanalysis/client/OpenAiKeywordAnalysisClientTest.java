@@ -85,8 +85,8 @@ class OpenAiKeywordAnalysisClientTest {
                         ]}
                         """,
                 """
-                        {"keywords":[%s]}
-                        """.formatted("\"" + "{\"keyword\":\"키워드\",\"importance\":80}" + "\"")
+                        {"keywords":["not-object"]}
+                        """
         );
 
         for (String response : invalidResponses) {
