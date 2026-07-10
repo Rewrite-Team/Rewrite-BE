@@ -1,9 +1,11 @@
 package com.daon.rewrite.interview.controller;
 
+import com.daon.rewrite.interview.dto.CurrentInterviewResponse;
 import com.daon.rewrite.interview.dto.StartInterviewRequest;
 import com.daon.rewrite.interview.dto.StartInterviewResponse;
 import com.daon.rewrite.interview.service.InterviewService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -14,6 +16,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class InterviewController {
 
     private final InterviewService interviewService;
+
+    @GetMapping("/cover-letters/{coverLetterId}/interview")
+    public CurrentInterviewResponse getCurrentInterview(@PathVariable String coverLetterId) {
+        return CurrentInterviewResponse.from(interviewService.findMyCurrentInterview(coverLetterId));
+    }
 
     @PostMapping("/cover-letters/{coverLetterId}/interviews")
     public StartInterviewResponse startInterview(

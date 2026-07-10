@@ -244,8 +244,66 @@ class InterviewServiceTest {
         assertThat(interviewSessionRepository.count()).isZero();
     }
 
+    @Test
+    void findMyCurrentInterviewReturnsNullWhenSessionDoesNotExist() {
+        Instant now = Instant.parse("2026-07-10T01:00:00Z");
+        coverLetterRepository.save(CoverLetter.draft("cl_1", "user_1", now));
+        given(currentUserProvider.currentUser()).willReturn(new CurrentUser("user_1", "테스트", null));
+
+        CurrentInterviewResult result = service.findMyCurrentInterview("cl_1");
+
+        assertThat(result.coverLetterId()).isEqualTo("cl_1");
+        assertThat(result.interviewSession()).isNull();
+    }
+
+    @Test
+    void findMyCurrentInterviewReturnsExistingSessionRegardlessOfCoverLetterStatus() {
+        Instant now = Instant.parse("2026-07-10T01:00:00Z");
+        CoverLetter coverLetter = saveReviewedCoverLetter("cl_1", "user_1", "rv_1", now);
+        InterviewSession interviewSession = InterviewSession.questionGenerating(
+                "is_1",
+                coverLetter,
+                "rv_1",
+                now.plusSeconds(120)
+        );
+        interviewSession.activate();
+        interviewSessionRepository.save(interviewSession);
+        coverLetter.startReview(now.plusSeconds(180));
+        coverLetterRepository.saveAndFlush(coverLetter);
+        given(currentUserProvider.currentUser()).willReturn(new CurrentUser("user_1", "테스트", null));
+
+        CurrentInterviewResult result = service.findMyCurrentInterview("cl_1");
+
+        assertThat(result.coverLetterId()).isEqualTo("cl_1");
+        assertThat(result.interviewSession().getId()).isEqualTo("is_1");
+        assertThat(result.interviewSession().getInitialSourceReviewVersionId()).isEqualTo("rv_1");
+        assertThat(result.interviewSession().getStatus()).isEqualTo(InterviewSessionStatus.ACTIVE);
+        assertThat(result.interviewSession().getCreatedAt()).isEqualTo(now.plusSeconds(120));
+    }
+
+    @Test
+    void findMyCurrentInterviewRejectsMissingOtherOwnerOrDeletedCoverLetter() {
+        Instant now = Instant.parse("2026-07-10T01:00:00Z");
+        coverLetterRepository.save(CoverLetter.draft("cl_other", "user_2", now));
+        CoverLetter deleted = CoverLetter.draft("cl_deleted", "user_1", now);
+        deleted.markDeleted(now.plusSeconds(60));
+        coverLetterRepository.save(deleted);
+        given(currentUserProvider.currentUser()).willReturn(new CurrentUser("user_1", "테스트", null));
+
+        assertCurrentInterviewNotFound("cl_missing");
+        assertCurrentInterviewNotFound("cl_other");
+        assertCurrentInterviewNotFound("cl_deleted");
+    }
+
     private void assertNotFound(String coverLetterId) {
         assertThatThrownBy(() -> service.startMyInterview(coverLetterId, null))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.NOT_FOUND);
+    }
+
+    private void assertCurrentInterviewNotFound(String coverLetterId) {
+        assertThatThrownBy(() -> service.findMyCurrentInterview(coverLetterId))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.NOT_FOUND);

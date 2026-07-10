@@ -46,6 +46,10 @@ GET /cover-letters/{coverLetterId}/interview
 }
 ```
 
+면접 세션이 없는 것은 정상 상태이므로 `200 OK`와 `interviewSession: null`을 반환한다.
+자기소개서가 존재하지 않거나 현재 사용자 소유가 아니거나 soft delete된 경우에는 `NOT_FOUND`를 반환한다.
+재첨삭 후에도 기존 면접 세션을 유지하므로 자기소개서의 현재 상태와 관계없이 세션을 조회한다.
+
 ### 모의면접 시작
 
 ```http
