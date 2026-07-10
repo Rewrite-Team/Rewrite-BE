@@ -5,6 +5,7 @@ import com.daon.rewrite.global.exception.BusinessException;
 import com.daon.rewrite.global.exception.ErrorCode;
 import com.daon.rewrite.interview.entity.InterviewSession;
 import com.daon.rewrite.interview.entity.InterviewSessionStatus;
+import com.daon.rewrite.interview.service.CurrentInterviewResult;
 import com.daon.rewrite.interview.service.InterviewService;
 import com.daon.rewrite.interview.service.StartInterviewResult;
 import com.daon.rewrite.llmjob.entity.LlmJob;
@@ -19,6 +20,7 @@ import java.time.Instant;
 
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.BDDMockito.given;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -125,5 +127,72 @@ class InterviewControllerTest {
                         .content("{}"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error.code").value("LLM_JOB_ALREADY_RUNNING"));
+    }
+
+    @Test
+    void getCurrentInterviewReturnsNullWhenSessionDoesNotExist() throws Exception {
+        given(interviewService.findMyCurrentInterview("cl_1"))
+                .willReturn(new CurrentInterviewResult("cl_1", null));
+
+        mockMvc.perform(get("/cover-letters/{coverLetterId}/interview", "cl_1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.coverLetterId").value("cl_1"))
+                .andExpect(jsonPath("$.interviewSession").value(nullValue()));
+    }
+
+    @Test
+    void getCurrentInterviewReturnsEachSessionStatusAndSeoulCreatedAt() throws Exception {
+        Instant createdAt = Instant.parse("2026-07-10T01:00:00Z");
+
+        for (InterviewSessionStatus sessionStatus : InterviewSessionStatus.values()) {
+            String coverLetterId = "cl_" + sessionStatus.name().toLowerCase();
+            InterviewSession interviewSession = sessionWithStatus(
+                    "is_" + sessionStatus.name().toLowerCase(),
+                    coverLetterId,
+                    sessionStatus,
+                    createdAt
+            );
+            given(interviewService.findMyCurrentInterview(coverLetterId))
+                    .willReturn(new CurrentInterviewResult(coverLetterId, interviewSession));
+
+            mockMvc.perform(get("/cover-letters/{coverLetterId}/interview", coverLetterId))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.coverLetterId").value(coverLetterId))
+                    .andExpect(jsonPath("$.interviewSession.id").value(interviewSession.getId()))
+                    .andExpect(jsonPath("$.interviewSession.initialSourceReviewVersionId").value("rv_1"))
+                    .andExpect(jsonPath("$.interviewSession.status").value(sessionStatus.name()))
+                    .andExpect(jsonPath("$.interviewSession.createdAt").value("2026-07-10T10:00:00"));
+        }
+    }
+
+    @Test
+    void getCurrentInterviewReturnsNotFound() throws Exception {
+        given(interviewService.findMyCurrentInterview("cl_missing"))
+                .willThrow(new BusinessException(ErrorCode.NOT_FOUND));
+
+        mockMvc.perform(get("/cover-letters/{coverLetterId}/interview", "cl_missing"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("NOT_FOUND"));
+    }
+
+    private InterviewSession sessionWithStatus(
+            String interviewSessionId,
+            String coverLetterId,
+            InterviewSessionStatus status,
+            Instant createdAt
+    ) {
+        CoverLetter coverLetter = CoverLetter.draft(coverLetterId, "user_1", createdAt);
+        InterviewSession interviewSession = InterviewSession.questionGenerating(
+                interviewSessionId,
+                coverLetter,
+                "rv_1",
+                createdAt
+        );
+        if (status == InterviewSessionStatus.ACTIVE) {
+            interviewSession.activate();
+        } else if (status == InterviewSessionStatus.FAILED) {
+            interviewSession.fail();
+        }
+        return interviewSession;
     }
 }

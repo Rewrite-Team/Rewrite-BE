@@ -46,6 +46,19 @@ public class InterviewService {
     private final Clock clock;
     private final ApplicationEventPublisher eventPublisher;
 
+    @Transactional(readOnly = true)
+    public CurrentInterviewResult findMyCurrentInterview(String coverLetterId) {
+        CurrentUser currentUser = currentUserProvider.currentUser();
+        CoverLetter coverLetter = coverLetterRepository
+                .findByIdAndOwnerIdAndDeletedAtIsNull(coverLetterId, currentUser.id())
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
+        InterviewSession interviewSession = interviewSessionRepository
+                .findByCoverLetterId(coverLetter.getId())
+                .orElse(null);
+
+        return new CurrentInterviewResult(coverLetter.getId(), interviewSession);
+    }
+
     @Transactional
     public StartInterviewResult startMyInterview(String coverLetterId, String sourceReviewVersionId) {
         CurrentUser currentUser = currentUserProvider.currentUser();
