@@ -27,7 +27,7 @@ API 계약과 API별 상태는 `docs/api/README.md`와 `docs/api/` 하위 도메
 | REQ-007 | DB/JPA 전환 | Implemented | High | API-008 내부 persistence, persistence 내부 변경 | [#22](https://github.com/Rewrite-Team/Rewrite-BE/issues/22), [#24](https://github.com/Rewrite-Team/Rewrite-BE/issues/24), [#25](https://github.com/Rewrite-Team/Rewrite-BE/issues/25), [PR #26](https://github.com/Rewrite-Team/Rewrite-BE/pull/26) | `CoverLetterRepositoryTest`, `CoverLetterServiceTest`, `CoverLetterControllerTest`, `./gradlew test`, `./gradlew check` | API-008 공개 계약은 유지하고 `cover_letters` persistence를 DB/JPA로 전환. H2 file 로컬 DB, H2 in-memory 테스트 DB 사용. Flyway는 별도 이슈로 분리 |
 | REQ-008 | 실제 인증 경계 | Planned | Medium | API-001 - API-006 | - | - | 카카오 OAuth, cookie, CSRF |
 | REQ-009 | 키워드 분석 | Implemented | Medium | API-020, API-021 | [#56](https://github.com/Rewrite-Team/Rewrite-BE/issues/56), [#58](https://github.com/Rewrite-Team/Rewrite-BE/issues/58), [#60](https://github.com/Rewrite-Team/Rewrite-BE/issues/60) | `KeywordAnalysisRepositoryTest`, `KeywordAnalysisKeywordRepositoryTest`, `KeywordAnalysisServiceTest`, `KeywordAnalysisControllerTest`, `OpenAiKeywordAnalysisClientTest`, `KeywordAnalysisJobWorkerTest`, `KeywordAnalysisJobEventIntegrationTest`, `LlmJobRepositoryTest`, `./gradlew test`, `./gradlew check` | API-020 키워드 분석 시작/재분석 Job 생성, API-021 최신 결과 조회, OpenAI 키워드 분석 client와 after-commit worker, `KeywordAnalysisKeyword` 완료 결과 저장 구현됨 |
-| REQ-010 | AI 면접 | Planned | Medium | API-022, API-023, API-025 - API-029 | - | - | LLM Job/SSE 기반 |
+| REQ-010 | AI 면접 | In Progress | Medium | API-022, API-023, API-025 - API-029 | [#62](https://github.com/Rewrite-Team/Rewrite-BE/issues/62) | `InterviewSessionRepositoryTest`, `InterviewServiceTest`, `InterviewControllerTest`, `LlmJobRepositoryTest`, `./gradlew test`, `./gradlew check` | API-022 면접 세션 시작과 PENDING 초기 질문 생성 Job 생성 구현됨. OpenAI 질문 생성 worker와 질문 저장은 후속 이슈로 분리 |
 
 ## Open Maintenance Work
 
@@ -59,6 +59,7 @@ API 계약과 API별 상태는 `docs/api/README.md`와 `docs/api/` 하위 도메
 
 | Candidate | Related REQ | Related APIs | Suggested Scope |
 |---|---|---|---|
+| AI 면접 초기 질문 생성 OpenAI worker | REQ-010 | API-022 후속 내부 실행 | `INTERVIEW_QUESTION_GENERATION` Job을 실행해 자기소개서 기반 3개, 기술 질문 2개를 저장하고 세션을 `ACTIVE` 또는 `FAILED`로 전환 |
 | LLM Job 자동 재시도 | REQ-005, REQ-006 | API-014 이후 내부 실행 | provider/output 실패 시 Decision 017 기준 1회 자동 재시도 처리 |
 
 ## Update Rules

@@ -70,7 +70,7 @@ API 설계 결정과 트레이드오프는 `../decisions/README.md`를 함께 �
 | API-019 | PUT | `/cover-letters/{coverLetterId}/review-versions/{versionId}/final-answers` | Implemented | REQ-006 | 최종 작성본 일괄 저장 |
 | API-020 | POST | `/cover-letters/{coverLetterId}/keyword-analysis` | Implemented | REQ-009 | 키워드 분석 시작/재분석 |
 | API-021 | GET | `/cover-letters/{coverLetterId}/keyword-analysis/latest` | Implemented | REQ-009 | 최신 키워드 분석 조회 |
-| API-022 | POST | `/cover-letters/{coverLetterId}/interviews` | Planned | REQ-010 | 면접 세션/질문 생성 |
+| API-022 | POST | `/cover-letters/{coverLetterId}/interviews` | Implemented | REQ-010 | 면접 세션과 초기 질문 생성 Job 생성 |
 | API-023 | POST | `/interview-threads/{threadId}/messages` | Planned | REQ-010 | 면접 답변 전송 |
 | API-024 | POST | `/cover-letters/{coverLetterId}/review-versions` | Implemented | REQ-006 | AI 첨삭 다시받기 |
 | API-025 | GET | `/cover-letters/{coverLetterId}/interview` | Planned | REQ-010 | 현재 면접 세션 조회 |

@@ -79,9 +79,13 @@ Response:
 }
 ```
 
+현재 구현 범위는 `InterviewSession(status=QUESTION_GENERATING)`과
+`LlmJob(type=INTERVIEW_QUESTION_GENERATION, status=PENDING)` 생성까지다.
+OpenAI 질문 생성과 질문 5개 저장은 후속 worker 이슈에서 구현한다.
+
 질문 생성 실패 시 `InterviewSession.status`는 `FAILED`로 저장된다. 실패한 세션은 현재 면접 세션 조회 API에서 그대로 반환한다.
 
-이미 면접 세션이 있는 경우 이 API에서는 초기 질문 생성 Job을 새로 만들지 않고 기존 세션을 반환한다. 기존 세션에 질문을 추가하려면 `POST /interviews/{interviewSessionId}/questions`를 사용한다.
+이미 `ACTIVE` 또는 `QUESTION_GENERATING` 면접 세션이 있는 경우 이 API에서는 초기 질문 생성 Job을 새로 만들지 않고 기존 세션을 반환한다. 이때 `jobId`는 `null`이고 `status`는 현재 세션 상태를 반환한다. 기존 세션에 질문을 추가하려면 `POST /interviews/{interviewSessionId}/questions`를 사용한다.
 
 ```json
 {

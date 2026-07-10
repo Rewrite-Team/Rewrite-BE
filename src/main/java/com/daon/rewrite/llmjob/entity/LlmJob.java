@@ -145,6 +145,19 @@ public class LlmJob {
         );
     }
 
+    public static LlmJob pendingInterviewQuestionGeneration(String id, String coverLetterId, Instant now) {
+        return new LlmJob(
+                id,
+                LlmJobType.INTERVIEW_QUESTION_GENERATION,
+                LlmJobStatus.PENDING,
+                LlmJobTargetType.COVER_LETTER,
+                coverLetterId,
+                null,
+                5,
+                now
+        );
+    }
+
     public void startProcessing(String progressMessage) {
         if (this.status != LlmJobStatus.PENDING) {
             throw new IllegalStateException("PENDING Job만 처리를 시작할 수 있습니다.");
