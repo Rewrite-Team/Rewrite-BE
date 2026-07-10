@@ -50,6 +50,9 @@ class InterviewQuestionGenerationJobWorkerTest {
     private InterviewQuestionGenerationJobWorker worker;
 
     @Autowired
+    private InterviewQuestionGenerationJobTransactionService transactionService;
+
+    @Autowired
     private CoverLetterRepository coverLetterRepository;
 
     @Autowired
@@ -192,6 +195,53 @@ class InterviewQuestionGenerationJobWorkerTest {
             assertThat(job.getStatus()).isEqualTo(LlmJobStatus.FAILED);
             assertThat(job.getErrorCode()).isEqualTo("LLM_OUTPUT_VALIDATION_FAILED");
             assertThat(job.getErrorMessage()).isEqualTo("LLM 출력 형식이 올바르지 않습니다.");
+            assertThat(job.getCompletedAt()).isEqualTo(failedAt);
+        });
+    }
+
+    @Test
+    void failMarksJobFailedWhenSessionIsAlreadyActive() {
+        Instant failedAt = Instant.parse("2026-07-10T12:00:00Z");
+        savePendingInterviewQuestionGenerationJob("cl_1", "rv_1", "is_1", "job_1");
+        transactionService.start("job_1");
+        InterviewSession interviewSession = interviewSessionRepository.findById("is_1").orElseThrow();
+        interviewSession.activate();
+        interviewSessionRepository.saveAndFlush(interviewSession);
+        given(clock.instant()).willReturn(failedAt);
+
+        transactionService.fail(
+                "job_1",
+                InterviewQuestionGenerationClientException.Reason.PROVIDER_ERROR
+        );
+
+        assertThat(interviewSessionRepository.findById("is_1")).hasValueSatisfying(session ->
+                assertThat(session.getStatus()).isEqualTo(InterviewSessionStatus.ACTIVE)
+        );
+        assertThat(llmJobRepository.findById("job_1")).hasValueSatisfying(job -> {
+            assertThat(job.getStatus()).isEqualTo(LlmJobStatus.FAILED);
+            assertThat(job.getErrorCode()).isEqualTo("LLM_PROVIDER_ERROR");
+            assertThat(job.getCompletedAt()).isEqualTo(failedAt);
+        });
+    }
+
+    @Test
+    void failMarksJobFailedWhenSessionDoesNotExist() {
+        Instant failedAt = Instant.parse("2026-07-10T12:00:00Z");
+        savePendingInterviewQuestionGenerationJob("cl_1", "rv_1", "is_1", "job_1");
+        transactionService.start("job_1");
+        interviewSessionRepository.deleteById("is_1");
+        interviewSessionRepository.flush();
+        given(clock.instant()).willReturn(failedAt);
+
+        transactionService.fail(
+                "job_1",
+                InterviewQuestionGenerationClientException.Reason.OUTPUT_VALIDATION_FAILED
+        );
+
+        assertThat(interviewSessionRepository.findById("is_1")).isEmpty();
+        assertThat(llmJobRepository.findById("job_1")).hasValueSatisfying(job -> {
+            assertThat(job.getStatus()).isEqualTo(LlmJobStatus.FAILED);
+            assertThat(job.getErrorCode()).isEqualTo("LLM_OUTPUT_VALIDATION_FAILED");
             assertThat(job.getCompletedAt()).isEqualTo(failedAt);
         });
     }

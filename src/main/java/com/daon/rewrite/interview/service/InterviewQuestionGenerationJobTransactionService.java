@@ -155,12 +155,6 @@ class InterviewQuestionGenerationJobTransactionService {
             return;
         }
 
-        InterviewSession interviewSession = interviewSessionRepository.findByCoverLetterId(job.getTargetId())
-                .orElseThrow(() -> new BusinessException(ErrorCode.INTERNAL_ERROR));
-        if (interviewSession.getStatus() != InterviewSessionStatus.QUESTION_GENERATING) {
-            throw new BusinessException(ErrorCode.INTERNAL_ERROR);
-        }
-
         Instant now = Instant.now(clock);
         job.markFailed(
                 job.getProgressCurrent(),
@@ -169,7 +163,9 @@ class InterviewQuestionGenerationJobTransactionService {
                 errorMessage(reason),
                 now
         );
-        interviewSession.fail();
+        interviewSessionRepository.findByCoverLetterId(job.getTargetId())
+                .filter(session -> session.getStatus() == InterviewSessionStatus.QUESTION_GENERATING)
+                .ifPresent(InterviewSession::fail);
     }
 
     @Transactional
