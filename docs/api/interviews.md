@@ -79,9 +79,9 @@ Response:
 }
 ```
 
-현재 구현 범위는 `InterviewSession(status=QUESTION_GENERATING)`과
-`LlmJob(type=INTERVIEW_QUESTION_GENERATION, status=PENDING)` 생성까지다.
-OpenAI 질문 생성과 질문 5개 저장은 후속 worker 이슈에서 구현한다.
+`LlmJob(type=INTERVIEW_QUESTION_GENERATION)`은 after-commit 비동기 worker에서 실행한다.
+생성에 성공하면 질문 5개를 저장하고 `InterviewSession.status`를 `ACTIVE`로 전환한다.
+완료 Job의 `resultRef`는 해당 면접 세션을 가리킨다.
 
 질문 생성 실패 시 `InterviewSession.status`는 `FAILED`로 저장된다. 실패한 세션은 현재 면접 세션 조회 API에서 그대로 반환한다.
 
