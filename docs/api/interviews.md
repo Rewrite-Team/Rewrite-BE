@@ -13,7 +13,7 @@ FAILED: 실패 안내와 다시 시작하기 또는 재시도 버튼
 
 면접 세션은 최초 질문 세트를 생성할 때 기준이 된 첨삭 버전을 `initialSourceReviewVersionId`로 기록한다. 재첨삭 후에도 기존 면접 세션과 기존 질문별 대화방은 유지된다.
 
-사용자가 `새로운 질문 추가하기`를 실행하면 기존 면접 세션에 가장 최근 첨삭 버전 기준 면접 질문 5개를 추가한다. 기존 질문과 대화 기록은 변경하지 않는다.
+면접 질문과 질문별 thread는 항상 같은 transaction에서 1:1로 생성한다. 사용자가 `새로운 질문 추가하기`를 실행하면 기존 면접 세션에 가장 최근 첨삭 버전 기준 면접 질문 5개와 thread 5개를 추가한다. 기존 질문과 대화 기록은 변경하지 않는다.
 
 ### 현재 면접 세션 조회
 
@@ -84,7 +84,7 @@ Response:
 ```
 
 `LlmJob(type=INTERVIEW_QUESTION_GENERATION)`은 after-commit 비동기 worker에서 실행한다.
-생성에 성공하면 질문 5개를 저장하고 `InterviewSession.status`를 `ACTIVE`로 전환한다.
+생성에 성공하면 질문 5개와 질문별 thread 5개를 저장하고 `InterviewSession.status`를 `ACTIVE`로 전환한다.
 완료 Job의 `resultRef`는 해당 면접 세션을 가리킨다.
 
 질문 생성 실패 시 `InterviewSession.status`는 `FAILED`로 저장된다. 실패한 세션은 현재 면접 세션 조회 API에서 그대로 반환한다.
@@ -143,7 +143,7 @@ Response:
       "order": 2,
       "type": "COVER_LETTER_BASED",
       "question": "지원 동기에서 언급한 회사 선택 기준을 실제 경험과 연결해 설명해 주세요.",
-      "threadId": null
+      "threadId": "it_01HY..."
     },
     {
       "id": "iq_01HX...",
@@ -151,7 +151,7 @@ Response:
       "order": 3,
       "type": "COVER_LETTER_BASED",
       "question": "자기소개서에 작성한 협업 경험에서 갈등을 어떻게 해결했는지 설명해 주세요.",
-      "threadId": null
+      "threadId": "it_01HX..."
     },
     {
       "id": "iq_01HW...",
@@ -159,7 +159,7 @@ Response:
       "order": 4,
       "type": "TECHNICAL",
       "question": "Spring에서 트랜잭션 전파 옵션을 설명해 주세요.",
-      "threadId": null
+      "threadId": "it_01HW..."
     },
     {
       "id": "iq_01HV...",
@@ -167,13 +167,13 @@ Response:
       "order": 5,
       "type": "TECHNICAL",
       "question": "REST API 설계 시 멱등성을 어떻게 고려하는지 설명해 주세요.",
-      "threadId": null
+      "threadId": "it_01HV..."
     }
   ]
 }
 ```
 
-질문은 `order` 오름차순으로 반환한다. 질문에 생성된 대화방이 있으면 `threadId`를 반환하고, 아직 대화방이 없으면 `null`을 반환한다.
+질문은 `order` 오름차순으로 반환한다. 모든 질문은 생성 시 thread가 함께 저장되므로 `threadId`는 필수값이다. 질문은 존재하지만 thread가 없으면 데이터 불변식 위반으로 처리한다.
 
 질문 생성 중이거나 생성 결과가 없는 세션은 정상 상태이므로 `200 OK`와 빈 `items`를 반환한다.
 면접 세션이 존재하지 않거나 현재 사용자 소유가 아니거나 soft delete된 자기소개서의 세션이면 `NOT_FOUND`를 반환한다.
@@ -223,45 +223,11 @@ interviewSession.status는 ACTIVE여야 한다.
 같은 자기소개서에 PENDING 또는 PROCESSING 상태의 LLM Job이 없어야 한다.
 ```
 
-### 질문별 대화방 생성 또는 조회
+### 질문별 대화방 정책
 
-화면 우측의 예상 질문을 클릭했을 때 사용한다.
+질문별 thread는 질문 생성 시 함께 저장하므로 별도 생성 API를 제공하지 않는다. API-028 `POST /interviews/{interviewSessionId}/threads`는 사용하지 않는다.
 
-```http
-POST /interviews/{interviewSessionId}/threads
-```
-
-Request:
-
-```json
-{
-  "interviewQuestionId": "iq_01HZ..."
-}
-```
-
-Response:
-
-```json
-{
-  "id": "it_01HZ...",
-  "interviewSessionId": "is_01HZ...",
-  "interviewQuestionId": "iq_01HZ...",
-  "messages": [
-    {
-      "id": "im_01HZ...",
-      "role": "ASSISTANT",
-      "content": "프로젝트에서 맡은 역할을 더 구체적으로 설명해 주세요.",
-      "feedback": null,
-      "score": null,
-      "followUpQuestion": null,
-      "createdAt": "2026-06-20T16:05:00"
-    }
-  ],
-  "createdAt": "2026-06-20T16:05:00"
-}
-```
-
-이미 대화방이 있으면 기존 thread를 반환한다.
+화면에서 질문을 선택하면 API-026이 반환한 `threadId`로 해당 대화 메시지를 조회한다. 최초 면접 질문은 `InterviewQuestion.question`을 표시하며 `ASSISTANT` 메시지로 중복 저장하지 않는다.
 
 ### 대화 메시지 조회
 
@@ -275,15 +241,6 @@ Response:
 {
   "threadId": "it_01HZ...",
   "items": [
-    {
-      "id": "im_01HZ...",
-      "role": "ASSISTANT",
-      "content": "프로젝트에서 맡은 역할을 더 구체적으로 설명해 주세요.",
-      "feedback": null,
-      "score": null,
-      "followUpQuestion": null,
-      "createdAt": "2026-06-20T16:05:00"
-    },
     {
       "id": "im_01HY...",
       "role": "USER",
@@ -316,6 +273,8 @@ Response:
   ]
 }
 ```
+
+최초 면접 질문은 API-026의 `question`으로 표시한다. `items`에는 사용자가 답변을 전송한 시점부터 `USER`, `ASSISTANT` 메시지가 순서대로 저장된다.
 
 ### 사용자 답변 전송
 

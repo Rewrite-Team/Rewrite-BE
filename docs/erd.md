@@ -38,7 +38,7 @@ erDiagram
     REVIEW_VERSIONS ||--o{ INTERVIEW_QUESTIONS : source
     INTERVIEW_SESSIONS ||--o{ INTERVIEW_QUESTIONS : contains
     INTERVIEW_SESSIONS ||--o{ INTERVIEW_THREADS : contains
-    INTERVIEW_QUESTIONS ||--o| INTERVIEW_THREADS : has
+    INTERVIEW_QUESTIONS ||--|| INTERVIEW_THREADS : has
     INTERVIEW_THREADS ||--o{ INTERVIEW_MESSAGES : contains
 
     USERS {
@@ -376,6 +376,7 @@ Policy:
 
 - 세션 시작 시 5개, 추가 생성 시 5개씩 생성한다.
 - 각 생성 단위는 자기소개서 기반 질문 3개와 기술 질문 2개로 구성한다.
+- 질문과 질문별 thread는 같은 transaction에서 1:1로 생성한다.
 - 꼬리질문은 질문 row로 저장하지 않고 `interview_messages.follow_up_question`에 저장한다.
 
 ### interview_threads
@@ -386,13 +387,13 @@ Policy:
 |---|---:|---|
 | `id` | No | PK |
 | `interview_session_id` | No | FK to `interview_sessions.id` |
-| `interview_question_id` | No | FK to `interview_questions.id`; 한 질문당 최대 1개 thread |
+| `interview_question_id` | No | FK to `interview_questions.id`; 한 질문당 정확히 1개 thread |
 | `status` | No | MVP 기본 `ACTIVE` |
 | `created_at` | No | 생성 시각 |
 
 Policy:
 
-- 이미 대화방이 있으면 기존 thread를 반환한다.
+- 질문 row와 동시에 생성하며 별도 thread 생성 API를 제공하지 않는다.
 - `interview_session_id`는 조회와 owner 검증 경로를 단순하게 하기 위해 중복 저장한다.
 
 ### interview_messages
@@ -418,6 +419,7 @@ Policy:
 - 사용자 답변 1개에 대해 assistant 메시지 1개를 저장한다.
 - assistant 메시지는 피드백, 점수, 꼬리질문을 함께 포함한다.
 - 꼬리질문은 별도 assistant 메시지로 분리하지 않는다.
+- 최초 면접 질문은 `interview_questions.question`으로 관리하고 message로 중복 저장하지 않는다.
 
 ## Cross-Cutting Policies
 

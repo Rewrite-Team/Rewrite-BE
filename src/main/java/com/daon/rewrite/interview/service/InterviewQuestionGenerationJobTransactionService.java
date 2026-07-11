@@ -13,8 +13,10 @@ import com.daon.rewrite.interview.client.InterviewQuestionGenerationResult;
 import com.daon.rewrite.interview.entity.InterviewQuestion;
 import com.daon.rewrite.interview.entity.InterviewSession;
 import com.daon.rewrite.interview.entity.InterviewSessionStatus;
+import com.daon.rewrite.interview.entity.InterviewThread;
 import com.daon.rewrite.interview.repository.InterviewQuestionRepository;
 import com.daon.rewrite.interview.repository.InterviewSessionRepository;
+import com.daon.rewrite.interview.repository.InterviewThreadRepository;
 import com.daon.rewrite.llmjob.entity.LlmJob;
 import com.daon.rewrite.llmjob.entity.LlmJobResultRefType;
 import com.daon.rewrite.llmjob.entity.LlmJobStatus;
@@ -39,6 +41,7 @@ import java.util.List;
 class InterviewQuestionGenerationJobTransactionService {
 
     private static final String INTERVIEW_QUESTION_ID_PREFIX = "iq";
+    private static final String INTERVIEW_THREAD_ID_PREFIX = "it";
     private static final String STARTED_MESSAGE = "면접 질문 생성을 시작합니다.";
     private static final String COMPLETED_MESSAGE = "면접 질문 생성이 완료되었습니다.";
     private static final String FAILED_MESSAGE = "면접 질문 생성에 실패했습니다.";
@@ -55,6 +58,7 @@ class InterviewQuestionGenerationJobTransactionService {
     private final ReviewVersionQuestionResultRepository questionResultRepository;
     private final InterviewSessionRepository interviewSessionRepository;
     private final InterviewQuestionRepository interviewQuestionRepository;
+    private final InterviewThreadRepository interviewThreadRepository;
     private final IdGenerator idGenerator;
     private final Clock clock;
 
@@ -138,6 +142,14 @@ class InterviewQuestionGenerationJobTransactionService {
         interviewQuestionRepository.saveAll(questions);
 
         Instant now = Instant.now(clock);
+        interviewThreadRepository.saveAll(questions.stream()
+                .map(question -> InterviewThread.active(
+                        idGenerator.generate(INTERVIEW_THREAD_ID_PREFIX),
+                        interviewSession,
+                        question,
+                        now
+                ))
+                .toList());
         interviewSession.activate();
         job.markCompleted(
                 job.getProgressTotal(),

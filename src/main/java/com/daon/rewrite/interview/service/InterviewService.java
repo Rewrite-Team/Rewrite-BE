@@ -164,8 +164,16 @@ public class InterviewService {
                 question.getQuestionOrder(),
                 question.getType(),
                 question.getQuestion(),
-                threadIdsByQuestionId.get(question.getId())
+                findRequiredThreadId(question.getId(), threadIdsByQuestionId)
         );
+    }
+
+    private String findRequiredThreadId(String questionId, Map<String, String> threadIdsByQuestionId) {
+        String threadId = threadIdsByQuestionId.get(questionId);
+        if (threadId == null) {
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR);
+        }
+        return threadId;
     }
 
     private String selectSourceReviewVersionId(CoverLetter coverLetter, String sourceReviewVersionId) {

@@ -95,3 +95,4 @@ API 계약: `../api/README.md`
 | Decision 070 | 삭제된 자기소개서와 하위 리소스는 사용자-facing API에서 모두 NOT_FOUND로 응답한다 | `cover-letters.md` | REQ-003, REQ-004, REQ-005 | API-007 - API-014 | Active |
 | Decision 071 | 날짜/시간 응답은 Asia/Seoul 기준 LocalDateTime으로 반환한다 | `common.md` | REQ-001, REQ-002 | 공통 API 정책 | Active |
 | Decision 072 | 남은 자기소개서 CRUD 확장 전 DB/JPA 전환을 선행한다 | `persistence.md` | REQ-003, REQ-007 | API-007 - API-013 | Active |
+| Decision 073 | 면접 질문과 질문별 대화방은 함께 생성한다 | `interviews.md` | REQ-010 | API-022, API-026, API-028 | Active |
