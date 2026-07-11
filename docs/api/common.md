@@ -479,7 +479,8 @@ AI 면접 질문은 세션 시작 시 5개 생성하고, 사용자가 `새로운
   "sourceReviewVersionId": "rv_01HZ...",
   "order": 1,
   "type": "COVER_LETTER_BASED",
-  "question": "프로젝트에서 맡은 역할을 더 구체적으로 설명해 주세요."
+  "question": "프로젝트에서 맡은 역할을 더 구체적으로 설명해 주세요.",
+  "threadId": "it_01HZ..."
 }
 ```
 
@@ -491,6 +492,8 @@ TECHNICAL
 ```
 
 꼬리질문은 `InterviewQuestion` type이 아니라 `InterviewMessage.followUpQuestion`으로 저장한다.
+
+모든 면접 질문은 생성 시 질문별 `InterviewThread`와 1:1로 연결되며 `threadId`는 필수값이다.
 
 ### InterviewThread
 
@@ -506,7 +509,7 @@ TECHNICAL
 
 ### InterviewMessage
 
-사용자 답변 1개에 대해 assistant 메시지 1개를 생성한다. assistant 메시지는 피드백, 점수, 꼬리질문을 함께 포함하며, 꼬리질문을 별도 메시지로 분리 저장하지 않는다.
+최초 면접 질문은 `InterviewQuestion.question`으로 표시하고 message로 중복 저장하지 않는다. 사용자가 답변을 전송한 시점부터 `USER` 메시지를 저장하며, 사용자 답변 1개에 대해 assistant 메시지 1개를 생성한다. assistant 메시지는 피드백, 점수, 꼬리질문을 함께 포함하며, 꼬리질문을 별도 메시지로 분리 저장하지 않는다.
 
 ```json
 {

@@ -14,8 +14,11 @@ import com.daon.rewrite.interview.entity.InterviewQuestion;
 import com.daon.rewrite.interview.entity.InterviewQuestionType;
 import com.daon.rewrite.interview.entity.InterviewSession;
 import com.daon.rewrite.interview.entity.InterviewSessionStatus;
+import com.daon.rewrite.interview.entity.InterviewThread;
+import com.daon.rewrite.interview.entity.InterviewThreadStatus;
 import com.daon.rewrite.interview.repository.InterviewQuestionRepository;
 import com.daon.rewrite.interview.repository.InterviewSessionRepository;
+import com.daon.rewrite.interview.repository.InterviewThreadRepository;
 import com.daon.rewrite.llmjob.entity.LlmJob;
 import com.daon.rewrite.llmjob.entity.LlmJobResultRefType;
 import com.daon.rewrite.llmjob.entity.LlmJobStatus;
@@ -29,8 +32,10 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -41,6 +46,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.BDDMockito.willThrow;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -70,6 +76,9 @@ class InterviewQuestionGenerationJobWorkerTest {
     @Autowired
     private InterviewQuestionRepository interviewQuestionRepository;
 
+    @MockitoSpyBean
+    private InterviewThreadRepository interviewThreadRepository;
+
     @Autowired
     private LlmJobRepository llmJobRepository;
 
@@ -84,6 +93,7 @@ class InterviewQuestionGenerationJobWorkerTest {
 
     @AfterEach
     void cleanUp() {
+        interviewThreadRepository.deleteAll();
         interviewQuestionRepository.deleteAll();
         interviewSessionRepository.deleteAll();
         reviewVersionQuestionResultRepository.deleteAll();
@@ -94,11 +104,12 @@ class InterviewQuestionGenerationJobWorkerTest {
     }
 
     @Test
-    void executeCompletesPendingJobAndStoresFiveQuestions() {
+    void executeCompletesPendingJobAndStoresFiveQuestionsWithThreads() {
         Instant completedAt = Instant.parse("2026-07-10T12:00:00Z");
         savePendingInterviewQuestionGenerationJob("cl_1", "rv_1", "is_1", "job_1");
         given(client.generate(any())).willReturn(validResults());
         given(idGenerator.generate("iq")).willReturn("iq_1", "iq_2", "iq_3", "iq_4", "iq_5");
+        given(idGenerator.generate("it")).willReturn("it_1", "it_2", "it_3", "it_4", "it_5");
         given(clock.instant()).willReturn(completedAt);
 
         worker.execute("job_1");
@@ -149,6 +160,31 @@ class InterviewQuestionGenerationJobWorkerTest {
                         ),
                         org.assertj.core.groups.Tuple.tuple(
                                 "iq_5", "rv_1", 5, InterviewQuestionType.TECHNICAL, "기술 질문 2"
+                        )
+                );
+        assertThat(interviewThreadRepository.findByInterviewSessionId("is_1"))
+                .extracting(
+                        InterviewThread::getId,
+                        thread -> thread.getInterviewSession().getId(),
+                        thread -> thread.getInterviewQuestion().getId(),
+                        InterviewThread::getStatus,
+                        InterviewThread::getCreatedAt
+                )
+                .containsExactlyInAnyOrder(
+                        org.assertj.core.groups.Tuple.tuple(
+                                "it_1", "is_1", "iq_1", InterviewThreadStatus.ACTIVE, completedAt
+                        ),
+                        org.assertj.core.groups.Tuple.tuple(
+                                "it_2", "is_1", "iq_2", InterviewThreadStatus.ACTIVE, completedAt
+                        ),
+                        org.assertj.core.groups.Tuple.tuple(
+                                "it_3", "is_1", "iq_3", InterviewThreadStatus.ACTIVE, completedAt
+                        ),
+                        org.assertj.core.groups.Tuple.tuple(
+                                "it_4", "is_1", "iq_4", InterviewThreadStatus.ACTIVE, completedAt
+                        ),
+                        org.assertj.core.groups.Tuple.tuple(
+                                "it_5", "is_1", "iq_5", InterviewThreadStatus.ACTIVE, completedAt
                         )
                 );
         assertThat(llmJobRepository.findById("job_1")).hasValueSatisfying(job -> {
@@ -265,6 +301,28 @@ class InterviewQuestionGenerationJobWorkerTest {
     }
 
     @Test
+    void executeRollsBackQuestionsAndThreadsWhenThreadPersistenceFails() {
+        Instant failedAt = Instant.parse("2026-07-10T12:00:00Z");
+        savePendingInterviewQuestionGenerationJob("cl_1", "rv_1", "is_1", "job_1");
+        given(client.generate(any())).willReturn(validResults());
+        given(idGenerator.generate("iq")).willReturn("iq_1", "iq_2", "iq_3", "iq_4", "iq_5");
+        given(idGenerator.generate("it")).willReturn("it_1", "it_2", "it_3", "it_4", "it_5");
+        given(clock.instant()).willReturn(failedAt);
+        willThrow(new DataIntegrityViolationException("thread persistence failed"))
+                .given(interviewThreadRepository)
+                .saveAll(any());
+
+        worker.execute("job_1");
+
+        assertFailedSessionAndEmptyQuestions("is_1");
+        assertThat(llmJobRepository.findById("job_1")).hasValueSatisfying(job -> {
+            assertThat(job.getStatus()).isEqualTo(LlmJobStatus.FAILED);
+            assertThat(job.getErrorCode()).isEqualTo("INTERNAL_ERROR");
+            assertThat(job.getCompletedAt()).isEqualTo(failedAt);
+        });
+    }
+
+    @Test
     void executeFailsSessionAndJobWhenStartPreconditionFails() {
         Instant failedAt = Instant.parse("2026-07-10T12:00:00Z");
         savePendingJobForDraftCoverLetter("cl_1", "is_1", "job_1");
@@ -303,6 +361,16 @@ class InterviewQuestionGenerationJobWorkerTest {
             ));
         }
         interviewQuestionRepository.saveAll(existingQuestions);
+        List<InterviewThread> existingThreads = new ArrayList<>();
+        for (int index = 0; index < existingQuestions.size(); index++) {
+            existingThreads.add(InterviewThread.active(
+                    "it_existing_" + (index + 1),
+                    interviewSession,
+                    existingQuestions.get(index),
+                    completedAt
+            ));
+        }
+        interviewThreadRepository.saveAll(existingThreads);
         LlmJob job = llmJobRepository.findById("job_1").orElseThrow();
         job.startProcessing("면접 질문 생성을 시작합니다.");
         job.markCompleted(
@@ -325,6 +393,15 @@ class InterviewQuestionGenerationJobWorkerTest {
                         "iq_existing_3",
                         "iq_existing_4",
                         "iq_existing_5"
+                );
+        assertThat(interviewThreadRepository.findByInterviewSessionId("is_1"))
+                .extracting(InterviewThread::getId)
+                .containsExactlyInAnyOrder(
+                        "it_existing_1",
+                        "it_existing_2",
+                        "it_existing_3",
+                        "it_existing_4",
+                        "it_existing_5"
                 );
         assertThat(interviewSessionRepository.findById("is_1")).hasValueSatisfying(session ->
                 assertThat(session.getStatus()).isEqualTo(InterviewSessionStatus.ACTIVE)
@@ -354,6 +431,7 @@ class InterviewQuestionGenerationJobWorkerTest {
         assertThat(interviewQuestionRepository
                 .findByInterviewSessionIdOrderByQuestionOrderAsc(interviewSessionId))
                 .isEmpty();
+        assertThat(interviewThreadRepository.findByInterviewSessionId(interviewSessionId)).isEmpty();
     }
 
     private void savePendingInterviewQuestionGenerationJob(

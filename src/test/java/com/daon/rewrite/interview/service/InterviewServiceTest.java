@@ -310,7 +310,7 @@ class InterviewServiceTest {
     }
 
     @Test
-    void findMyInterviewQuestionsReturnsOrderedQuestionsAndOptionalThreadIds() {
+    void findMyInterviewQuestionsReturnsOrderedQuestionsWithRequiredThreadIds() {
         Instant now = Instant.parse("2026-07-11T01:00:00Z");
         CoverLetter coverLetter = coverLetterRepository.save(CoverLetter.draft("cl_1", "user_1", now));
         InterviewSession interviewSession = interviewSessionRepository.save(InterviewSession.questionGenerating(
@@ -342,6 +342,12 @@ class InterviewServiceTest {
                 firstQuestion,
                 now.plusSeconds(120)
         ));
+        interviewThreadRepository.save(InterviewThread.active(
+                "it_2",
+                interviewSession,
+                secondQuestion,
+                now.plusSeconds(120)
+        ));
         given(currentUserProvider.currentUser()).willReturn(new CurrentUser("user_1", "테스트", null));
 
         InterviewQuestionListResult result = service.findMyInterviewQuestions("is_1");
@@ -371,9 +377,35 @@ class InterviewServiceTest {
                                 2,
                                 InterviewQuestionType.TECHNICAL,
                                 "트랜잭션 격리 수준을 설명해 주세요.",
-                                null
+                                "it_2"
                         )
                 );
+    }
+
+    @Test
+    void findMyInterviewQuestionsRejectsQuestionWithoutThreadAsInternalError() {
+        Instant now = Instant.parse("2026-07-11T01:00:00Z");
+        CoverLetter coverLetter = coverLetterRepository.save(CoverLetter.draft("cl_1", "user_1", now));
+        InterviewSession interviewSession = interviewSessionRepository.save(InterviewSession.questionGenerating(
+                "is_1",
+                coverLetter,
+                "rv_1",
+                now.plusSeconds(60)
+        ));
+        interviewQuestionRepository.save(InterviewQuestion.create(
+                "iq_1",
+                interviewSession,
+                "rv_1",
+                1,
+                InterviewQuestionType.COVER_LETTER_BASED,
+                "프로젝트에서 맡은 역할을 설명해 주세요."
+        ));
+        given(currentUserProvider.currentUser()).willReturn(new CurrentUser("user_1", "테스트", null));
+
+        assertThatThrownBy(() -> service.findMyInterviewQuestions("is_1"))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.INTERNAL_ERROR);
     }
 
     @Test

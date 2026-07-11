@@ -180,7 +180,7 @@ class InterviewControllerTest {
     }
 
     @Test
-    void getInterviewQuestionsReturnsOrderedItemsWithOptionalThreadIds() throws Exception {
+    void getInterviewQuestionsReturnsOrderedItemsWithRequiredThreadIds() throws Exception {
         given(interviewService.findMyInterviewQuestions("is_1"))
                 .willReturn(new InterviewQuestionListResult(
                         "is_1",
@@ -199,7 +199,7 @@ class InterviewControllerTest {
                                         2,
                                         InterviewQuestionType.TECHNICAL,
                                         "트랜잭션 격리 수준을 설명해 주세요.",
-                                        null
+                                        "it_2"
                                 )
                         )
                 ));
@@ -215,7 +215,7 @@ class InterviewControllerTest {
                 .andExpect(jsonPath("$.items[0].question").value("프로젝트에서 맡은 역할을 설명해 주세요."))
                 .andExpect(jsonPath("$.items[0].threadId").value("it_1"))
                 .andExpect(jsonPath("$.items[1].id").value("iq_2"))
-                .andExpect(jsonPath("$.items[1].threadId").value(nullValue()));
+                .andExpect(jsonPath("$.items[1].threadId").value("it_2"));
     }
 
     @Test
