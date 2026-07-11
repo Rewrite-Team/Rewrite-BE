@@ -5,7 +5,10 @@ import com.daon.rewrite.global.exception.BusinessException;
 import com.daon.rewrite.global.exception.ErrorCode;
 import com.daon.rewrite.interview.entity.InterviewSession;
 import com.daon.rewrite.interview.entity.InterviewSessionStatus;
+import com.daon.rewrite.interview.entity.InterviewQuestionType;
 import com.daon.rewrite.interview.service.CurrentInterviewResult;
+import com.daon.rewrite.interview.service.InterviewQuestionItemResult;
+import com.daon.rewrite.interview.service.InterviewQuestionListResult;
 import com.daon.rewrite.interview.service.InterviewService;
 import com.daon.rewrite.interview.service.StartInterviewResult;
 import com.daon.rewrite.llmjob.entity.LlmJob;
@@ -17,6 +20,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
+import java.util.List;
 
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.BDDMockito.given;
@@ -171,6 +175,66 @@ class InterviewControllerTest {
                 .willThrow(new BusinessException(ErrorCode.NOT_FOUND));
 
         mockMvc.perform(get("/cover-letters/{coverLetterId}/interview", "cl_missing"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("NOT_FOUND"));
+    }
+
+    @Test
+    void getInterviewQuestionsReturnsOrderedItemsWithOptionalThreadIds() throws Exception {
+        given(interviewService.findMyInterviewQuestions("is_1"))
+                .willReturn(new InterviewQuestionListResult(
+                        "is_1",
+                        List.of(
+                                new InterviewQuestionItemResult(
+                                        "iq_1",
+                                        "rv_1",
+                                        1,
+                                        InterviewQuestionType.COVER_LETTER_BASED,
+                                        "프로젝트에서 맡은 역할을 설명해 주세요.",
+                                        "it_1"
+                                ),
+                                new InterviewQuestionItemResult(
+                                        "iq_2",
+                                        "rv_2",
+                                        2,
+                                        InterviewQuestionType.TECHNICAL,
+                                        "트랜잭션 격리 수준을 설명해 주세요.",
+                                        null
+                                )
+                        )
+                ));
+
+        mockMvc.perform(get("/interviews/{interviewSessionId}/questions", "is_1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.interviewSessionId").value("is_1"))
+                .andExpect(jsonPath("$.items.length()").value(2))
+                .andExpect(jsonPath("$.items[0].id").value("iq_1"))
+                .andExpect(jsonPath("$.items[0].sourceReviewVersionId").value("rv_1"))
+                .andExpect(jsonPath("$.items[0].order").value(1))
+                .andExpect(jsonPath("$.items[0].type").value("COVER_LETTER_BASED"))
+                .andExpect(jsonPath("$.items[0].question").value("프로젝트에서 맡은 역할을 설명해 주세요."))
+                .andExpect(jsonPath("$.items[0].threadId").value("it_1"))
+                .andExpect(jsonPath("$.items[1].id").value("iq_2"))
+                .andExpect(jsonPath("$.items[1].threadId").value(nullValue()));
+    }
+
+    @Test
+    void getInterviewQuestionsReturnsEmptyItems() throws Exception {
+        given(interviewService.findMyInterviewQuestions("is_1"))
+                .willReturn(new InterviewQuestionListResult("is_1", List.of()));
+
+        mockMvc.perform(get("/interviews/{interviewSessionId}/questions", "is_1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.interviewSessionId").value("is_1"))
+                .andExpect(jsonPath("$.items").isEmpty());
+    }
+
+    @Test
+    void getInterviewQuestionsReturnsNotFound() throws Exception {
+        given(interviewService.findMyInterviewQuestions("is_missing"))
+                .willThrow(new BusinessException(ErrorCode.NOT_FOUND));
+
+        mockMvc.perform(get("/interviews/{interviewSessionId}/questions", "is_missing"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error.code").value("NOT_FOUND"));
     }
