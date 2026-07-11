@@ -8,4 +8,9 @@ import java.util.Optional;
 public interface InterviewSessionRepository extends JpaRepository<InterviewSession, String> {
 
     Optional<InterviewSession> findByCoverLetterId(String coverLetterId);
+
+    Optional<InterviewSession> findByIdAndCoverLetterOwnerIdAndCoverLetterDeletedAtIsNull(
+            String id,
+            String ownerId
+    );
 }

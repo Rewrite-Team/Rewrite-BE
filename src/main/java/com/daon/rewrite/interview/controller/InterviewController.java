@@ -1,6 +1,7 @@
 package com.daon.rewrite.interview.controller;
 
 import com.daon.rewrite.interview.dto.CurrentInterviewResponse;
+import com.daon.rewrite.interview.dto.InterviewQuestionListResponse;
 import com.daon.rewrite.interview.dto.StartInterviewRequest;
 import com.daon.rewrite.interview.dto.StartInterviewResponse;
 import com.daon.rewrite.interview.service.InterviewService;
@@ -20,6 +21,13 @@ public class InterviewController {
     @GetMapping("/cover-letters/{coverLetterId}/interview")
     public CurrentInterviewResponse getCurrentInterview(@PathVariable String coverLetterId) {
         return CurrentInterviewResponse.from(interviewService.findMyCurrentInterview(coverLetterId));
+    }
+
+    @GetMapping("/interviews/{interviewSessionId}/questions")
+    public InterviewQuestionListResponse getInterviewQuestions(@PathVariable String interviewSessionId) {
+        return InterviewQuestionListResponse.from(
+                interviewService.findMyInterviewQuestions(interviewSessionId)
+        );
     }
 
     @PostMapping("/cover-letters/{coverLetterId}/interviews")

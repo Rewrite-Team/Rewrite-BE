@@ -8,9 +8,12 @@ import com.daon.rewrite.coverletter.repository.CoverLetterRepository;
 import com.daon.rewrite.global.exception.BusinessException;
 import com.daon.rewrite.global.exception.ErrorCode;
 import com.daon.rewrite.global.util.IdGenerator;
+import com.daon.rewrite.interview.entity.InterviewQuestion;
 import com.daon.rewrite.interview.entity.InterviewSession;
 import com.daon.rewrite.interview.entity.InterviewSessionStatus;
+import com.daon.rewrite.interview.repository.InterviewQuestionRepository;
 import com.daon.rewrite.interview.repository.InterviewSessionRepository;
+import com.daon.rewrite.interview.repository.InterviewThreadRepository;
 import com.daon.rewrite.llmjob.entity.LlmJob;
 import com.daon.rewrite.llmjob.entity.LlmJobStatus;
 import com.daon.rewrite.llmjob.entity.LlmJobTargetType;
@@ -25,6 +28,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -41,6 +46,8 @@ public class InterviewService {
     private final CoverLetterRepository coverLetterRepository;
     private final ReviewVersionRepository reviewVersionRepository;
     private final InterviewSessionRepository interviewSessionRepository;
+    private final InterviewQuestionRepository interviewQuestionRepository;
+    private final InterviewThreadRepository interviewThreadRepository;
     private final LlmJobRepository llmJobRepository;
     private final IdGenerator idGenerator;
     private final Clock clock;
@@ -57,6 +64,32 @@ public class InterviewService {
                 .orElse(null);
 
         return new CurrentInterviewResult(coverLetter.getId(), interviewSession);
+    }
+
+    @Transactional(readOnly = true)
+    public InterviewQuestionListResult findMyInterviewQuestions(String interviewSessionId) {
+        CurrentUser currentUser = currentUserProvider.currentUser();
+        InterviewSession interviewSession = interviewSessionRepository
+                .findByIdAndCoverLetterOwnerIdAndCoverLetterDeletedAtIsNull(
+                        interviewSessionId,
+                        currentUser.id()
+                )
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
+
+        Map<String, String> threadIdsByQuestionId = interviewThreadRepository
+                .findByInterviewSessionId(interviewSession.getId())
+                .stream()
+                .collect(Collectors.toMap(
+                        thread -> thread.getInterviewQuestion().getId(),
+                        thread -> thread.getId()
+                ));
+        List<InterviewQuestionItemResult> items = interviewQuestionRepository
+                .findByInterviewSessionIdOrderByQuestionOrderAsc(interviewSession.getId())
+                .stream()
+                .map(question -> toQuestionItem(question, threadIdsByQuestionId))
+                .toList();
+
+        return new InterviewQuestionListResult(interviewSession.getId(), items);
     }
 
     @Transactional
@@ -119,6 +152,20 @@ public class InterviewService {
                         RUNNING_JOB_STATUSES
                 )
                 .isPresent();
+    }
+
+    private InterviewQuestionItemResult toQuestionItem(
+            InterviewQuestion question,
+            Map<String, String> threadIdsByQuestionId
+    ) {
+        return new InterviewQuestionItemResult(
+                question.getId(),
+                question.getSourceReviewVersionId(),
+                question.getQuestionOrder(),
+                question.getType(),
+                question.getQuestion(),
+                threadIdsByQuestionId.get(question.getId())
+        );
     }
 
     private String selectSourceReviewVersionId(CoverLetter coverLetter, String sourceReviewVersionId) {
