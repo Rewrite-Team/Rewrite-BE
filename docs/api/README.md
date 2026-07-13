@@ -77,4 +77,4 @@ API 설계 결정과 트레이드오프는 `../decisions/README.md`를 함께 �
 | API-026 | GET | `/interviews/{interviewSessionId}/questions` | Implemented | REQ-010 | 면접 질문 목록 |
 | API-027 | POST | `/interviews/{interviewSessionId}/questions` | Planned | REQ-010 | 면접 질문 추가 생성 |
 | API-028 | POST | `/interviews/{interviewSessionId}/threads` | Deprecated | REQ-010 | 질문 생성 시 thread를 함께 저장하므로 사용하지 않음 |
-| API-029 | GET | `/interview-threads/{threadId}/messages` | Planned | REQ-010 | 대화 메시지 조회 |
+| API-029 | GET | `/interview-threads/{threadId}/messages` | Implemented | REQ-010 | 대화 메시지 조회 |

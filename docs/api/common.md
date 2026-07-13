@@ -526,10 +526,7 @@ TECHNICAL
       "성과 지표와 문제 해결 과정을 보강하세요."
     ]
   },
-  "score": {
-    "overall": 78,
-    "max": 100
-  },
+  "score": 78,
   "followUpQuestion": "그 API 설계에서 가장 중요하게 고려한 트레이드오프는 무엇이었나요?",
   "createdAt": "2026-06-20T16:05:00"
 }
@@ -540,5 +537,4 @@ role:
 ```text
 USER
 ASSISTANT
-SYSTEM
 ```

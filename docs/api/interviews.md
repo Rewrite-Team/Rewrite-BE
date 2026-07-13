@@ -263,10 +263,7 @@ Response:
           "성과 지표와 문제 해결 과정을 보강하세요."
         ]
       },
-      "score": {
-        "overall": 78,
-        "max": 100
-      },
+      "score": 78,
       "followUpQuestion": "그 API 설계에서 가장 중요하게 고려한 트레이드오프는 무엇이었나요?",
       "createdAt": "2026-06-20T16:06:00"
     }
@@ -275,6 +272,8 @@ Response:
 ```
 
 최초 면접 질문은 API-026의 `question`으로 표시한다. `items`에는 사용자가 답변을 전송한 시점부터 `USER`, `ASSISTANT` 메시지가 순서대로 저장된다.
+
+메시지는 `createdAt`, `id` 오름차순으로 반환한다. 메시지가 없는 새 thread는 정상 상태이므로 `200 OK`와 빈 `items`를 반환한다. thread가 존재하지 않거나 현재 사용자 소유가 아니거나 soft delete된 자기소개서의 thread이면 `NOT_FOUND`를 반환한다.
 
 ### 사용자 답변 전송
 
@@ -317,4 +316,4 @@ LLM 작업이 완료되면 assistant 메시지가 저장된다. assistant 메시
 
 면접 평가의 핵심 정보는 `feedback`이다. `score`는 답변 품질을 빠르게 가늠하기 위한 보조 지표로 제공한다.
 
-`score.overall`은 1~100 범위의 정수이며, `score.max`는 100으로 고정한다. 항목별 점수는 제공하지 않는다.
+`score`는 1~100 범위의 정수다. 만점은 항상 100이므로 별도 max 필드를 저장하거나 응답하지 않으며, 항목별 점수도 제공하지 않는다.

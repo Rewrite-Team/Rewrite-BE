@@ -167,8 +167,7 @@ erDiagram
         text feedback_summary
         json feedback_strengths_json
         json feedback_improvements_json
-        int score_overall
-        int score_max
+        int score
         text follow_up_question
         instant created_at
     }
@@ -407,10 +406,9 @@ Policy:
 | `role` | No | `USER`, `ASSISTANT` |
 | `content` | No | 사용자 답변 또는 assistant 통합 응답 |
 | `feedback_summary` | Yes | assistant 메시지에서 사용 |
-| `feedback_strengths_json` | Yes | assistant 메시지에서 사용. 실제 DB type은 구현 이슈에서 확정 |
-| `feedback_improvements_json` | Yes | assistant 메시지에서 사용. 실제 DB type은 구현 이슈에서 확정 |
-| `score_overall` | Yes | assistant 메시지에서 사용. 1-100 |
-| `score_max` | Yes | assistant 메시지에서 사용. MVP 기본 100 |
+| `feedback_strengths_json` | Yes | assistant 메시지에서 사용. JSON 배열로 저장 |
+| `feedback_improvements_json` | Yes | assistant 메시지에서 사용. JSON 배열로 저장 |
+| `score` | Yes | assistant 메시지에서 사용. 1-100 정수 |
 | `follow_up_question` | Yes | assistant 메시지에서 사용 |
 | `created_at` | No | 생성 시각 |
 
@@ -418,6 +416,7 @@ Policy:
 
 - 사용자 답변 1개에 대해 assistant 메시지 1개를 저장한다.
 - assistant 메시지는 피드백, 점수, 꼬리질문을 함께 포함한다.
+- 점수 만점은 항상 100이므로 별도 max 컬럼을 저장하지 않는다.
 - 꼬리질문은 별도 assistant 메시지로 분리하지 않는다.
 - 최초 면접 질문은 `interview_questions.question`으로 관리하고 message로 중복 저장하지 않는다.
 
