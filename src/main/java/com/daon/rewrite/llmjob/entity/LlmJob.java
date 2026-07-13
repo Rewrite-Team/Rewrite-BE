@@ -158,6 +158,19 @@ public class LlmJob {
         );
     }
 
+    public static LlmJob pendingInterviewMessageFeedback(String id, String coverLetterId, Instant now) {
+        return new LlmJob(
+                id,
+                LlmJobType.INTERVIEW_MESSAGE_FEEDBACK,
+                LlmJobStatus.PENDING,
+                LlmJobTargetType.COVER_LETTER,
+                coverLetterId,
+                null,
+                1,
+                now
+        );
+    }
+
     public void startProcessing(String progressMessage) {
         if (this.status != LlmJobStatus.PENDING) {
             throw new IllegalStateException("PENDING Job만 처리를 시작할 수 있습니다.");

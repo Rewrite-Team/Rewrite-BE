@@ -302,9 +302,15 @@ Response:
 {
   "userMessageId": "im_01HY...",
   "jobId": "job_01HZ...",
-  "status": "PROCESSING"
+  "status": "PENDING"
 }
 ```
+
+요청이 성공하면 trim된 USER 메시지와 `INTERVIEW_MESSAGE_FEEDBACK` Job을 같은 transaction에서 저장한다. 생성 직후 Job 상태는 `PENDING`이며, Job이 실제 실행을 시작하면 `PROCESSING`으로 전환된다.
+
+thread가 존재하지 않거나 현재 사용자 소유가 아니거나 soft delete된 자기소개서의 thread이면 `NOT_FOUND`를 반환한다. 같은 자기소개서에 이미 `PENDING` 또는 `PROCESSING` Job이 있으면 USER 메시지를 저장하지 않고 `LLM_JOB_ALREADY_RUNNING`을 반환한다.
+
+현재 구현 범위는 USER 메시지와 PENDING Job 생성까지다. OpenAI 피드백 생성과 완료 후 ASSISTANT 메시지 저장은 후속 구현에서 연결한다.
 
 LLM 작업이 완료되면 assistant 메시지가 저장된다. assistant 메시지는 항상 `feedback`, `score`, `followUpQuestion`을 포함한다.
 
