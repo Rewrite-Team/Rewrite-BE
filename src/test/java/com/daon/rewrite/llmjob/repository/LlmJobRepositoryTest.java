@@ -2,6 +2,7 @@ package com.daon.rewrite.llmjob.repository;
 
 import com.daon.rewrite.llmjob.entity.LlmJob;
 import com.daon.rewrite.llmjob.entity.LlmJobResultRefType;
+import com.daon.rewrite.llmjob.entity.LlmJobRequestRefType;
 import com.daon.rewrite.llmjob.entity.LlmJobStatus;
 import com.daon.rewrite.llmjob.entity.LlmJobTargetType;
 import com.daon.rewrite.llmjob.entity.LlmJobType;
@@ -130,7 +131,7 @@ class LlmJobRepositoryTest {
     @Test
     void saveAndFindPendingInterviewMessageFeedbackJobRoundTripsThroughJpa() {
         Instant now = Instant.parse("2026-07-13T01:00:00Z");
-        LlmJob job = LlmJob.pendingInterviewMessageFeedback("job_feedback", "cl_1", now);
+        LlmJob job = LlmJob.pendingInterviewMessageFeedback("job_feedback", "cl_1", "im_1", now);
 
         repository.save(job);
         entityManager.flush();
@@ -142,6 +143,8 @@ class LlmJobRepositoryTest {
         assertThat(found.getStatus()).isEqualTo(LlmJobStatus.PENDING);
         assertThat(found.getTargetType()).isEqualTo(LlmJobTargetType.COVER_LETTER);
         assertThat(found.getTargetId()).isEqualTo("cl_1");
+        assertThat(found.getRequestRefType()).isEqualTo(LlmJobRequestRefType.INTERVIEW_MESSAGE);
+        assertThat(found.getRequestRefId()).isEqualTo("im_1");
         assertThat(found.getRequestInstruction()).isNull();
         assertThat(found.getProgressCurrent()).isZero();
         assertThat(found.getProgressTotal()).isEqualTo(1);

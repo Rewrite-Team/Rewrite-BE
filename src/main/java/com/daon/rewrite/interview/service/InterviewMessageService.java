@@ -91,6 +91,7 @@ public class InterviewMessageService {
         LlmJob job = llmJobRepository.save(LlmJob.pendingInterviewMessageFeedback(
                 idGenerator.generate(LLM_JOB_ID_PREFIX),
                 coverLetter.getId(),
+                userMessage.getId(),
                 now
         ));
         eventPublisher.publishEvent(new LlmJobCreatedEvent(job.getId()));

@@ -43,6 +43,13 @@ public class LlmJob {
     @Column(name = "request_instruction", length = 1000)
     private String requestInstruction;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "request_ref_type", length = 40)
+    private LlmJobRequestRefType requestRefType;
+
+    @Column(name = "request_ref_id", length = 64)
+    private String requestRefId;
+
     @Column(name = "progress_current", nullable = false)
     private int progressCurrent;
 
@@ -84,6 +91,8 @@ public class LlmJob {
             LlmJobTargetType targetType,
             String targetId,
             String requestInstruction,
+            LlmJobRequestRefType requestRefType,
+            String requestRefId,
             int progressTotal,
             Instant createdAt
     ) {
@@ -93,6 +102,8 @@ public class LlmJob {
         this.targetType = targetType;
         this.targetId = targetId;
         this.requestInstruction = requestInstruction;
+        this.requestRefType = requestRefType;
+        this.requestRefId = requestRefId;
         this.progressCurrent = 0;
         this.progressTotal = progressTotal;
         this.attempt = DEFAULT_ATTEMPT;
@@ -107,6 +118,8 @@ public class LlmJob {
                 LlmJobStatus.PENDING,
                 LlmJobTargetType.COVER_LETTER,
                 coverLetterId,
+                null,
+                null,
                 null,
                 progressTotal,
                 now
@@ -127,6 +140,8 @@ public class LlmJob {
                 LlmJobTargetType.COVER_LETTER,
                 coverLetterId,
                 requestInstruction,
+                null,
+                null,
                 progressTotal,
                 now
         );
@@ -139,6 +154,8 @@ public class LlmJob {
                 LlmJobStatus.PENDING,
                 LlmJobTargetType.COVER_LETTER,
                 coverLetterId,
+                null,
+                null,
                 null,
                 1,
                 now
@@ -153,12 +170,19 @@ public class LlmJob {
                 LlmJobTargetType.COVER_LETTER,
                 coverLetterId,
                 null,
+                null,
+                null,
                 5,
                 now
         );
     }
 
-    public static LlmJob pendingInterviewMessageFeedback(String id, String coverLetterId, Instant now) {
+    public static LlmJob pendingInterviewMessageFeedback(
+            String id,
+            String coverLetterId,
+            String userMessageId,
+            Instant now
+    ) {
         return new LlmJob(
                 id,
                 LlmJobType.INTERVIEW_MESSAGE_FEEDBACK,
@@ -166,6 +190,8 @@ public class LlmJob {
                 LlmJobTargetType.COVER_LETTER,
                 coverLetterId,
                 null,
+                LlmJobRequestRefType.INTERVIEW_MESSAGE,
+                userMessageId,
                 1,
                 now
         );

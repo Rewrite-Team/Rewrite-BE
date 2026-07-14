@@ -104,6 +104,9 @@ erDiagram
         string status
         string target_type
         string target_id
+        text request_instruction
+        string request_ref_type
+        string request_ref_id
         int progress_current
         int progress_total
         string progress_message
@@ -287,6 +290,8 @@ LLM 비동기 작업 상태 테이블이다.
 | `target_type` | No | 작업 대상 타입 |
 | `target_id` | No | 작업 대상 id. Polymorphic reference라 DB FK를 강제하지 않는다 |
 | `request_instruction` | Yes | 재첨삭 요구사항. 최초 첨삭과 요구사항 없는 재첨삭은 null |
+| `request_ref_type` | Yes | 작업 입력 리소스 타입. 입력 리소스를 별도로 식별할 필요가 없는 Job은 null |
+| `request_ref_id` | Yes | 작업 입력 리소스 id. Polymorphic reference라 DB FK를 강제하지 않는다 |
 | `progress_current` | No | 진행률 현재값 |
 | `progress_total` | No | 진행률 전체값 |
 | `progress_message` | Yes | 진행 메시지 |
@@ -302,6 +307,7 @@ LLM 비동기 작업 상태 테이블이다.
 Policy:
 
 - 같은 자기소개서에 대해 `PENDING` 또는 `PROCESSING` LLM Job은 동시에 하나만 허용한다.
+- `INTERVIEW_MESSAGE_FEEDBACK` Job은 `request_ref_type=INTERVIEW_MESSAGE`, `request_ref_id=USER 메시지 id`로 처리할 답변을 확정한다.
 - `partialResult`는 영속 컬럼이 아니다. MVP에서는 서버 메모리/cache 계층에서 관리한다.
 
 ### keyword_analyses
@@ -448,4 +454,4 @@ Policy:
 
 ### Physical FK exceptions
 
-`llm_jobs.target_id`와 `llm_jobs.result_ref_id`는 여러 도메인 리소스를 가리키는 polymorphic reference다. ERD에서는 논리 관계를 문서화하지만, DB physical FK는 강제하지 않는다.
+`llm_jobs.target_id`, `llm_jobs.request_ref_id`, `llm_jobs.result_ref_id`는 여러 도메인 리소스를 가리키는 polymorphic reference다. ERD에서는 논리 관계를 문서화하지만, DB physical FK는 강제하지 않는다.
