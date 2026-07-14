@@ -50,7 +50,7 @@ class InterviewMessageControllerTest {
                 "저는 프로젝트에서 API 설계를 담당했습니다.",
                 now
         );
-        LlmJob job = LlmJob.pendingInterviewMessageFeedback("job_1", "cl_1", now);
+        LlmJob job = LlmJob.pendingInterviewMessageFeedback("job_1", "cl_1", "im_1", now);
         given(interviewMessageService.sendMyInterviewMessage(
                 "it_1",
                 "저는 프로젝트에서 API 설계를 담당했습니다."

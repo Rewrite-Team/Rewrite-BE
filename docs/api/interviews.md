@@ -310,9 +310,11 @@ Response:
 
 thread가 존재하지 않거나 현재 사용자 소유가 아니거나 soft delete된 자기소개서의 thread이면 `NOT_FOUND`를 반환한다. 같은 자기소개서에 이미 `PENDING` 또는 `PROCESSING` Job이 있으면 USER 메시지를 저장하지 않고 `LLM_JOB_ALREADY_RUNNING`을 반환한다.
 
-현재 구현 범위는 USER 메시지와 PENDING Job 생성까지다. OpenAI 피드백 생성과 완료 후 ASSISTANT 메시지 저장은 후속 구현에서 연결한다.
+피드백 Job은 생성된 USER 메시지 ID를 입력 참조로 저장한다. 비동기 worker는 이 참조를 기준으로 처리할 답변을 확정하고, 원본 면접 질문과 해당 USER 메시지까지의 대화 이력을 순서대로 OpenAI client에 전달한다.
 
-LLM 작업이 완료되면 assistant 메시지가 저장된다. assistant 메시지는 항상 `feedback`, `score`, `followUpQuestion`을 포함한다.
+LLM 작업이 완료되면 assistant 메시지와 Job 완료 상태를 같은 transaction에서 저장한다. assistant 메시지는 항상 `feedback`, `score`, `followUpQuestion`을 포함하며, 완료된 Job의 `resultRef`는 생성된 `INTERVIEW_MESSAGE`를 가리킨다.
+
+provider 호출 또는 출력 검증에 실패하면 Job은 `FAILED`로 종료하고 assistant 메시지는 저장하지 않는다. 이미 완료되거나 실패한 Job event가 다시 전달되어도 메시지를 중복 생성하지 않는다.
 
 면접 답변 피드백 Job(`INTERVIEW_MESSAGE_FEEDBACK`)은 진행 중 assistant 메시지를 미리 생성하지 않는다. 스트리밍 중 생성되는 delta는 현재 SSE 연결 화면에만 표시하며, 서버는 면접 피드백용 partial result를 저장하지 않는다.
 

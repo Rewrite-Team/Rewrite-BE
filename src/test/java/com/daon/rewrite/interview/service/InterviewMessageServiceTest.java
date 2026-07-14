@@ -21,6 +21,7 @@ import com.daon.rewrite.llmjob.entity.LlmJob;
 import com.daon.rewrite.llmjob.entity.LlmJobStatus;
 import com.daon.rewrite.llmjob.entity.LlmJobTargetType;
 import com.daon.rewrite.llmjob.entity.LlmJobType;
+import com.daon.rewrite.llmjob.entity.LlmJobRequestRefType;
 import com.daon.rewrite.llmjob.repository.LlmJobRepository;
 import com.daon.rewrite.llmjob.service.LlmJobCreatedEvent;
 import org.junit.jupiter.api.AfterEach;
@@ -78,6 +79,9 @@ class InterviewMessageServiceTest {
     @MockitoBean
     private Clock clock;
 
+    @MockitoBean
+    private InterviewMessageFeedbackJobWorker interviewMessageFeedbackJobWorker;
+
     @AfterEach
     void cleanUp() {
         interviewMessageRepository.deleteAll();
@@ -112,6 +116,8 @@ class InterviewMessageServiceTest {
         assertThat(result.job().getStatus()).isEqualTo(LlmJobStatus.PENDING);
         assertThat(result.job().getTargetType()).isEqualTo(LlmJobTargetType.COVER_LETTER);
         assertThat(result.job().getTargetId()).isEqualTo("cl_1");
+        assertThat(result.job().getRequestRefType()).isEqualTo(LlmJobRequestRefType.INTERVIEW_MESSAGE);
+        assertThat(result.job().getRequestRefId()).isEqualTo("im_1");
         assertThat(result.job().getProgressCurrent()).isZero();
         assertThat(result.job().getProgressTotal()).isEqualTo(1);
         assertThat(interviewMessageRepository.findById("im_1")).isPresent();

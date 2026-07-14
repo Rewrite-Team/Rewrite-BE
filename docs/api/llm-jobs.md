@@ -8,7 +8,7 @@
 GET /llm-jobs/{jobId}
 ```
 
-현재 구현 범위에서는 최초 첨삭 Job과 재첨삭 Job이 생성 이후 비동기 worker로 실행될 수 있다. `partialResult`는 아직 서버 메모리/cache 저장소가 없으므로 항상 `null`이다.
+현재 구현 범위에서는 최초 첨삭, 재첨삭, 키워드 분석, 면접 질문 생성, 면접 답변 피드백 Job이 생성 이후 비동기 worker로 실행될 수 있다. `partialResult`는 아직 서버 메모리/cache 저장소가 없으므로 항상 `null`이다.
 
 `targetType=COVER_LETTER`인 Job은 연결된 자기소개서의 owner와 soft delete 상태를 기준으로 접근 권한을 검증한다. 존재하지 않는 Job, 다른 사용자 소유 자기소개서에 연결된 Job, 삭제된 자기소개서에 연결된 Job은 모두 `NOT_FOUND`를 반환한다.
 
