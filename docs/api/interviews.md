@@ -13,7 +13,7 @@ FAILED: 실패 안내와 다시 시작하기 또는 재시도 버튼
 
 면접 세션은 최초 질문 세트를 생성할 때 기준이 된 첨삭 버전을 `initialSourceReviewVersionId`로 기록한다. 재첨삭 후에도 기존 면접 세션과 기존 질문별 대화방은 유지된다.
 
-면접 질문과 질문별 thread는 항상 같은 transaction에서 1:1로 생성한다. 사용자가 `새로운 질문 추가하기`를 실행하면 기존 면접 세션에 가장 최근 첨삭 버전 기준 면접 질문 5개와 thread 5개를 추가한다. 기존 질문과 대화 기록은 변경하지 않는다.
+면접 질문과 질문별 thread는 항상 같은 transaction에서 1:1로 생성한다. 사용자가 `새로운 질문 추가하기`를 실행하면 기존 면접 세션에 가장 최근 첨삭 버전 기준 면접 질문 1개와 thread 1개를 추가한다. 기존 질문과 대화 기록은 변경하지 않는다.
 
 ### 현재 면접 세션 조회
 
@@ -66,12 +66,7 @@ Request:
 
 `sourceReviewVersionId`를 생략하면 최신 첨삭 버전을 기준으로 면접 질문을 생성한다.
 
-면접 질문은 총 5개 생성한다.
-
-```text
-COVER_LETTER_BASED: 3개
-TECHNICAL: 2개
-```
+면접 질문은 총 5개 생성한다. 모든 질문은 자기소개서 최종 작성본에 드러난 경험, 역할, 행동, 성과, 문제 해결 과정과 의사결정을 기반으로 하며 질문 종류를 구분하지 않는다.
 
 Response:
 
@@ -133,7 +128,6 @@ Response:
       "id": "iq_01HZ...",
       "sourceReviewVersionId": "rv_01HZ...",
       "order": 1,
-      "type": "COVER_LETTER_BASED",
       "question": "프로젝트에서 맡은 역할을 더 구체적으로 설명해 주세요.",
       "threadId": "it_01HZ..."
     },
@@ -141,7 +135,6 @@ Response:
       "id": "iq_01HY...",
       "sourceReviewVersionId": "rv_01HZ...",
       "order": 2,
-      "type": "COVER_LETTER_BASED",
       "question": "지원 동기에서 언급한 회사 선택 기준을 실제 경험과 연결해 설명해 주세요.",
       "threadId": "it_01HY..."
     },
@@ -149,7 +142,6 @@ Response:
       "id": "iq_01HX...",
       "sourceReviewVersionId": "rv_01HZ...",
       "order": 3,
-      "type": "COVER_LETTER_BASED",
       "question": "자기소개서에 작성한 협업 경험에서 갈등을 어떻게 해결했는지 설명해 주세요.",
       "threadId": "it_01HX..."
     },
@@ -157,16 +149,14 @@ Response:
       "id": "iq_01HW...",
       "sourceReviewVersionId": "rv_01HZ...",
       "order": 4,
-      "type": "TECHNICAL",
-      "question": "Spring에서 트랜잭션 전파 옵션을 설명해 주세요.",
+      "question": "프로젝트 성과를 만들기 위해 본인이 직접 수행한 행동을 설명해 주세요.",
       "threadId": "it_01HW..."
     },
     {
       "id": "iq_01HV...",
       "sourceReviewVersionId": "rv_01HZ...",
       "order": 5,
-      "type": "TECHNICAL",
-      "question": "REST API 설계 시 멱등성을 어떻게 고려하는지 설명해 주세요.",
+      "question": "문제 해결 과정에서 가장 중요하게 내린 의사결정을 설명해 주세요.",
       "threadId": "it_01HV..."
     }
   ]
@@ -188,18 +178,13 @@ POST /interviews/{interviewSessionId}/questions
 
 Request body는 없다. 서버는 항상 해당 자기소개서의 최신 첨삭 버전인 `CoverLetter.latestReviewVersionId`를 기준으로 질문을 생성한다.
 
-추가 질문은 총 5개 생성한다.
-
-```text
-COVER_LETTER_BASED: 3개
-TECHNICAL: 2개
-```
+추가 질문은 자기소개서 최종 작성본을 기반으로 총 1개 생성한다. 질문 종류는 구분하지 않는다.
 
 생성된 질문은 기존 질문 목록 뒤에 이어서 `order`를 부여한다.
 
 ```text
 기존 질문 order: 1~5
-추가 질문 order: 6~10
+추가 질문 order: 6
 ```
 
 Response:

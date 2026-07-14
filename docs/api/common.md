@@ -448,7 +448,7 @@ FAILED
 
 면접 세션은 최초 질문 세트를 생성할 때 기준이 된 첨삭 버전을 `initialSourceReviewVersionId`로 기록한다. 이 값은 세션의 시작 기준을 나타내는 메타데이터이며, 세션 안의 모든 질문이 같은 첨삭 버전을 기준으로 생성되었다는 뜻은 아니다.
 
-사용자가 `새로운 질문 추가하기`를 실행하면 기존 면접 세션은 유지하고, 가장 최근 `ReviewVersion`을 기준으로 면접 질문 5개를 추가 생성한다. 질문마다 생성 기준 버전이 다를 수 있으므로 `InterviewQuestion.sourceReviewVersionId`에 각 질문의 기준 첨삭 버전을 기록한다.
+사용자가 `새로운 질문 추가하기`를 실행하면 기존 면접 세션은 유지하고, 가장 최근 `ReviewVersion`을 기준으로 면접 질문 1개를 추가 생성한다. 질문마다 생성 기준 버전이 다를 수 있으므로 `InterviewQuestion.sourceReviewVersionId`에 각 질문의 기준 첨삭 버전을 기록한다.
 
 상태:
 
@@ -470,7 +470,7 @@ FAILED
 
 ### InterviewQuestion
 
-AI 면접 질문은 세션 시작 시 5개 생성하고, 사용자가 `새로운 질문 추가하기`를 실행할 때마다 5개씩 추가 생성한다. 각 생성 단위는 자기소개서 기반 질문 3개와 기술 질문 2개로 구성한다.
+AI 면접 질문은 세션 시작 시 5개 생성하고, 사용자가 `새로운 질문 추가하기`를 실행할 때마다 1개씩 추가 생성한다. 모든 질문은 자기소개서 최종 작성본을 기반으로 생성하며 질문 종류를 구분하지 않는다.
 
 ```json
 {
@@ -478,20 +478,12 @@ AI 면접 질문은 세션 시작 시 5개 생성하고, 사용자가 `새로운
   "interviewSessionId": "is_01HZ...",
   "sourceReviewVersionId": "rv_01HZ...",
   "order": 1,
-  "type": "COVER_LETTER_BASED",
   "question": "프로젝트에서 맡은 역할을 더 구체적으로 설명해 주세요.",
   "threadId": "it_01HZ..."
 }
 ```
 
-질문 type 후보:
-
-```text
-COVER_LETTER_BASED
-TECHNICAL
-```
-
-꼬리질문은 `InterviewQuestion` type이 아니라 `InterviewMessage.followUpQuestion`으로 저장한다.
+꼬리질문은 별도 `InterviewQuestion`이 아니라 `InterviewMessage.followUpQuestion`으로 저장한다.
 
 모든 면접 질문은 생성 시 질문별 `InterviewThread`와 1:1로 연결되며 `threadId`는 필수값이다.
 

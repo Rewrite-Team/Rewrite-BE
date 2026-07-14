@@ -156,10 +156,10 @@ class InterviewQuestionGenerationJobWorkerTest {
                                 "iq_3", "rv_1", 3, InterviewQuestionType.COVER_LETTER_BASED, "경험 질문 3"
                         ),
                         org.assertj.core.groups.Tuple.tuple(
-                                "iq_4", "rv_1", 4, InterviewQuestionType.TECHNICAL, "기술 질문 1"
+                                "iq_4", "rv_1", 4, InterviewQuestionType.COVER_LETTER_BASED, "경험 질문 4"
                         ),
                         org.assertj.core.groups.Tuple.tuple(
-                                "iq_5", "rv_1", 5, InterviewQuestionType.TECHNICAL, "기술 질문 2"
+                                "iq_5", "rv_1", 5, InterviewQuestionType.COVER_LETTER_BASED, "경험 질문 5"
                         )
                 );
         assertThat(interviewThreadRepository.findByInterviewSessionId("is_1"))
@@ -356,7 +356,7 @@ class InterviewQuestionGenerationJobWorkerTest {
                     interviewSession,
                     "rv_1",
                     index + 1,
-                    result.type(),
+                    InterviewQuestionType.COVER_LETTER_BASED,
                     result.question()
             ));
         }
@@ -416,11 +416,11 @@ class InterviewQuestionGenerationJobWorkerTest {
 
     private List<InterviewQuestionGenerationResult> validResults() {
         return List.of(
-                new InterviewQuestionGenerationResult(InterviewQuestionType.COVER_LETTER_BASED, "경험 질문 1"),
-                new InterviewQuestionGenerationResult(InterviewQuestionType.COVER_LETTER_BASED, "경험 질문 2"),
-                new InterviewQuestionGenerationResult(InterviewQuestionType.COVER_LETTER_BASED, "경험 질문 3"),
-                new InterviewQuestionGenerationResult(InterviewQuestionType.TECHNICAL, "기술 질문 1"),
-                new InterviewQuestionGenerationResult(InterviewQuestionType.TECHNICAL, "기술 질문 2")
+                new InterviewQuestionGenerationResult("경험 질문 1"),
+                new InterviewQuestionGenerationResult("경험 질문 2"),
+                new InterviewQuestionGenerationResult("경험 질문 3"),
+                new InterviewQuestionGenerationResult("경험 질문 4"),
+                new InterviewQuestionGenerationResult("경험 질문 5")
         );
     }
 
