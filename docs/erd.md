@@ -374,13 +374,13 @@ Policy:
 | `interview_session_id` | No | FK to `interview_sessions.id` |
 | `source_review_version_id` | No | FK to `review_versions.id` |
 | `question_order` | No | 세션 안 표시 순서 |
-| `type` | No | `COVER_LETTER_BASED`, `TECHNICAL` |
+| `type` | No | 내부 persistence 호환 필드. 신규 생성 질문은 `COVER_LETTER_BASED`로 고정 |
 | `question` | No | 질문 본문 |
 
 Policy:
 
-- 세션 시작 시 5개, 추가 생성 시 5개씩 생성한다.
-- 각 생성 단위는 자기소개서 기반 질문 3개와 기술 질문 2개로 구성한다.
+- 세션 시작 시 5개, 추가 생성 요청마다 1개를 생성한다.
+- 모든 신규 질문은 자기소개서 최종 작성본을 기반으로 생성하고 종류를 구분하지 않는다.
 - 질문과 질문별 thread는 같은 transaction에서 1:1로 생성한다.
 - 꼬리질문은 질문 row로 저장하지 않고 `interview_messages.follow_up_question`에 저장한다.
 

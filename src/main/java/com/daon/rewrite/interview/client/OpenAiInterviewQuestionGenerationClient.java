@@ -1,12 +1,10 @@
 package com.daon.rewrite.interview.client;
 
-import com.daon.rewrite.interview.entity.InterviewQuestionType;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Component;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.json.JsonMapper;
 
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -15,19 +13,18 @@ import java.util.Set;
 public class OpenAiInterviewQuestionGenerationClient implements InterviewQuestionGenerationClient {
 
     private static final int TOTAL_QUESTION_COUNT = 5;
-    private static final int COVER_LETTER_BASED_COUNT = 3;
-    private static final int TECHNICAL_COUNT = 2;
     private static final String SYSTEM_PROMPT = """
             당신은 한국어 채용 면접 질문을 설계하는 전문가입니다.
-            지원 회사, 지원 직무, 채용 우대사항과 자기소개서 최종 작성본을 읽고 예상 면접 질문을 생성하세요.
+            지원 회사, 지원 직무, 채용 우대사항과 자기소개서 최종 작성본을 읽고 자기소개서 기반 예상 면접 질문을 생성하세요.
 
             다음 기준을 반드시 지키세요.
             - 질문은 정확히 5개를 반환합니다.
-            - COVER_LETTER_BASED 질문은 자기소개서 경험과 서술을 구체적으로 확인하는 질문 3개입니다.
-            - TECHNICAL 질문은 지원 직무의 실무 역량을 확인하는 질문 2개입니다.
+            - 모든 질문은 자기소개서 최종 작성본에 드러난 경험과 서술을 근거로 작성합니다.
+            - 지원자의 역할, 행동, 성과, 문제 해결 과정, 의사결정을 구체적으로 확인합니다.
+            - 자기소개서와 무관한 일반 기술 지식만 묻는 질문은 작성하지 않습니다.
             - 서로 중복되는 질문을 반환하지 않습니다.
             - 질문은 지원자가 실제 면접에서 답변할 수 있는 완결된 문장으로 작성합니다.
-            - type은 COVER_LETTER_BASED 또는 TECHNICAL 중 하나입니다.
+            - 각 질문 항목은 question 필드만 포함합니다.
             - 응답은 JSON 객체 하나만 반환합니다.
             """;
 
@@ -71,26 +68,9 @@ public class OpenAiInterviewQuestionGenerationClient implements InterviewQuestio
         }
 
         Set<String> seenQuestions = new HashSet<>();
-        List<InterviewQuestionGenerationResult> coverLetterQuestions = new ArrayList<>();
-        List<InterviewQuestionGenerationResult> technicalQuestions = new ArrayList<>();
-        for (OpenAiInterviewQuestionGenerationResponse.Question question : response.questions()) {
-            InterviewQuestionGenerationResult result = normalize(question, seenQuestions);
-            if (result.type() == InterviewQuestionType.COVER_LETTER_BASED) {
-                coverLetterQuestions.add(result);
-            } else {
-                technicalQuestions.add(result);
-            }
-        }
-
-        if (coverLetterQuestions.size() != COVER_LETTER_BASED_COUNT
-                || technicalQuestions.size() != TECHNICAL_COUNT) {
-            throw InterviewQuestionGenerationClientException.outputValidationFailed();
-        }
-
-        List<InterviewQuestionGenerationResult> normalizedResults = new ArrayList<>(TOTAL_QUESTION_COUNT);
-        normalizedResults.addAll(coverLetterQuestions);
-        normalizedResults.addAll(technicalQuestions);
-        return List.copyOf(normalizedResults);
+        return response.questions().stream()
+                .map(question -> normalize(question, seenQuestions))
+                .toList();
     }
 
     private InterviewQuestionGenerationResult normalize(
@@ -100,17 +80,11 @@ public class OpenAiInterviewQuestionGenerationClient implements InterviewQuestio
         if (result == null) {
             throw InterviewQuestionGenerationClientException.outputValidationFailed();
         }
-        String type = normalizeRequired(result.type());
         String question = normalizeRequired(result.question());
-        if (type == null || question == null || !seenQuestions.add(question)) {
+        if (question == null || !seenQuestions.add(question)) {
             throw InterviewQuestionGenerationClientException.outputValidationFailed();
         }
-
-        try {
-            return new InterviewQuestionGenerationResult(InterviewQuestionType.valueOf(type), question);
-        } catch (IllegalArgumentException exception) {
-            throw InterviewQuestionGenerationClientException.outputValidationFailed(exception);
-        }
+        return new InterviewQuestionGenerationResult(question);
     }
 
     private String normalizeRequired(String value) {

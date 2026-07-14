@@ -162,7 +162,6 @@ public class InterviewService {
                 question.getId(),
                 question.getSourceReviewVersionId(),
                 question.getQuestionOrder(),
-                question.getType(),
                 question.getQuestion(),
                 findRequiredThreadId(question.getId(), threadIdsByQuestionId)
         );

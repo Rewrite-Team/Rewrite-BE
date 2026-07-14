@@ -358,7 +358,6 @@ class InterviewServiceTest {
                         InterviewQuestionItemResult::id,
                         InterviewQuestionItemResult::sourceReviewVersionId,
                         InterviewQuestionItemResult::order,
-                        InterviewQuestionItemResult::type,
                         InterviewQuestionItemResult::question,
                         InterviewQuestionItemResult::threadId
                 )
@@ -367,7 +366,6 @@ class InterviewServiceTest {
                                 "iq_1",
                                 "rv_1",
                                 1,
-                                InterviewQuestionType.COVER_LETTER_BASED,
                                 "프로젝트에서 맡은 역할을 설명해 주세요.",
                                 "it_1"
                         ),
@@ -375,7 +373,6 @@ class InterviewServiceTest {
                                 "iq_2",
                                 "rv_2",
                                 2,
-                                InterviewQuestionType.TECHNICAL,
                                 "트랜잭션 격리 수준을 설명해 주세요.",
                                 "it_2"
                         )

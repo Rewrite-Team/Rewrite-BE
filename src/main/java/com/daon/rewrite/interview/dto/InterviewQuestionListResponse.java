@@ -1,6 +1,5 @@
 package com.daon.rewrite.interview.dto;
 
-import com.daon.rewrite.interview.entity.InterviewQuestionType;
 import com.daon.rewrite.interview.service.InterviewQuestionItemResult;
 import com.daon.rewrite.interview.service.InterviewQuestionListResult;
 
@@ -24,7 +23,6 @@ public record InterviewQuestionListResponse(
             String id,
             String sourceReviewVersionId,
             int order,
-            InterviewQuestionType type,
             String question,
             String threadId
     ) {
@@ -34,7 +32,6 @@ public record InterviewQuestionListResponse(
                     item.id(),
                     item.sourceReviewVersionId(),
                     item.order(),
-                    item.type(),
                     item.question(),
                     item.threadId()
             );

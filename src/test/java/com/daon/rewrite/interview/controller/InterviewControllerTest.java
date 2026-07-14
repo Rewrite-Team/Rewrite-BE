@@ -5,7 +5,6 @@ import com.daon.rewrite.global.exception.BusinessException;
 import com.daon.rewrite.global.exception.ErrorCode;
 import com.daon.rewrite.interview.entity.InterviewSession;
 import com.daon.rewrite.interview.entity.InterviewSessionStatus;
-import com.daon.rewrite.interview.entity.InterviewQuestionType;
 import com.daon.rewrite.interview.service.CurrentInterviewResult;
 import com.daon.rewrite.interview.service.InterviewQuestionItemResult;
 import com.daon.rewrite.interview.service.InterviewQuestionListResult;
@@ -189,7 +188,6 @@ class InterviewControllerTest {
                                         "iq_1",
                                         "rv_1",
                                         1,
-                                        InterviewQuestionType.COVER_LETTER_BASED,
                                         "프로젝트에서 맡은 역할을 설명해 주세요.",
                                         "it_1"
                                 ),
@@ -197,8 +195,7 @@ class InterviewControllerTest {
                                         "iq_2",
                                         "rv_2",
                                         2,
-                                        InterviewQuestionType.TECHNICAL,
-                                        "트랜잭션 격리 수준을 설명해 주세요.",
+                                        "성과를 만들기 위해 어떤 행동을 했는지 설명해 주세요.",
                                         "it_2"
                                 )
                         )
@@ -211,7 +208,7 @@ class InterviewControllerTest {
                 .andExpect(jsonPath("$.items[0].id").value("iq_1"))
                 .andExpect(jsonPath("$.items[0].sourceReviewVersionId").value("rv_1"))
                 .andExpect(jsonPath("$.items[0].order").value(1))
-                .andExpect(jsonPath("$.items[0].type").value("COVER_LETTER_BASED"))
+                .andExpect(jsonPath("$.items[0].type").doesNotExist())
                 .andExpect(jsonPath("$.items[0].question").value("프로젝트에서 맡은 역할을 설명해 주세요."))
                 .andExpect(jsonPath("$.items[0].threadId").value("it_1"))
                 .andExpect(jsonPath("$.items[1].id").value("iq_2"))

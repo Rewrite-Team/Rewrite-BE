@@ -4,6 +4,6 @@ import java.util.List;
 
 record OpenAiInterviewQuestionGenerationResponse(List<Question> questions) {
 
-    record Question(String type, String question) {
+    record Question(String question) {
     }
 }

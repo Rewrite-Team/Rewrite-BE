@@ -1,6 +1,5 @@
 package com.daon.rewrite.interview.client;
 
-import com.daon.rewrite.interview.entity.InterviewQuestionType;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -17,15 +16,15 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class OpenAiInterviewQuestionGenerationClientTest {
 
     @Test
-    void generatesAndNormalizesThreeCoverLetterAndTwoTechnicalQuestions() {
+    void generatesAndNormalizesFiveCoverLetterBasedQuestionsWithoutTypes() {
         CapturingChatModel chatModel = new CapturingChatModel("""
                 {
                   "questions": [
-                    {"type":"TECHNICAL","question":" REST API의 멱등성을 설명해 주세요. "},
-                    {"type":"COVER_LETTER_BASED","question":"프로젝트에서 맡은 역할을 설명해 주세요."},
-                    {"type":"COVER_LETTER_BASED","question":"갈등을 해결한 과정을 설명해 주세요."},
-                    {"type":"TECHNICAL","question":"트랜잭션 격리 수준을 설명해 주세요."},
-                    {"type":"COVER_LETTER_BASED","question":"지원 동기를 경험과 연결해 설명해 주세요."}
+                    {"question":" 프로젝트에서 맡은 역할을 설명해 주세요. "},
+                    {"question":"갈등을 해결한 과정을 설명해 주세요."},
+                    {"question":"성과를 만들기 위해 어떤 행동을 했는지 설명해 주세요."},
+                    {"question":"문제 해결 과정에서 내린 의사결정을 설명해 주세요."},
+                    {"question":"지원 동기를 경험과 연결해 설명해 주세요."}
                   ]
                 }
                 """);
@@ -36,33 +35,19 @@ class OpenAiInterviewQuestionGenerationClientTest {
         List<InterviewQuestionGenerationResult> results = client.generate(request());
 
         assertThat(results)
-                .extracting(InterviewQuestionGenerationResult::type, InterviewQuestionGenerationResult::question)
+                .extracting(InterviewQuestionGenerationResult::question)
                 .containsExactly(
-                        org.assertj.core.groups.Tuple.tuple(
-                                InterviewQuestionType.COVER_LETTER_BASED,
-                                "프로젝트에서 맡은 역할을 설명해 주세요."
-                        ),
-                        org.assertj.core.groups.Tuple.tuple(
-                                InterviewQuestionType.COVER_LETTER_BASED,
-                                "갈등을 해결한 과정을 설명해 주세요."
-                        ),
-                        org.assertj.core.groups.Tuple.tuple(
-                                InterviewQuestionType.COVER_LETTER_BASED,
-                                "지원 동기를 경험과 연결해 설명해 주세요."
-                        ),
-                        org.assertj.core.groups.Tuple.tuple(
-                                InterviewQuestionType.TECHNICAL,
-                                "REST API의 멱등성을 설명해 주세요."
-                        ),
-                        org.assertj.core.groups.Tuple.tuple(
-                                InterviewQuestionType.TECHNICAL,
-                                "트랜잭션 격리 수준을 설명해 주세요."
-                        )
+                        "프로젝트에서 맡은 역할을 설명해 주세요.",
+                        "갈등을 해결한 과정을 설명해 주세요.",
+                        "성과를 만들기 위해 어떤 행동을 했는지 설명해 주세요.",
+                        "문제 해결 과정에서 내린 의사결정을 설명해 주세요.",
+                        "지원 동기를 경험과 연결해 설명해 주세요."
                 );
 
         Prompt prompt = chatModel.capturedPrompt();
         assertThat(prompt.getSystemMessage().getText())
-                .contains("면접 질문", "정확히 5개", "COVER_LETTER_BASED", "TECHNICAL", "3개", "2개");
+                .contains("면접 질문", "정확히 5개", "자기소개서", "경험", "성과", "의사결정")
+                .doesNotContain("COVER_LETTER_BASED", "TECHNICAL", "type");
         assertThat(prompt.getUserMessage().getText())
                 .contains(
                         "다온",
@@ -85,46 +70,28 @@ class OpenAiInterviewQuestionGenerationClientTest {
                         """,
                 """
                         {"questions":[
-                          {"type":"COVER_LETTER_BASED","question":"질문 1"},
-                          {"type":"COVER_LETTER_BASED","question":"질문 2"},
-                          {"type":"COVER_LETTER_BASED","question":"질문 3"},
-                          {"type":"TECHNICAL","question":"질문 4"}
+                          {"question":"질문 1"},
+                          {"question":"질문 2"},
+                          {"question":"질문 3"},
+                          {"question":"질문 4"}
                         ]}
                         """,
                 """
                         {"questions":[
-                          {"type":"COVER_LETTER_BASED","question":"질문 1"},
-                          {"type":"COVER_LETTER_BASED","question":"질문 2"},
-                          {"type":"TECHNICAL","question":"질문 3"},
-                          {"type":"TECHNICAL","question":"질문 4"},
-                          {"type":"TECHNICAL","question":"질문 5"}
+                          {"question":"질문 1"},
+                          {"question":"질문 2"},
+                          {"question":" "},
+                          {"question":"질문 4"},
+                          {"question":"질문 5"}
                         ]}
                         """,
                 """
                         {"questions":[
-                          {"type":"COVER_LETTER_BASED","question":"질문 1"},
-                          {"type":"COVER_LETTER_BASED","question":"질문 2"},
-                          {"type":"COVER_LETTER_BASED","question":"질문 3"},
-                          {"type":"TECHNICAL","question":"질문 4"},
-                          {"type":"UNKNOWN","question":"질문 5"}
-                        ]}
-                        """,
-                """
-                        {"questions":[
-                          {"type":"COVER_LETTER_BASED","question":"질문 1"},
-                          {"type":"COVER_LETTER_BASED","question":"질문 2"},
-                          {"type":"COVER_LETTER_BASED","question":" "},
-                          {"type":"TECHNICAL","question":"질문 4"},
-                          {"type":"TECHNICAL","question":"질문 5"}
-                        ]}
-                        """,
-                """
-                        {"questions":[
-                          {"type":"COVER_LETTER_BASED","question":"중복 질문"},
-                          {"type":"COVER_LETTER_BASED","question":"질문 2"},
-                          {"type":"COVER_LETTER_BASED","question":"질문 3"},
-                          {"type":"TECHNICAL","question":" 중복 질문 "},
-                          {"type":"TECHNICAL","question":"질문 5"}
+                          {"question":"중복 질문"},
+                          {"question":"질문 2"},
+                          {"question":"질문 3"},
+                          {"question":" 중복 질문 "},
+                          {"question":"질문 5"}
                         ]}
                         """,
                 """

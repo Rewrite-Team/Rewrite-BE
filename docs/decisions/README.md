@@ -42,7 +42,7 @@ API 계약: `../api/README.md`
 | Decision 017 | LLM Job은 실패 시 서버에서 1회 자동 재시도한다 | `llm-jobs.md` | REQ-005, REQ-009, REQ-010 | API-015 - API-016, LLM 시작 API | Active |
 | Decision 018 | Cookie 인증은 SameSite=Lax와 CSRF 토큰을 함께 사용한다 | `auth.md` | REQ-008 | API-001 - API-006 | Active |
 | Decision 019 | Access token은 30분, Refresh token은 14일이며 refresh token rotation을 사용한다 | `auth.md` | REQ-008 | API-001 - API-006 | Active |
-| Decision 020 | AI 면접 질문은 생성 요청마다 5개를 생성한다 | `interviews.md` | REQ-010 | API-022 - API-023, API-025 - API-029 | Active |
+| Decision 020 | AI 면접 질문은 최초 5개, 추가 요청마다 1개를 자기소개서 기반으로 생성한다 | `interviews.md` | REQ-010 | API-022 - API-023, API-025 - API-029 | Active |
 | Decision 021 | 키워드 분석 결과는 상위 20개를 제공한다 | `keyword-analysis.md` | REQ-009 | API-020 - API-021 | Active |
 | Decision 022 | 같은 자기소개서의 LLM Job은 동시에 하나만 실행한다 | `llm-jobs.md` | REQ-005, REQ-009, REQ-010 | API-015 - API-016, LLM 시작 API | Active |
 | Decision 023 | 제출 후 원본 자기소개서는 수정할 수 없다 | `cover-letters.md` | REQ-003, REQ-004, REQ-005 | API-007 - API-014 | Active |

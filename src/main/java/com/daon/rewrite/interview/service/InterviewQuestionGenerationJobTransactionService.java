@@ -11,6 +11,7 @@ import com.daon.rewrite.interview.client.InterviewQuestionGenerationClientExcept
 import com.daon.rewrite.interview.client.InterviewQuestionGenerationRequest;
 import com.daon.rewrite.interview.client.InterviewQuestionGenerationResult;
 import com.daon.rewrite.interview.entity.InterviewQuestion;
+import com.daon.rewrite.interview.entity.InterviewQuestionType;
 import com.daon.rewrite.interview.entity.InterviewSession;
 import com.daon.rewrite.interview.entity.InterviewSessionStatus;
 import com.daon.rewrite.interview.entity.InterviewThread;
@@ -135,7 +136,7 @@ class InterviewQuestionGenerationJobTransactionService {
                     interviewSession,
                     interviewSession.getInitialSourceReviewVersionId(),
                     index + 1,
-                    result.type(),
+                    InterviewQuestionType.COVER_LETTER_BASED,
                     result.question()
             ));
         }
