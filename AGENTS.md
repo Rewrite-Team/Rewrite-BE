@@ -38,6 +38,9 @@
 
 - API를 추가하거나 변경하면 `docs/api/README.md`와 `docs/api/` 하위 관련 도메인 문서를 갱신한다.
 - API를 추가, 삭제하거나 path, request, response, error, validation, 상태 또는 구현 여부를 변경하면 같은 작업에서 `docs/api/rewrite-api-documentation.xlsx`도 반드시 갱신한다.
+- `docs/api/rewrite-api-documentation.xlsx`는 기준 원본이고, Google Drive 파일 `15eS_Q4x5kAZHkQhkwNFk08Zt3wCkxo8W`는 공유용 미러다.
+- Excel API 문서를 로컬에서 갱신하고 검증한 뒤에는 Google Drive의 기존 Excel 파일에 바이트를 덮어써서 같은 파일 ID와 URL을 유지한다. 새 Drive 파일이나 네이티브 Google Sheet를 만들지 않는다.
+- Drive 동기화 후 파일 ID, Excel MIME type, 수정 시각을 다시 확인한다. 인증 또는 업로드 실패 시 동기화 완료로 보고하지 않고 최종 응답에 실패 이유를 명시한다.
 - Excel API 문서는 프론트엔드 구현과 디버깅에 필요한 정보만 유지한다. API별 기능, 실제 요청·응답 예시, 요청·응답 필드의 의미와 제약, 정확한 HTTP 상태와 오류 코드, 인증/CSRF 요구사항, 구현 여부를 포함하고 소스 경로·중복 예시·내부 설계 설명은 제외한다.
 - Excel API 문서의 목차와 각 API 상세 시트에는 `Asia/Seoul` 기준 `최근 변경일`과 `최근 변경 시각`을 기록하고, API 계약이나 문서 내용이 바뀐 작업에서 해당 시각을 갱신한다.
 - Excel API 문서의 첫 시트는 전체 API 목차로 유지하고, 이후에는 API ID별로 하나의 상세 시트를 사용한다. 여러 API를 한 상세 시트에 합치지 않는다.
