@@ -240,6 +240,8 @@ MVP에서는 LLM 작업 결과의 기준이 명확한 것이 중요하다. 첨�
 
 ## Decision 024: SSE 재연결 시 전체 결과를 재조회한다
 
+> Superseded by Decision 076. 첨삭 Job 재연결은 완료 문항 스냅샷을 먼저 전송하는 방식으로 변경한다.
+
 ### 결정
 
 SSE 연결이 끊겼을 때 서버는 `Last-Event-ID` 기반 이어받기를 지원하지 않는다.
@@ -413,6 +415,8 @@ Rewrite는 키워드 분석 결과를 자기소개서별 하나만 유지하고,
 
 ## Decision 061: 첨삭 진행 중 화면 복구는 partial text 저장 방식으로 처리한다
 
+> Superseded by Decision 075. 필드별 partial text 대신 완성된 문항 결과를 임시 영속 저장한다.
+
 ### 결정
 
 첨삭 Job(`COVER_LETTER_REVIEW`, `COVER_LETTER_RE_REVIEW`)은 진행 중 생성된 텍스트를 문항별/필드별 partial result로 누적 저장한다.
@@ -499,6 +503,8 @@ SSE는 `Last-Event-ID` 기반 이벤트 replay를 지원하지 않는다. 이미
 
 ## Decision 062: MVP에서는 partial result를 서버 메모리에 저장하고 이후 cache 저장소로 이전한다
 
+> Superseded by Decision 075. 첨삭 진행 결과는 완료된 문항 단위로 DB에 임시 저장한다.
+
 ### 결정
 
 MVP에서는 첨삭 Job의 `partialResult`를 서버 메모리에 저장한다.
@@ -565,6 +571,8 @@ partial result는 최종 데이터가 아니라 진행 중 스트리밍 화면 �
 
 
 ## Decision 063: PROCESSING 상태에서 partialResult가 없으면 delta 텍스트를 숨기고 완료/실패만 감지한다
+
+> Superseded by Decision 076. 첨삭 SSE는 delta가 아니라 완성된 문항 결과를 전송한다.
 
 ### 결정
 
@@ -642,6 +650,8 @@ partial result는 진행 중 화면 복구를 위한 임시 데이터다. 서버
 
 ## Decision 064: 실패한 첨삭 Job의 partialResult는 실패 화면에 표시하지 않는다
 
+> Superseded by Decision 075. 실패한 첨삭 Job의 임시 문항 결과는 사용자-facing API에서 숨긴다.
+
 ### 결정
 
 `LlmJob.status=FAILED`인 첨삭 Job의 `partialResult`는 사용자-facing 실패 화면에 표시하지 않는다.
@@ -702,6 +712,8 @@ latestFirstReviewJob.completedAt
 
 
 ## Decision 065: 실패 화면의 사용자 메시지는 LLM Job error.code 기준으로 매핑한다
+
+> Superseded by Decision 074. 이번 공통 상세 계약에서는 실패 화면 전용 error 응답을 다루지 않는다.
 
 ### 결정
 
@@ -788,6 +800,8 @@ LLM_PROVIDER_ERROR: AI 첨삭에 실패했습니다. 잠시 후 다시 시도해
 
 
 ## Decision 066: 알 수 없는 LLM Job error.code는 기본 fallback 메시지로 표시한다
+
+> Superseded by Decision 074. 이번 공통 상세 계약에서는 실패 화면 전용 error 응답을 다루지 않는다.
 
 ### 결정
 
@@ -920,3 +934,20 @@ LLM 출력은 사용자에게 직접 보이는 결과 데이터다. 구조가 �
   - 일부 유효한 내용이 있어도 사용자에게 제공하지 않는다.
   - LLM 출력 형식이 자주 흔들리면 실패율이 높아질 수 있다.
   - 프롬프트와 파서, schema validation 품질 관리가 중요해진다.
+
+## Decision 076: 첨삭 SSE는 완성된 문항 단위 이벤트와 연결 시 스냅샷을 제공한다
+
+### 결정
+
+API-016은 최초 첨삭과 재첨삭에 공통으로 문항의 `aiReport`와 `rewrittenAnswer`가 모두 완성된 시점에 `review.question.completed` 이벤트 하나를 전송한다. 필드별 또는 토큰별 delta 이벤트는 제공하지 않는다.
+
+연결 직후 해당 Job에 임시 영속 저장된 완료 문항 결과를 같은 이벤트 형식으로 먼저 전송한 뒤 실시간 이벤트를 전송한다. 이벤트는 중복될 수 있으며 클라이언트는 `questionId`로 upsert하고 `order`로 정렬한다. `Last-Event-ID` 기반 영속 replay는 제공하지 않는다.
+
+### 선택 이유
+
+AI 리포트와 수정본은 한 문항의 완결된 결과로 함께 사용한다. 문항 단위 전송은 불완전한 필드 조합을 피하고, 연결 직후 스냅샷은 상세 조회와 SSE 연결 사이의 이벤트 누락을 방지한다.
+
+### 트레이드오프
+
+- 장점: 프론트엔드 상태 병합이 단순하고 새로고침·재연결 복구가 안정적이다.
+- 단점: 토큰 스트리밍처럼 글자가 생성되는 즉시 보이는 효과는 제공하지 않는다.

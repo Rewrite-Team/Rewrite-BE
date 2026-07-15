@@ -34,7 +34,12 @@ Response:
       "positionTitle": "백엔드 개발자",
       "status": "REVIEWED",
       "createdAt": "2026-06-20T14:00:00",
-      "latestReviewVersionId": "rv_01HZ..."
+      "latestReviewVersionId": "rv_01HZ...",
+      "activeReviewJob": {
+        "jobId": "job_01HZ...",
+        "type": "COVER_LETTER_RE_REVIEW",
+        "status": "PROCESSING"
+      }
     }
   ],
   "page": 1,
@@ -43,6 +48,8 @@ Response:
   "totalPages": 3
 }
 ```
+
+`activeReviewJob`은 현재 `PENDING` 또는 `PROCESSING`인 최초 첨삭 Job(`COVER_LETTER_REVIEW`)이나 재첨삭 Job(`COVER_LETTER_RE_REVIEW`)이 있을 때만 포함하고, 없으면 `null`이다. 최초 첨삭과 재첨삭 모두 목록 카드에서 `첨삭 중`으로 표시한다. `CoverLetter.status`와 `status` query filter 의미는 유지한다.
 
 목록 카드 클릭 시 프론트엔드는 `status`에 따라 이동 화면을 결정한다.
 
@@ -54,6 +61,32 @@ REVIEW_FAILED: AI 첨삭 실패 화면
 ```
 
 `REVIEW_FAILED`의 실패 화면에서는 저장된 원본 입력값을 표시할 수 있지만 원본 수정은 제공하지 않는다. 사용자는 실패 화면에서 submit 재시도를 실행할 수 있다.
+
+### 내 자기소개서 첨삭 상태 스트림
+
+메인 화면은 카드마다 연결하지 않고 현재 사용자 기준 SSE 연결 하나만 유지한다.
+
+```http
+GET /cover-letters/stream
+Accept: text/event-stream
+```
+
+응답 Content-Type:
+
+```http
+Content-Type: text/event-stream
+```
+
+연결 직후 현재 사용자의 `PENDING` 또는 `PROCESSING` 첨삭 Job 스냅샷을 먼저 전송하고, 이후 최초 첨삭·재첨삭 Job의 시작, 완료, 실패 상태 변경을 전송한다.
+
+```text
+event: cover-letter.review-status.changed
+data: {"coverLetterId":"cl_01HZ...","coverLetterStatus":"REVIEWED","latestReviewVersionId":"rv_01HZ...","activeReviewJob":{"jobId":"job_01HZ...","type":"COVER_LETTER_RE_REVIEW","status":"PROCESSING"}}
+```
+
+완료 또는 실패 이벤트에서는 `activeReviewJob`이 `null`이다. 이벤트는 현재 페이지에 표시된 항목으로 제한하지 않고 현재 사용자의 모든 자기소개서 상태를 전달하며, 프론트엔드는 현재 목록에 없는 `coverLetterId`를 무시한다.
+
+이 스트림은 `Last-Event-ID` 영속 replay를 제공하지 않는다. 재연결하면 현재 활성 Job 스냅샷을 다시 받은 뒤 실시간 이벤트를 수신한다.
 
 ### 자기소개서 생성
 
@@ -324,7 +357,7 @@ Conflict Response:
 
 ### 자기소개서 상세 조회
 
-등록 step4 확인 화면과 AI 첨삭 페이지 상단 정보에서 사용한다.
+등록 step4 확인 화면, 최초·재첨삭 진행 화면, 최신 첨삭 결과 화면에서 공통으로 사용한다. `DRAFT`, `REVIEWING`, `REVIEW_FAILED`, `REVIEWED` 모든 상태에서 같은 응답 구조를 반환한다.
 
 ```http
 GET /cover-letters/{coverLetterId}
@@ -334,73 +367,74 @@ Response:
 
 ```json
 {
-  "id": "cl_01HZ...",
-  "title": "2026 상반기 백엔드 개발자 자기소개서",
-  "companyName": "Rewrite Corp",
-  "positionTitle": "백엔드 개발자",
-  "jobPostingUrl": "https://example.com/jobs/1",
-  "preferences": "Spring Boot 경험, 대용량 트래픽 처리 경험 우대",
-  "status": "DRAFT",
+  "coverLetter": {
+    "id": "cl_01HZ...",
+    "title": "2026 상반기 백엔드 개발자 자기소개서",
+    "companyName": "Rewrite Corp",
+    "positionTitle": "백엔드 개발자",
+    "jobPostingUrl": "https://example.com/jobs/1",
+    "preferences": "Spring Boot 경험, 대용량 트래픽 처리 경험 우대",
+    "status": "REVIEWING"
+  },
+  "reviewVersion": null,
+  "reviewJob": {
+    "jobId": "job_01HZ...",
+    "type": "COVER_LETTER_REVIEW",
+    "status": "PROCESSING",
+    "progress": {
+      "current": 1,
+      "total": 3,
+      "message": "1개 문항의 첨삭이 완료되었습니다."
+    }
+  },
   "questions": [
     {
-      "id": "clq_01HZ...",
+      "questionResultId": null,
+      "questionId": "clq_01HZ...",
       "order": 1,
       "question": "지원 동기를 작성해주세요.",
       "maxAnswerLength": 1000,
-      "originalAnswer": "제가 지원한 이유는..."
+      "originalAnswer": "제가 지원한 이유는...",
+      "originalAnswerLength": 530,
+      "aiReport": "직무 경험과 지원 동기의 연결을 보강하는 것이 좋습니다.",
+      "rewrittenAnswer": "저는 백엔드 개발자로서...",
+      "rewrittenAnswerLength": 820,
+      "finalAnswer": "저는 백엔드 개발자로서...",
+      "finalAnswerLength": 820
+    },
+    {
+      "questionResultId": null,
+      "questionId": "clq_01HY...",
+      "order": 2,
+      "question": "문제를 해결한 경험을 작성해주세요.",
+      "maxAnswerLength": 1000,
+      "originalAnswer": "프로젝트에서 발생한 문제를...",
+      "originalAnswerLength": 610,
+      "aiReport": null,
+      "rewrittenAnswer": null,
+      "rewrittenAnswerLength": null,
+      "finalAnswer": null,
+      "finalAnswerLength": null
     }
-  ],
-  "createdAt": "2026-06-20T14:00:00",
-  "updatedAt": "2026-06-20T14:10:00",
-  "latestReviewVersionId": null,
-  "latestFirstReviewJob": null
+  ]
 }
 ```
 
-`latestFirstReviewJob`은 최초 첨삭 Job(`type=COVER_LETTER_REVIEW`) 중 가장 최근 Job의 요약이다. 최초 첨삭을 아직 제출하지 않은 `DRAFT` 상태이면 `null`이다.
+상태별 응답 정책:
 
-`REVIEWING` 상태에서는 진행 화면 복구를 위해 다음 형태로 포함한다.
-
-```json
-{
-  "latestFirstReviewJob": {
-    "jobId": "job_01HZ...",
-    "status": "PROCESSING",
-    "progress": {
-      "current": 2,
-      "total": 3,
-      "message": "2번 문항을 첨삭하고 있습니다."
-    },
-    "partialResult": {
-      "questions": [
-        {
-          "questionId": "clq_01HZ_1",
-          "order": 1,
-          "aiReport": "지원 동기는 구체적이지만 직무 경험과의 연결이 더 필요합니다.",
-          "rewrittenAnswer": "저는 백엔드 개발자로서..."
-        },
-        {
-          "questionId": "clq_01HZ_2",
-          "order": 2,
-          "aiReport": "프로젝트 경험의 문제 상황은 잘 드러나지만",
-          "rewrittenAnswer": ""
-        }
-      ]
-    },
-    "error": null,
-    "createdAt": "2026-06-20T14:10:00",
-    "completedAt": null
-  }
-}
+```text
+DRAFT: reviewVersion=null, reviewJob=null. 저장된 전체 질문과 원본 답변을 반환한다.
+REVIEWING: reviewVersion=null, 진행 중 최초 첨삭 reviewJob과 전체 질문을 반환한다. 완료된 임시 문항 결과만 AI 필드를 채운다.
+REVIEW_FAILED: reviewVersion=null, reviewJob=null. 임시 문항 결과는 숨기고 AI 필드를 모두 null로 반환한다.
+REVIEWED: 최신 ReviewVersion 전체 결과를 reviewVersion과 questions에 직접 반환한다.
+REVIEWED + 재첨삭 진행: reviewVersion=null, 새 재첨삭 reviewJob을 반환하고 새 작업의 임시 결과를 questions에 표시한다.
 ```
 
-프론트엔드는 `REVIEWING` 화면 재진입 시 `partialResult`를 먼저 렌더링하고, `latestFirstReviewJob.jobId`로 SSE에 연결한 뒤 이후 수신한 delta를 해당 문항/필드 뒤에 이어붙인다.
+재첨삭 진행 시 `originalAnswer`는 새 Job의 입력으로 확정한 이전 최신 `ReviewVersion`의 `finalAnswer`다. 새 작업을 시작할 때 이전 버전의 `aiReport`, `rewrittenAnswer`, `finalAnswer`를 복사하지 않으며, 완료된 문항부터 새 값으로 채운다.
 
-`REVIEWING` 상태인데 `partialResult`가 `null`이면 진행률과 상태 메시지만 먼저 표시하고 SSE에 연결한다. 이 경우 이미 생성된 텍스트는 복구하지 못하므로, SSE 연결 이후 수신한 delta 텍스트도 화면에 렌더링하지 않는다. 클라이언트는 SSE를 완료/실패 감지 용도로만 사용하고, 완료 후 `ReviewVersion` 상세를 조회해 온전한 최종 결과를 표시한다. Job 자체는 실패 처리하지 않는다.
+`questionResultId`는 `ReviewVersion`으로 확정된 문항 결과 ID다. 진행 중 임시 결과는 내부 staging ID를 노출하지 않고 `null`을 반환한다. 첨삭 결과가 완성된 문항의 `finalAnswer` 초깃값은 `rewrittenAnswer`와 같다.
 
-`REVIEW_FAILED` 상태에서는 실패 화면 복구를 위해 `status`, `progress`, `error`, `createdAt`, `completedAt`을 포함한다. 실패 화면의 사용자 안내 문구는 `error.code`를 기준으로 프론트엔드가 매핑한다. `error.message`나 provider 원문은 그대로 노출하지 않는다. 실패한 Job의 `partialResult`는 최종 첨삭 결과가 아니므로 실패 화면에 표시하지 않는다.
-
-`REVIEWED` 상태에서는 최초 첨삭 결과가 이미 `ReviewVersion`으로 생성되었으므로 `latestReviewVersionId`를 기준으로 결과 화면을 조회한다. `latestFirstReviewJob`은 화면 복구에 필요하지 않으므로 `null`로 내려도 된다.
+`REVIEWED` 상태에서도 최신 결과를 보기 위해 API-018을 다시 호출하지 않는다. API-018은 버전 히스토리에서 선택한 특정 버전을 조회할 때만 사용한다.
 
 ### 자기소개서 제출 및 최초 AI 첨삭 요청
 
@@ -448,7 +482,9 @@ questions는 1개 이상이어야 한다.
 
 `REVIEW_FAILED` 상태의 사용자 수동 재시도에는 제품 도메인상 횟수 제한을 두지 않는다. 단, LLM 비용과 남용 방지를 위한 rate limit, 사용자 quota, 운영 정책은 별도로 적용할 수 있다.
 
-새 Job이 생성되면 submit transaction commit 이후 최초 첨삭 worker가 비동기로 실행된다. worker 성공 시 `ReviewVersion`이 생성되고 `CoverLetter.status`는 `REVIEWED`가 된다. worker 실패 시 `LlmJob.status`는 `FAILED`, `CoverLetter.status`는 `REVIEW_FAILED`가 된다.
+새 Job이 생성되면 submit transaction commit 이후 최초 첨삭 worker가 비동기로 실행된다. worker는 전체 자기소개서 문맥과 대상 문항을 입력으로 각 문항 호출을 병렬 실행한다. 문항의 `aiReport`와 `rewrittenAnswer`가 모두 완성되면 임시 문항 결과를 영속 저장하고 `review.question.completed` 이벤트를 전송한다.
+
+모든 문항이 성공하면 임시 결과를 최종 `ReviewVersion`과 문항별 결과로 확정하고 `CoverLetter.status`를 `REVIEWED`로 변경한다. 최종 실패하면 `LlmJob.status`는 `FAILED`, `CoverLetter.status`는 `REVIEW_FAILED`가 되며 임시 결과는 사용자-facing 상세 응답에서 숨긴다.
 
 이미 최초 첨삭 Job이 `PENDING` 또는 `PROCESSING` 상태이면 새 Job을 만들지 않고 기존 진행 중 Job을 반환한다.
 

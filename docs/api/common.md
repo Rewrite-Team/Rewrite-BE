@@ -404,11 +404,11 @@ LLM 출력 파싱 실패, 필수 필드 누락, 타입 불일치, 범위 위반�
 
 최초 면접 질문 생성 Job은 `type=INTERVIEW_INITIAL_QUESTION_GENERATION`, 추가 면접 질문 생성 Job은 `type=INTERVIEW_ADDITIONAL_QUESTION_GENERATION`으로 구분한다. 두 Job 모두 `requestRef.type=REVIEW_VERSION`, `requestRef.id=생성 기준 첨삭 버전 id`를 저장한다. 추가 생성 Job의 `progress.total`은 1이며 완료 결과는 생성된 `INTERVIEW_QUESTION`을 가리킨다.
 
-첨삭 Job(`COVER_LETTER_REVIEW`, `COVER_LETTER_RE_REVIEW`)은 진행 중 생성된 텍스트를 문항별/필드별 partial result로 누적 저장한다. 이 값은 화면 재진입 시 지금까지 생성된 텍스트를 먼저 복구하고, 이후 SSE delta를 이어붙이기 위한 임시 결과다. 첨삭 Job이 아닌 LLM Job의 `partialResult`는 `null`이다.
+첨삭 Job(`COVER_LETTER_REVIEW`, `COVER_LETTER_RE_REVIEW`)은 문항별 호출을 병렬 실행하고, 문항의 `aiReport`와 `rewrittenAnswer`가 모두 완성된 결과만 Job과 연결된 임시 문항 결과로 영속 저장한다. API-012는 이 완료 문항을 진행 상세에 포함하고 API-016은 같은 결과를 `review.question.completed` 이벤트로 전송한다.
 
-MVP에서는 partial result를 서버 메모리에 저장한다. 서버 재시작, 프로세스 종료, 스케일아웃 환경에서는 진행 중 partial result가 유실될 수 있다. 이후 Redis 같은 외부 cache 저장소로 이전할 수 있도록 partial result 저장소는 교체 가능한 내부 인터페이스로 분리한다.
+Job 상태 조회의 `partialResult`는 호환 필드로 유지하지만 첨삭 진행 화면 복구에 사용하지 않고 `null`을 반환한다. 필드별 partial text와 토큰별 첨삭 delta는 저장하거나 전송하지 않는다.
 
-첨삭 Job이 완료되면 LLM 호출의 최종 accumulated output을 기준으로 `ReviewVersionQuestionResult`를 확정하고 `ReviewVersion`을 생성한다. partial result는 화면 복구용 캐시이므로, partial result 유실이 최종 첨삭 결과를 훼손하면 안 된다.
+모든 문항이 성공하면 임시 결과를 `ReviewVersionQuestionResult`로 확정하고 `ReviewVersion`을 생성한다. 최종 실패한 Job은 새 버전을 만들지 않으며 임시 결과를 사용자-facing API에서 숨긴다.
 
 ### KeywordAnalysis
 
