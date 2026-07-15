@@ -46,10 +46,11 @@ class OpenAiInterviewQuestionGenerationClientTest {
 
         Prompt prompt = chatModel.capturedPrompt();
         assertThat(prompt.getSystemMessage().getText())
-                .contains("면접 질문", "정확히 5개", "자기소개서", "경험", "성과", "의사결정")
+                .contains("면접 질문", "요청된 개수", "자기소개서", "경험", "성과", "의사결정")
                 .doesNotContain("COVER_LETTER_BASED", "TECHNICAL", "type");
         assertThat(prompt.getUserMessage().getText())
                 .contains(
+                        "\"questionCount\":5",
                         "다온",
                         "백엔드 개발자",
                         "Spring 경험 우대",
@@ -60,6 +61,30 @@ class OpenAiInterviewQuestionGenerationClientTest {
                         "직무 역량은?",
                         "최종 작성본 2"
                 );
+    }
+
+    @Test
+    void generatesOneAdditionalQuestionAndRejectsExistingQuestion() {
+        CapturingChatModel chatModel = new CapturingChatModel("""
+                {"questions":[{"question":" 새로운 의사결정 질문 "}]}
+                """);
+        InterviewQuestionGenerationClient client = new OpenAiInterviewQuestionGenerationClient(
+                ChatClient.builder(chatModel)
+        );
+
+        List<InterviewQuestionGenerationResult> results = client.generate(additionalRequest());
+
+        assertThat(results)
+                .extracting(InterviewQuestionGenerationResult::question)
+                .containsExactly("새로운 의사결정 질문");
+        assertThat(chatModel.capturedPrompt().getUserMessage().getText())
+                .contains("\"questionCount\":1", "기존 역할 질문", "기존 성과 질문");
+
+        InterviewQuestionGenerationClient duplicateClient = clientReturning("""
+                {"questions":[{"question":" 기존 역할 질문 "}]}
+                """);
+
+        assertOutputValidationFailure(() -> duplicateClient.generate(additionalRequest()));
     }
 
     @Test
@@ -149,6 +174,22 @@ class OpenAiInterviewQuestionGenerationClientTest {
                 "다온",
                 "백엔드 개발자",
                 "Spring 경험 우대",
+                5,
+                List.of(),
+                List.of(
+                        new InterviewQuestionGenerationAnswer("clq_1", 1, "지원 동기는?", "최종 작성본 1"),
+                        new InterviewQuestionGenerationAnswer("clq_2", 2, "직무 역량은?", "최종 작성본 2")
+                )
+        );
+    }
+
+    private InterviewQuestionGenerationRequest additionalRequest() {
+        return new InterviewQuestionGenerationRequest(
+                "다온",
+                "백엔드 개발자",
+                "Spring 경험 우대",
+                1,
+                List.of("기존 역할 질문", "기존 성과 질문"),
                 List.of(
                         new InterviewQuestionGenerationAnswer("clq_1", 1, "지원 동기는?", "최종 작성본 1"),
                         new InterviewQuestionGenerationAnswer("clq_2", 2, "직무 역량은?", "최종 작성본 2")

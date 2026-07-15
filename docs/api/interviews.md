@@ -78,7 +78,7 @@ Response:
 }
 ```
 
-`LlmJob(type=INTERVIEW_QUESTION_GENERATION)`은 after-commit 비동기 worker에서 실행한다.
+`LlmJob(type=INTERVIEW_INITIAL_QUESTION_GENERATION)`은 `requestRef.type=REVIEW_VERSION`, `requestRef.id=생성 기준 첨삭 버전 id`를 저장하고 after-commit 비동기 worker에서 실행한다.
 생성에 성공하면 질문 5개와 질문별 thread 5개를 저장하고 `InterviewSession.status`를 `ACTIVE`로 전환한다.
 완료 Job의 `resultRef`는 해당 면접 세션을 가리킨다.
 
@@ -178,7 +178,11 @@ POST /interviews/{interviewSessionId}/questions
 
 Request body는 없다. 서버는 항상 해당 자기소개서의 최신 첨삭 버전인 `CoverLetter.latestReviewVersionId`를 기준으로 질문을 생성한다.
 
+요청 시점의 최신 첨삭 버전은 Job의 `requestRef.type=REVIEW_VERSION`, `requestRef.id=latestReviewVersionId`로 확정한다. 추가 질문 생성 Job은 `type=INTERVIEW_ADDITIONAL_QUESTION_GENERATION`, `progress.total=1`로 생성한다.
+
 추가 질문은 자기소개서 최종 작성본을 기반으로 총 1개 생성한다. 질문 종류는 구분하지 않는다.
+
+OpenAI 요청에는 기존 질문 목록을 함께 전달한다. 생성 결과가 기존 질문과 trim 후 동일하거나 정확히 1개가 아니면 출력 검증 실패로 처리하며 새 질문을 저장하지 않는다.
 
 생성된 질문은 기존 질문 목록 뒤에 이어서 `order`를 부여한다.
 
@@ -198,7 +202,11 @@ Response:
 }
 ```
 
-질문 추가 생성 중에도 기존 면접 세션과 기존 질문별 대화방은 유지된다. 추가 질문 생성 Job이 실패해도 `InterviewSession.status`는 `ACTIVE`를 유지하고, 실패 상태는 `LlmJob.status`와 `LlmJob.error`로 확인한다.
+응답은 `200 OK`다. Job은 transaction commit 이후 기존 면접 질문 생성 worker에서 비동기로 실행한다.
+
+질문과 thread는 같은 transaction에서 저장한다. Job이 완료되면 `progress.current=1`이고 `resultRef.type=INTERVIEW_QUESTION`, `resultRef.id=생성된 질문 id`가 된다. 클라이언트는 완료 후 API-026을 다시 조회해 추가된 질문과 `threadId`를 확인한다.
+
+질문 추가 생성 중에도 기존 면접 세션과 기존 질문별 대화방은 유지된다. 추가 질문 생성 Job이 실패해도 `InterviewSession.status`는 `ACTIVE`를 유지하고, 새 질문과 thread는 저장하지 않는다. 실패 상태는 `LlmJob.status`와 `LlmJob.error`로 확인한다.
 
 Validation:
 
@@ -207,6 +215,8 @@ interviewSession.status는 ACTIVE여야 한다.
 연결된 coverLetter.status는 REVIEWED여야 한다.
 같은 자기소개서에 PENDING 또는 PROCESSING 상태의 LLM Job이 없어야 한다.
 ```
+
+면접 세션이 존재하지 않거나 현재 사용자 소유가 아니거나 soft delete된 자기소개서의 세션이면 `NOT_FOUND`를 반환한다. 세션 또는 자기소개서 상태가 생성 조건과 맞지 않으면 `CONFLICT`, 진행 중 Job이 있으면 `LLM_JOB_ALREADY_RUNNING`을 반환한다.
 
 ### 질문별 대화방 정책
 

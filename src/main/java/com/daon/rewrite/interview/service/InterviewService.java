@@ -119,14 +119,48 @@ public class InterviewService {
                 selectedSourceReviewVersionId,
                 now
         );
-        LlmJob job = llmJobRepository.save(LlmJob.pendingInterviewQuestionGeneration(
+        LlmJob job = llmJobRepository.save(LlmJob.pendingInitialInterviewQuestionGeneration(
                 idGenerator.generate(LLM_JOB_ID_PREFIX),
                 coverLetter.getId(),
+                selectedSourceReviewVersionId,
                 now
         ));
         eventPublisher.publishEvent(new LlmJobCreatedEvent(job.getId()));
 
         return new StartInterviewResult(interviewSession, job);
+    }
+
+    @Transactional
+    public AddInterviewQuestionResult addMyInterviewQuestion(String interviewSessionId) {
+        CurrentUser currentUser = currentUserProvider.currentUser();
+        String coverLetterId = interviewSessionRepository
+                .findActiveCoverLetterIdByIdAndOwnerId(interviewSessionId, currentUser.id())
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
+        CoverLetter coverLetter = coverLetterRepository
+                .findActiveByIdAndOwnerIdForUpdate(coverLetterId, currentUser.id())
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
+        InterviewSession interviewSession = interviewSessionRepository.findById(interviewSessionId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.INTERNAL_ERROR));
+
+        if (interviewSession.getStatus() != InterviewSessionStatus.ACTIVE) {
+            throw new BusinessException(ErrorCode.CONFLICT);
+        }
+        validateReviewedCoverLetter(coverLetter);
+        String sourceReviewVersionId = selectSourceReviewVersionId(coverLetter, null);
+        if (hasRunningJob(coverLetter.getId())) {
+            throw new BusinessException(ErrorCode.LLM_JOB_ALREADY_RUNNING);
+        }
+
+        Instant now = Instant.now(clock);
+        LlmJob job = llmJobRepository.save(LlmJob.pendingAdditionalInterviewQuestionGeneration(
+                idGenerator.generate(LLM_JOB_ID_PREFIX),
+                coverLetter.getId(),
+                sourceReviewVersionId,
+                now
+        ));
+        eventPublisher.publishEvent(new LlmJobCreatedEvent(job.getId()));
+
+        return new AddInterviewQuestionResult(interviewSession, job);
     }
 
     private void validateReviewedCoverLetter(CoverLetter coverLetter) {

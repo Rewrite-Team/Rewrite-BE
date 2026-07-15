@@ -24,7 +24,7 @@ class InterviewQuestionGenerationJobEventListener {
     }
 
     private void dispatch(LlmJob job) {
-        if (job.getType() == LlmJobType.INTERVIEW_QUESTION_GENERATION) {
+        if (job.getType().isInterviewQuestionGeneration()) {
             worker.execute(job.getId());
         }
     }

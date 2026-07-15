@@ -122,6 +122,8 @@ class InterviewQuestionGenerationJobWorkerTest {
         assertThat(request.companyName()).isEqualTo("회사");
         assertThat(request.positionTitle()).isEqualTo("백엔드 개발자");
         assertThat(request.preferences()).isEqualTo("Spring Boot 경험");
+        assertThat(request.questionCount()).isEqualTo(5);
+        assertThat(request.existingQuestions()).isEmpty();
         assertThat(request.answers())
                 .extracting(
                         InterviewQuestionGenerationAnswer::questionId,
@@ -193,6 +195,120 @@ class InterviewQuestionGenerationJobWorkerTest {
             assertThat(job.getResultRefType()).isEqualTo(LlmJobResultRefType.INTERVIEW_SESSION);
             assertThat(job.getResultRefId()).isEqualTo("is_1");
             assertThat(job.getCompletedAt()).isEqualTo(completedAt);
+        });
+    }
+
+    @Test
+    void executeAppendsOneAdditionalQuestionAndThreadWithoutChangingActiveSession() {
+        Instant completedAt = Instant.parse("2026-07-14T12:00:00Z");
+        savePendingAdditionalInterviewQuestionGenerationJob("cl_1", "rv_1", "is_1", "job_1");
+        given(client.generate(any())).willReturn(List.of(
+                new InterviewQuestionGenerationResult("새로운 의사결정 질문")
+        ));
+        given(idGenerator.generate("iq")).willReturn("iq_6");
+        given(idGenerator.generate("it")).willReturn("it_6");
+        given(clock.instant()).willReturn(completedAt);
+
+        worker.execute("job_1");
+
+        ArgumentCaptor<InterviewQuestionGenerationRequest> requestCaptor = ArgumentCaptor.forClass(
+                InterviewQuestionGenerationRequest.class
+        );
+        then(client).should().generate(requestCaptor.capture());
+        InterviewQuestionGenerationRequest request = requestCaptor.getValue();
+        assertThat(request.questionCount()).isEqualTo(1);
+        assertThat(request.existingQuestions()).containsExactly(
+                "기존 질문 1",
+                "기존 질문 2",
+                "기존 질문 3",
+                "기존 질문 4",
+                "기존 질문 5"
+        );
+
+        assertThat(interviewSessionRepository.findById("is_1")).hasValueSatisfying(session ->
+                assertThat(session.getStatus()).isEqualTo(InterviewSessionStatus.ACTIVE)
+        );
+        assertThat(interviewQuestionRepository.findByInterviewSessionIdOrderByQuestionOrderAsc("is_1"))
+                .extracting(
+                        InterviewQuestion::getId,
+                        InterviewQuestion::getSourceReviewVersionId,
+                        InterviewQuestion::getQuestionOrder,
+                        InterviewQuestion::getType,
+                        InterviewQuestion::getQuestion
+                )
+                .containsExactly(
+                        org.assertj.core.groups.Tuple.tuple(
+                                "iq_existing_1", "rv_1", 1,
+                                InterviewQuestionType.COVER_LETTER_BASED, "기존 질문 1"
+                        ),
+                        org.assertj.core.groups.Tuple.tuple(
+                                "iq_existing_2", "rv_1", 2,
+                                InterviewQuestionType.COVER_LETTER_BASED, "기존 질문 2"
+                        ),
+                        org.assertj.core.groups.Tuple.tuple(
+                                "iq_existing_3", "rv_1", 3,
+                                InterviewQuestionType.COVER_LETTER_BASED, "기존 질문 3"
+                        ),
+                        org.assertj.core.groups.Tuple.tuple(
+                                "iq_existing_4", "rv_1", 4,
+                                InterviewQuestionType.COVER_LETTER_BASED, "기존 질문 4"
+                        ),
+                        org.assertj.core.groups.Tuple.tuple(
+                                "iq_existing_5", "rv_1", 5,
+                                InterviewQuestionType.COVER_LETTER_BASED, "기존 질문 5"
+                        ),
+                        org.assertj.core.groups.Tuple.tuple(
+                                "iq_6", "rv_1", 6,
+                                InterviewQuestionType.COVER_LETTER_BASED, "새로운 의사결정 질문"
+                        )
+                );
+        assertThat(interviewThreadRepository.findByInterviewSessionId("is_1"))
+                .extracting(thread -> thread.getInterviewQuestion().getId())
+                .containsExactlyInAnyOrder(
+                        "iq_existing_1",
+                        "iq_existing_2",
+                        "iq_existing_3",
+                        "iq_existing_4",
+                        "iq_existing_5",
+                        "iq_6"
+                );
+        assertThat(llmJobRepository.findById("job_1")).hasValueSatisfying(job -> {
+            assertThat(job.getStatus()).isEqualTo(LlmJobStatus.COMPLETED);
+            assertThat(job.getProgressCurrent()).isEqualTo(1);
+            assertThat(job.getResultRefType()).isEqualTo(LlmJobResultRefType.INTERVIEW_QUESTION);
+            assertThat(job.getResultRefId()).isEqualTo("iq_6");
+            assertThat(job.getCompletedAt()).isEqualTo(completedAt);
+        });
+    }
+
+    @Test
+    void executeAdditionalQuestionFailurePreservesActiveSessionAndExistingQuestions() {
+        Instant failedAt = Instant.parse("2026-07-14T12:00:00Z");
+        savePendingAdditionalInterviewQuestionGenerationJob("cl_1", "rv_1", "is_1", "job_1");
+        given(client.generate(any())).willThrow(
+                InterviewQuestionGenerationClientException.providerError(new IllegalStateException("provider down"))
+        );
+        given(clock.instant()).willReturn(failedAt);
+
+        worker.execute("job_1");
+
+        assertThat(interviewSessionRepository.findById("is_1")).hasValueSatisfying(session ->
+                assertThat(session.getStatus()).isEqualTo(InterviewSessionStatus.ACTIVE)
+        );
+        assertThat(interviewQuestionRepository.findByInterviewSessionIdOrderByQuestionOrderAsc("is_1"))
+                .extracting(InterviewQuestion::getId)
+                .containsExactly(
+                        "iq_existing_1",
+                        "iq_existing_2",
+                        "iq_existing_3",
+                        "iq_existing_4",
+                        "iq_existing_5"
+                );
+        assertThat(interviewThreadRepository.findByInterviewSessionId("is_1")).hasSize(5);
+        assertThat(llmJobRepository.findById("job_1")).hasValueSatisfying(job -> {
+            assertThat(job.getStatus()).isEqualTo(LlmJobStatus.FAILED);
+            assertThat(job.getErrorCode()).isEqualTo("LLM_PROVIDER_ERROR");
+            assertThat(job.getCompletedAt()).isEqualTo(failedAt);
         });
     }
 
@@ -424,6 +540,53 @@ class InterviewQuestionGenerationJobWorkerTest {
         );
     }
 
+    private void savePendingAdditionalInterviewQuestionGenerationJob(
+            String coverLetterId,
+            String reviewVersionId,
+            String interviewSessionId,
+            String jobId
+    ) {
+        savePendingInterviewQuestionGenerationJob(
+                coverLetterId,
+                reviewVersionId,
+                interviewSessionId,
+                "job_initial_setup"
+        );
+        llmJobRepository.deleteAll();
+        llmJobRepository.flush();
+
+        InterviewSession interviewSession = interviewSessionRepository.findById(interviewSessionId).orElseThrow();
+        interviewSession.activate();
+        interviewSessionRepository.saveAndFlush(interviewSession);
+
+        List<InterviewQuestion> existingQuestions = new ArrayList<>();
+        for (int index = 1; index <= 5; index++) {
+            existingQuestions.add(InterviewQuestion.create(
+                    "iq_existing_" + index,
+                    interviewSession,
+                    reviewVersionId,
+                    index,
+                    InterviewQuestionType.COVER_LETTER_BASED,
+                    "기존 질문 " + index
+            ));
+        }
+        interviewQuestionRepository.saveAll(existingQuestions);
+        interviewThreadRepository.saveAll(existingQuestions.stream()
+                .map(question -> InterviewThread.active(
+                        "it_" + question.getId(),
+                        interviewSession,
+                        question,
+                        Instant.parse("2026-07-14T11:00:00Z")
+                ))
+                .toList());
+        llmJobRepository.saveAndFlush(LlmJob.pendingAdditionalInterviewQuestionGeneration(
+                jobId,
+                coverLetterId,
+                reviewVersionId,
+                Instant.parse("2026-07-14T11:30:00Z")
+        ));
+    }
+
     private void assertFailedSessionAndEmptyQuestions(String interviewSessionId) {
         assertThat(interviewSessionRepository.findById(interviewSessionId)).hasValueSatisfying(session ->
                 assertThat(session.getStatus()).isEqualTo(InterviewSessionStatus.FAILED)
@@ -494,9 +657,10 @@ class InterviewQuestionGenerationJobWorkerTest {
                 reviewVersion.getId(),
                 now.plusSeconds(120)
         ));
-        llmJobRepository.save(LlmJob.pendingInterviewQuestionGeneration(
+        llmJobRepository.save(LlmJob.pendingInitialInterviewQuestionGeneration(
                 jobId,
                 coverLetterId,
+                reviewVersion.getId(),
                 now.plusSeconds(120)
         ));
     }
@@ -518,9 +682,10 @@ class InterviewQuestionGenerationJobWorkerTest {
                 "rv_missing",
                 now.plusSeconds(120)
         ));
-        llmJobRepository.save(LlmJob.pendingInterviewQuestionGeneration(
+        llmJobRepository.save(LlmJob.pendingInitialInterviewQuestionGeneration(
                 jobId,
                 coverLetterId,
+                "rv_missing",
                 now.plusSeconds(120)
         ));
     }

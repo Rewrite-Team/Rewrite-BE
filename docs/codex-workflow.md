@@ -25,6 +25,23 @@
 6. 아키텍처 또는 테스트 기준 변경은 `docs/architecture.md` 또는 `docs/testing.md`에 반영했다.
 7. 어떤 문서를 갱신하지 않았다면, 변경 영향이 없다고 판단한 이유를 최종 응답이나 PR 본문에 남긴다.
 
+## Excel API 문서 Google Drive 동기화
+
+`docs/api/rewrite-api-documentation.xlsx`는 Git에서 관리하는 기준 원본이다. 아래 Google Drive Excel 파일은 프론트엔드 공유용 미러로 사용한다.
+
+- File ID: `15eS_Q4x5kAZHkQhkwNFk08Zt3wCkxo8W`
+- URL: `https://docs.google.com/spreadsheets/d/15eS_Q4x5kAZHkQhkwNFk08Zt3wCkxo8W/edit`
+- MIME type: `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`
+
+Codex가 Excel API 문서를 수정할 때는 다음 순서로 처리한다.
+
+1. 로컬 Excel 문서를 갱신한다.
+2. 모든 시트를 렌더링하고 주요 범위, 수식 오류, 잘림과 가독성을 검증한다.
+3. Google Drive의 기존 File ID에 로컬 Excel 파일 바이트를 덮어쓴다.
+4. Drive metadata를 다시 조회해 File ID와 MIME type이 유지되고 수정 시각이 갱신됐는지 확인한다.
+5. 새 Drive 파일을 만들거나 네이티브 Google Sheet로 변환하지 않는다.
+6. 인증 또는 업로드가 실패하면 로컬 문서 검증 결과와 Drive 동기화 실패를 분리해 보고한다.
+
 ## 승인 게이트
 
 - 사용자가 명시적으로 요청하지 않은 commit, branch 생성, push, GitHub issue 생성, PR 생성은 하지 않는다.

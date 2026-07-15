@@ -56,7 +56,9 @@ class InterviewQuestionGenerationJobEventIntegrationTest {
     void interviewQuestionGenerationEventSchedulesWorkerAfterCommit() {
         Instant now = Instant.parse("2026-07-10T11:00:00Z");
         new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
-            llmJobRepository.save(LlmJob.pendingInterviewQuestionGeneration("job_1", "cl_1", now));
+            llmJobRepository.save(LlmJob.pendingInitialInterviewQuestionGeneration(
+                    "job_1", "cl_1", "rv_1", now
+            ));
             eventPublisher.publishEvent(new LlmJobCreatedEvent("job_1"));
         });
 
@@ -64,5 +66,24 @@ class InterviewQuestionGenerationJobEventIntegrationTest {
         then(keywordAnalysisJobWorker).should(never()).execute("job_1");
         then(firstReviewJobWorker).should(never()).execute("job_1");
         then(reReviewJobWorker).should(never()).execute("job_1");
+    }
+
+    @Test
+    void additionalInterviewQuestionGenerationEventSchedulesSameWorkerAfterCommit() {
+        Instant now = Instant.parse("2026-07-14T11:00:00Z");
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            llmJobRepository.save(LlmJob.pendingAdditionalInterviewQuestionGeneration(
+                    "job_additional",
+                    "cl_1",
+                    "rv_2",
+                    now
+            ));
+            eventPublisher.publishEvent(new LlmJobCreatedEvent("job_additional"));
+        });
+
+        then(interviewQuestionGenerationJobWorker).should(timeout(1000)).execute("job_additional");
+        then(keywordAnalysisJobWorker).should(never()).execute("job_additional");
+        then(firstReviewJobWorker).should(never()).execute("job_additional");
+        then(reReviewJobWorker).should(never()).execute("job_additional");
     }
 }

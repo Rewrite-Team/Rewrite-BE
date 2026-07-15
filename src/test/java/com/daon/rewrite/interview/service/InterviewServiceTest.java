@@ -16,6 +16,7 @@ import com.daon.rewrite.interview.repository.InterviewQuestionRepository;
 import com.daon.rewrite.interview.repository.InterviewSessionRepository;
 import com.daon.rewrite.interview.repository.InterviewThreadRepository;
 import com.daon.rewrite.llmjob.entity.LlmJob;
+import com.daon.rewrite.llmjob.entity.LlmJobRequestRefType;
 import com.daon.rewrite.llmjob.entity.LlmJobStatus;
 import com.daon.rewrite.llmjob.entity.LlmJobType;
 import com.daon.rewrite.llmjob.repository.LlmJobRepository;
@@ -70,6 +71,9 @@ class InterviewServiceTest {
     @MockitoBean
     private Clock clock;
 
+    @MockitoBean
+    private InterviewQuestionGenerationJobWorker interviewQuestionGenerationJobWorker;
+
     @AfterEach
     void cleanUp() {
         interviewThreadRepository.deleteAll();
@@ -95,9 +99,11 @@ class InterviewServiceTest {
         assertThat(result.interviewSession().getInitialSourceReviewVersionId()).isEqualTo("rv_1");
         assertThat(result.interviewSession().getStatus()).isEqualTo(InterviewSessionStatus.QUESTION_GENERATING);
         assertThat(result.job().getId()).isEqualTo("job_1");
-        assertThat(result.job().getType()).isEqualTo(LlmJobType.INTERVIEW_QUESTION_GENERATION);
+        assertThat(result.job().getType()).isEqualTo(LlmJobType.INTERVIEW_INITIAL_QUESTION_GENERATION);
         assertThat(result.job().getStatus()).isEqualTo(LlmJobStatus.PENDING);
         assertThat(result.job().getTargetId()).isEqualTo("cl_1");
+        assertThat(result.job().getRequestRefType()).isEqualTo(LlmJobRequestRefType.REVIEW_VERSION);
+        assertThat(result.job().getRequestRefId()).isEqualTo("rv_1");
         assertThat(result.job().getProgressTotal()).isEqualTo(5);
     }
 
@@ -256,6 +262,100 @@ class InterviewServiceTest {
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.LLM_JOB_ALREADY_RUNNING);
         assertThat(interviewSessionRepository.count()).isZero();
+    }
+
+    @Test
+    void addMyInterviewQuestionCreatesPendingJobWithLatestReviewVersion() {
+        Instant now = Instant.parse("2026-07-14T01:00:00Z");
+        CoverLetter coverLetter = saveReviewedCoverLetter("cl_1", "user_1", "rv_2", now);
+        InterviewSession interviewSession = InterviewSession.questionGenerating(
+                "is_1",
+                coverLetter,
+                "rv_1",
+                now.plusSeconds(120)
+        );
+        interviewSession.activate();
+        interviewSessionRepository.save(interviewSession);
+        given(currentUserProvider.currentUser()).willReturn(new CurrentUser("user_1", "테스트", null));
+        given(idGenerator.generate("job")).willReturn("job_additional");
+        given(clock.instant()).willReturn(now.plusSeconds(180));
+
+        AddInterviewQuestionResult result = service.addMyInterviewQuestion("is_1");
+
+        assertThat(result.interviewSession().getId()).isEqualTo("is_1");
+        assertThat(result.interviewSession().getStatus()).isEqualTo(InterviewSessionStatus.ACTIVE);
+        assertThat(result.job().getId()).isEqualTo("job_additional");
+        assertThat(result.job().getType()).isEqualTo(LlmJobType.INTERVIEW_ADDITIONAL_QUESTION_GENERATION);
+        assertThat(result.job().getStatus()).isEqualTo(LlmJobStatus.PENDING);
+        assertThat(result.job().getTargetId()).isEqualTo("cl_1");
+        assertThat(result.job().getRequestRefType()).isEqualTo(LlmJobRequestRefType.REVIEW_VERSION);
+        assertThat(result.job().getRequestRefId()).isEqualTo("rv_2");
+        assertThat(result.job().getProgressTotal()).isEqualTo(1);
+    }
+
+    @Test
+    void addMyInterviewQuestionRejectsMissingOtherOwnerOrDeletedSession() {
+        Instant now = Instant.parse("2026-07-14T01:00:00Z");
+        CoverLetter otherOwner = saveReviewedCoverLetter("cl_other", "user_2", "rv_other", now);
+        InterviewSession otherSession = InterviewSession.questionGenerating(
+                "is_other", otherOwner, "rv_other", now.plusSeconds(120)
+        );
+        otherSession.activate();
+        interviewSessionRepository.save(otherSession);
+
+        CoverLetter deleted = saveReviewedCoverLetter("cl_deleted", "user_1", "rv_deleted", now.plusSeconds(180));
+        InterviewSession deletedSession = InterviewSession.questionGenerating(
+                "is_deleted", deleted, "rv_deleted", now.plusSeconds(300)
+        );
+        deletedSession.activate();
+        interviewSessionRepository.save(deletedSession);
+        deleted.markDeleted(now.plusSeconds(360));
+        coverLetterRepository.saveAndFlush(deleted);
+        given(currentUserProvider.currentUser()).willReturn(new CurrentUser("user_1", "테스트", null));
+
+        assertAdditionalQuestionNotFound("is_missing");
+        assertAdditionalQuestionNotFound("is_other");
+        assertAdditionalQuestionNotFound("is_deleted");
+    }
+
+    @Test
+    void addMyInterviewQuestionRejectsNonActiveSessionOrNonReviewedCoverLetter() {
+        Instant now = Instant.parse("2026-07-14T01:00:00Z");
+        CoverLetter reviewed = saveReviewedCoverLetter("cl_reviewed", "user_1", "rv_1", now);
+        interviewSessionRepository.save(InterviewSession.questionGenerating(
+                "is_generating", reviewed, "rv_1", now.plusSeconds(120)
+        ));
+
+        CoverLetter draft = coverLetterRepository.save(CoverLetter.draft("cl_draft", "user_1", now));
+        InterviewSession activeDraftSession = InterviewSession.questionGenerating(
+                "is_draft", draft, "rv_missing", now.plusSeconds(120)
+        );
+        activeDraftSession.activate();
+        interviewSessionRepository.save(activeDraftSession);
+        given(currentUserProvider.currentUser()).willReturn(new CurrentUser("user_1", "테스트", null));
+
+        assertAdditionalQuestionConflict("is_generating");
+        assertAdditionalQuestionConflict("is_draft");
+        assertThat(llmJobRepository.count()).isZero();
+    }
+
+    @Test
+    void addMyInterviewQuestionRejectsWhenJobAlreadyRunning() {
+        Instant now = Instant.parse("2026-07-14T01:00:00Z");
+        CoverLetter coverLetter = saveReviewedCoverLetter("cl_1", "user_1", "rv_1", now);
+        InterviewSession interviewSession = InterviewSession.questionGenerating(
+                "is_1", coverLetter, "rv_1", now.plusSeconds(120)
+        );
+        interviewSession.activate();
+        interviewSessionRepository.save(interviewSession);
+        llmJobRepository.save(LlmJob.pendingReview("job_running", "cl_1", now.plusSeconds(150), 1));
+        given(currentUserProvider.currentUser()).willReturn(new CurrentUser("user_1", "테스트", null));
+
+        assertThatThrownBy(() -> service.addMyInterviewQuestion("is_1"))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.LLM_JOB_ALREADY_RUNNING);
+        assertThat(llmJobRepository.count()).isEqualTo(1);
     }
 
     @Test
@@ -467,6 +567,20 @@ class InterviewServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.NOT_FOUND);
+    }
+
+    private void assertAdditionalQuestionNotFound(String interviewSessionId) {
+        assertThatThrownBy(() -> service.addMyInterviewQuestion(interviewSessionId))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.NOT_FOUND);
+    }
+
+    private void assertAdditionalQuestionConflict(String interviewSessionId) {
+        assertThatThrownBy(() -> service.addMyInterviewQuestion(interviewSessionId))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.CONFLICT);
     }
 
     private CoverLetter saveReviewedCoverLetter(String coverLetterId, String ownerId, String versionId, Instant now) {

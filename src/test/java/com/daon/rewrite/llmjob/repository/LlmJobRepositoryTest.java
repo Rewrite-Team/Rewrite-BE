@@ -107,9 +107,14 @@ class LlmJobRepositoryTest {
     }
 
     @Test
-    void saveAndFindPendingInterviewQuestionGenerationJobRoundTripsThroughJpa() {
+    void saveAndFindPendingInitialInterviewQuestionGenerationJobRoundTripsReviewVersion() {
         Instant now = Instant.parse("2026-07-10T05:10:00Z");
-        LlmJob job = LlmJob.pendingInterviewQuestionGeneration("job_interview", "cl_1", now);
+        LlmJob job = LlmJob.pendingInitialInterviewQuestionGeneration(
+                "job_interview",
+                "cl_1",
+                "rv_1",
+                now
+        );
 
         repository.save(job);
         entityManager.flush();
@@ -117,13 +122,43 @@ class LlmJobRepositoryTest {
 
         LlmJob found = repository.findById("job_interview").orElseThrow();
 
-        assertThat(found.getType()).isEqualTo(LlmJobType.INTERVIEW_QUESTION_GENERATION);
+        assertThat(found.getType()).isEqualTo(LlmJobType.INTERVIEW_INITIAL_QUESTION_GENERATION);
         assertThat(found.getStatus()).isEqualTo(LlmJobStatus.PENDING);
         assertThat(found.getTargetType()).isEqualTo(LlmJobTargetType.COVER_LETTER);
         assertThat(found.getTargetId()).isEqualTo("cl_1");
         assertThat(found.getRequestInstruction()).isNull();
+        assertThat(found.getRequestRefType()).isEqualTo(LlmJobRequestRefType.REVIEW_VERSION);
+        assertThat(found.getRequestRefId()).isEqualTo("rv_1");
         assertThat(found.getProgressCurrent()).isZero();
         assertThat(found.getProgressTotal()).isEqualTo(5);
+        assertThat(found.getCreatedAt()).isEqualTo(now);
+        assertThat(found.getCompletedAt()).isNull();
+    }
+
+    @Test
+    void saveAndFindPendingAdditionalInterviewQuestionGenerationJobRoundTripsReviewVersion() {
+        Instant now = Instant.parse("2026-07-14T05:10:00Z");
+        LlmJob job = LlmJob.pendingAdditionalInterviewQuestionGeneration(
+                "job_additional",
+                "cl_1",
+                "rv_2",
+                now
+        );
+
+        repository.save(job);
+        entityManager.flush();
+        entityManager.clear();
+
+        LlmJob found = repository.findById("job_additional").orElseThrow();
+
+        assertThat(found.getType()).isEqualTo(LlmJobType.INTERVIEW_ADDITIONAL_QUESTION_GENERATION);
+        assertThat(found.getStatus()).isEqualTo(LlmJobStatus.PENDING);
+        assertThat(found.getTargetType()).isEqualTo(LlmJobTargetType.COVER_LETTER);
+        assertThat(found.getTargetId()).isEqualTo("cl_1");
+        assertThat(found.getRequestRefType()).isEqualTo(LlmJobRequestRefType.REVIEW_VERSION);
+        assertThat(found.getRequestRefId()).isEqualTo("rv_2");
+        assertThat(found.getProgressCurrent()).isZero();
+        assertThat(found.getProgressTotal()).isEqualTo(1);
         assertThat(found.getCreatedAt()).isEqualTo(now);
         assertThat(found.getCompletedAt()).isNull();
     }

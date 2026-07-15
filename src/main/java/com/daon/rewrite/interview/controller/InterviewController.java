@@ -1,5 +1,6 @@
 package com.daon.rewrite.interview.controller;
 
+import com.daon.rewrite.interview.dto.AddInterviewQuestionResponse;
 import com.daon.rewrite.interview.dto.CurrentInterviewResponse;
 import com.daon.rewrite.interview.dto.InterviewQuestionListResponse;
 import com.daon.rewrite.interview.dto.StartInterviewRequest;
@@ -39,5 +40,12 @@ public class InterviewController {
                 coverLetterId,
                 request == null ? null : request.sourceReviewVersionId()
         ));
+    }
+
+    @PostMapping("/interviews/{interviewSessionId}/questions")
+    public AddInterviewQuestionResponse addInterviewQuestion(@PathVariable String interviewSessionId) {
+        return AddInterviewQuestionResponse.from(
+                interviewService.addMyInterviewQuestion(interviewSessionId)
+        );
     }
 }

@@ -162,17 +162,42 @@ public class LlmJob {
         );
     }
 
-    public static LlmJob pendingInterviewQuestionGeneration(String id, String coverLetterId, Instant now) {
+    public static LlmJob pendingInitialInterviewQuestionGeneration(
+            String id,
+            String coverLetterId,
+            String sourceReviewVersionId,
+            Instant now
+    ) {
         return new LlmJob(
                 id,
-                LlmJobType.INTERVIEW_QUESTION_GENERATION,
+                LlmJobType.INTERVIEW_INITIAL_QUESTION_GENERATION,
                 LlmJobStatus.PENDING,
                 LlmJobTargetType.COVER_LETTER,
                 coverLetterId,
                 null,
-                null,
-                null,
+                LlmJobRequestRefType.REVIEW_VERSION,
+                sourceReviewVersionId,
                 5,
+                now
+        );
+    }
+
+    public static LlmJob pendingAdditionalInterviewQuestionGeneration(
+            String id,
+            String coverLetterId,
+            String sourceReviewVersionId,
+            Instant now
+    ) {
+        return new LlmJob(
+                id,
+                LlmJobType.INTERVIEW_ADDITIONAL_QUESTION_GENERATION,
+                LlmJobStatus.PENDING,
+                LlmJobTargetType.COVER_LETTER,
+                coverLetterId,
+                null,
+                LlmJobRequestRefType.REVIEW_VERSION,
+                sourceReviewVersionId,
+                1,
                 now
         );
     }

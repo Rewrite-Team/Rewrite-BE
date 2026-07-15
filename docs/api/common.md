@@ -381,7 +381,8 @@ Job type:
 COVER_LETTER_REVIEW
 COVER_LETTER_RE_REVIEW
 KEYWORD_ANALYSIS
-INTERVIEW_QUESTION_GENERATION
+INTERVIEW_INITIAL_QUESTION_GENERATION
+INTERVIEW_ADDITIONAL_QUESTION_GENERATION
 INTERVIEW_MESSAGE_FEEDBACK
 ```
 
@@ -400,6 +401,8 @@ LLM Job은 실패 시 서버에서 1회 자동 재시도한다. 최초 시도와
 LLM 출력 파싱 실패, 필수 필드 누락, 타입 불일치, 범위 위반처럼 서버가 기대한 결과 구조로 검증할 수 없는 응답도 LLM Job 실패로 처리한다. 이 경우 가능한 필드만 부분 저장하거나 서버가 임의 기본값으로 보정하지 않는다. 자동 재시도 1회 후에도 구조 검증에 실패하면 `FAILED`와 `LLM_OUTPUT_VALIDATION_FAILED`로 저장한다.
 
 같은 자기소개서에 대해 진행 중인 LLM Job은 동시에 하나만 허용한다. `PENDING` 또는 `PROCESSING` 상태의 Job이 있으면 새 LLM Job 시작 요청은 `CONFLICT`와 `LLM_JOB_ALREADY_RUNNING`을 반환한다.
+
+최초 면접 질문 생성 Job은 `type=INTERVIEW_INITIAL_QUESTION_GENERATION`, 추가 면접 질문 생성 Job은 `type=INTERVIEW_ADDITIONAL_QUESTION_GENERATION`으로 구분한다. 두 Job 모두 `requestRef.type=REVIEW_VERSION`, `requestRef.id=생성 기준 첨삭 버전 id`를 저장한다. 추가 생성 Job의 `progress.total`은 1이며 완료 결과는 생성된 `INTERVIEW_QUESTION`을 가리킨다.
 
 첨삭 Job(`COVER_LETTER_REVIEW`, `COVER_LETTER_RE_REVIEW`)은 진행 중 생성된 텍스트를 문항별/필드별 partial result로 누적 저장한다. 이 값은 화면 재진입 시 지금까지 생성된 텍스트를 먼저 복구하고, 이후 SSE delta를 이어붙이기 위한 임시 결과다. 첨삭 Job이 아닌 LLM Job의 `partialResult`는 `null`이다.
 
