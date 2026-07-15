@@ -37,6 +37,17 @@
 ## API documentation rules
 
 - API를 추가하거나 변경하면 `docs/api/README.md`와 `docs/api/` 하위 관련 도메인 문서를 갱신한다.
+- API를 추가, 삭제하거나 path, request, response, error, validation, 상태 또는 구현 여부를 변경하면 같은 작업에서 `docs/api/rewrite-api-documentation.xlsx`도 반드시 갱신한다.
+- Excel API 문서는 프론트엔드 구현과 디버깅에 필요한 정보만 유지한다. API별 기능, 실제 요청·응답 예시, 요청·응답 필드의 의미와 제약, 정확한 HTTP 상태와 오류 코드, 인증/CSRF 요구사항, 구현 여부를 포함하고 소스 경로·중복 예시·내부 설계 설명은 제외한다.
+- Excel API 문서의 목차와 각 API 상세 시트에는 `Asia/Seoul` 기준 `최근 변경일`과 `최근 변경 시각`을 기록하고, API 계약이나 문서 내용이 바뀐 작업에서 해당 시각을 갱신한다.
+- Excel API 문서의 첫 시트는 전체 API 목차로 유지하고, 이후에는 API ID별로 하나의 상세 시트를 사용한다. 여러 API를 한 상세 시트에 합치지 않는다.
+- 첫 시트의 API ID와 `상세 보기`는 해당 API 상세 시트로 이동하는 내부 링크를 제공하고, 각 상세 시트 상단에는 첫 시트로 돌아가는 내부 링크를 유지한다.
+- Excel API 문서는 회색 계열을 기본 색상으로 사용하고, 표 본문에 행별 줄무늬 색상이나 상태별 컬러 배경을 사용하지 않는다. 제목, 섹션 헤더, 표 헤더와 코드 예시는 회색의 명도 차이로만 구분한다.
+- 각 API 상세 시트에는 필드 설명과 별도로 실제 HTTP 요청 형식과 성공 응답 형식을 코드 예시로 유지한다. path/query/header/cookie/body, HTTP status, content type과 JSON 또는 SSE 본문이 계약과 일치해야 한다.
+- 오류 표의 HTTP 열에는 `4xx/5xx`, `요청 검증` 같은 범주를 쓰지 않고 `400 Bad Request`, `401 Unauthorized`, `403 Forbidden`처럼 실제 상태를 기록한다. validation 제약은 요청 필드 표에 한 번만 기록하고 오류 표에는 `VALIDATION_ERROR` 한 행만 둔다.
+- 계약에는 있으나 아직 구현되지 않은 인증·CSRF 오류는 `계약 정의·미구현`으로 명시하여 현재 동작으로 오해하지 않게 한다.
+- Excel API 문서의 인쇄 설정은 A4 가로, 너비 1페이지 맞춤으로 유지하고, HTTP 코드 예시는 한 행이 페이지 경계에서 잘리지 않도록 렌더링한다.
+- Excel API 문서를 갱신한 뒤에는 모든 시트를 렌더링해 잘림과 가독성을 확인하고, 주요 범위와 수식 오류를 검증한다.
 - API 변경이 요구사항, 상태, 설계 결정에 영향을 주면 `docs/requirements.md`, `docs/status.md`, `docs/decisions/` 하위 관련 문서도 함께 갱신한다.
 - API 상태는 `Planned`, `In Progress`, `Implemented`, `Verified`, `Deprecated` 중 하나로 관리한다.
 - 요청 형식, 성공 응답, 에러 응답, validation, 관련 requirement ID를 함께 기록한다.
