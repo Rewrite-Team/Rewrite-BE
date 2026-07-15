@@ -18,6 +18,7 @@ Codex는 모든 문서를 매번 읽지 않는다. 먼저 이 문서를 보고 �
 | `requirements.md` | `REQ-*` 기준 제품 요구사항과 검증 기준 | 기능 범위 확인 |
 | `api/README.md` | API 상태표와 도메인별 API 문서 라우팅 | API 구현/수정 |
 | `api/*.md` | 도메인별 API 계약, 요청/응답, 에러 | 특정 도메인 API 구현/수정 |
+| `api/rewrite-api-documentation.xlsx` | 전체 API와 필드 의미, 구현 여부, API별 최근 변경 일시 | API 전체 현황 확인, API 추가/변경 |
 | `erd.md` | MVP persistence ERD, 테이블 관계, nullable/FK/soft delete 정책 | DB/JPA entity, repository, schema, migration, persistence 전략 작업 |
 | `decisions/README.md` | API와 persistence 설계 결정 인덱스 및 도메인별 결정 문서 라우팅 | 설계 이유 확인, 결정 변경 검토 |
 | `decisions/*.md` | 도메인별 API, persistence 설계 결정과 트레이드오프 | 특정 도메인 또는 persistence 설계 결정 확인 |

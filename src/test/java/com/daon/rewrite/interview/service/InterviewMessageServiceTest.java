@@ -177,14 +177,16 @@ class InterviewMessageServiceTest {
         Instant now = Instant.parse("2026-07-13T01:00:00Z");
         saveThread("it_pending", "cl_pending", "user_1", false, now);
         saveThread("it_processing", "cl_processing", "user_1", false, now.plusSeconds(120));
-        llmJobRepository.save(LlmJob.pendingInterviewQuestionGeneration(
+        llmJobRepository.save(LlmJob.pendingInitialInterviewQuestionGeneration(
                 "job_pending",
                 "cl_pending",
+                "rv_pending",
                 now.plusSeconds(60)
         ));
-        LlmJob processingJob = LlmJob.pendingInterviewQuestionGeneration(
+        LlmJob processingJob = LlmJob.pendingInitialInterviewQuestionGeneration(
                 "job_processing",
                 "cl_processing",
+                "rv_processing",
                 now.plusSeconds(180)
         );
         processingJob.startProcessing("면접 질문을 생성하고 있습니다.");

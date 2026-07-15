@@ -5,6 +5,7 @@ import com.daon.rewrite.global.exception.BusinessException;
 import com.daon.rewrite.global.exception.ErrorCode;
 import com.daon.rewrite.interview.entity.InterviewSession;
 import com.daon.rewrite.interview.entity.InterviewSessionStatus;
+import com.daon.rewrite.interview.service.AddInterviewQuestionResult;
 import com.daon.rewrite.interview.service.CurrentInterviewResult;
 import com.daon.rewrite.interview.service.InterviewQuestionItemResult;
 import com.daon.rewrite.interview.service.InterviewQuestionListResult;
@@ -47,7 +48,9 @@ class InterviewControllerTest {
                 "rv_1",
                 now.plusSeconds(60)
         );
-        LlmJob job = LlmJob.pendingInterviewQuestionGeneration("job_1", "cl_1", now.plusSeconds(60));
+        LlmJob job = LlmJob.pendingInitialInterviewQuestionGeneration(
+                "job_1", "cl_1", "rv_1", now.plusSeconds(60)
+        );
         given(interviewService.startMyInterview("cl_1", "rv_1"))
                 .willReturn(new StartInterviewResult(interviewSession, job));
 
@@ -74,7 +77,9 @@ class InterviewControllerTest {
                 "rv_1",
                 now.plusSeconds(60)
         );
-        LlmJob job = LlmJob.pendingInterviewQuestionGeneration("job_1", "cl_1", now.plusSeconds(60));
+        LlmJob job = LlmJob.pendingInitialInterviewQuestionGeneration(
+                "job_1", "cl_1", "rv_1", now.plusSeconds(60)
+        );
         given(interviewService.startMyInterview("cl_1", null))
                 .willReturn(new StartInterviewResult(interviewSession, job));
 
@@ -128,6 +133,48 @@ class InterviewControllerTest {
         mockMvc.perform(post("/cover-letters/{coverLetterId}/interviews", "cl_1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("LLM_JOB_ALREADY_RUNNING"));
+    }
+
+    @Test
+    void addInterviewQuestionReturnsActiveSessionAndPendingJob() throws Exception {
+        Instant now = Instant.parse("2026-07-14T01:00:00Z");
+        CoverLetter coverLetter = CoverLetter.draft("cl_1", "user_1", now);
+        InterviewSession interviewSession = InterviewSession.questionGenerating(
+                "is_1", coverLetter, "rv_1", now.plusSeconds(60)
+        );
+        interviewSession.activate();
+        LlmJob job = LlmJob.pendingAdditionalInterviewQuestionGeneration(
+                "job_1", "cl_1", "rv_2", now.plusSeconds(120)
+        );
+        given(interviewService.addMyInterviewQuestion("is_1"))
+                .willReturn(new AddInterviewQuestionResult(interviewSession, job));
+
+        mockMvc.perform(post("/interviews/{interviewSessionId}/questions", "is_1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.interviewSessionId").value("is_1"))
+                .andExpect(jsonPath("$.jobId").value("job_1"))
+                .andExpect(jsonPath("$.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.jobStatus").value("PENDING"));
+    }
+
+    @Test
+    void addInterviewQuestionReturnsNotFoundAndConflictErrors() throws Exception {
+        given(interviewService.addMyInterviewQuestion("is_missing"))
+                .willThrow(new BusinessException(ErrorCode.NOT_FOUND));
+        given(interviewService.addMyInterviewQuestion("is_generating"))
+                .willThrow(new BusinessException(ErrorCode.CONFLICT));
+        given(interviewService.addMyInterviewQuestion("is_running"))
+                .willThrow(new BusinessException(ErrorCode.LLM_JOB_ALREADY_RUNNING));
+
+        mockMvc.perform(post("/interviews/{interviewSessionId}/questions", "is_missing"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("NOT_FOUND"));
+        mockMvc.perform(post("/interviews/{interviewSessionId}/questions", "is_generating"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("CONFLICT"));
+        mockMvc.perform(post("/interviews/{interviewSessionId}/questions", "is_running"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error.code").value("LLM_JOB_ALREADY_RUNNING"));
     }

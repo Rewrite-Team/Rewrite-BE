@@ -19,6 +19,7 @@ import com.daon.rewrite.interview.repository.InterviewQuestionRepository;
 import com.daon.rewrite.interview.repository.InterviewSessionRepository;
 import com.daon.rewrite.interview.repository.InterviewThreadRepository;
 import com.daon.rewrite.llmjob.entity.LlmJob;
+import com.daon.rewrite.llmjob.entity.LlmJobRequestRefType;
 import com.daon.rewrite.llmjob.entity.LlmJobResultRefType;
 import com.daon.rewrite.llmjob.entity.LlmJobStatus;
 import com.daon.rewrite.llmjob.entity.LlmJobTargetType;
@@ -41,6 +42,8 @@ import java.util.List;
 @RequiredArgsConstructor
 class InterviewQuestionGenerationJobTransactionService {
 
+    private static final int INITIAL_QUESTION_COUNT = 5;
+    private static final int ADDITIONAL_QUESTION_COUNT = 1;
     private static final String INTERVIEW_QUESTION_ID_PREFIX = "iq";
     private static final String INTERVIEW_THREAD_ID_PREFIX = "it";
     private static final String STARTED_MESSAGE = "면접 질문 생성을 시작합니다.";
@@ -78,12 +81,13 @@ class InterviewQuestionGenerationJobTransactionService {
 
         InterviewSession interviewSession = interviewSessionRepository.findByCoverLetterId(coverLetter.getId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.INTERNAL_ERROR));
-        if (interviewSession.getStatus() != InterviewSessionStatus.QUESTION_GENERATING) {
-            throw new BusinessException(ErrorCode.INTERNAL_ERROR);
-        }
+        List<InterviewQuestion> existingQuestions = interviewQuestionRepository
+                .findByInterviewSessionIdOrderByQuestionOrderAsc(interviewSession.getId());
+        GenerationMode generationMode = resolveGenerationMode(job);
+        validateStartState(job, interviewSession, existingQuestions, generationMode);
 
         ReviewVersion sourceReviewVersion = reviewVersionRepository.findByIdAndCoverLetterId(
-                        interviewSession.getInitialSourceReviewVersionId(),
+                        sourceReviewVersionId(job),
                         coverLetter.getId()
                 )
                 .orElseThrow(() -> new BusinessException(ErrorCode.INTERNAL_ERROR));
@@ -98,6 +102,10 @@ class InterviewQuestionGenerationJobTransactionService {
                 coverLetter.getCompanyName(),
                 coverLetter.getPositionTitle(),
                 coverLetter.getPreferences(),
+                generationMode.questionCount,
+                existingQuestions.stream()
+                        .map(InterviewQuestion::getQuestion)
+                        .toList(),
                 questionResults.stream()
                         .map(result -> new InterviewQuestionGenerationAnswer(
                                 result.getQuestion().getId(),
@@ -121,12 +129,14 @@ class InterviewQuestionGenerationJobTransactionService {
 
         InterviewSession interviewSession = interviewSessionRepository.findByCoverLetterId(job.getTargetId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.INTERNAL_ERROR));
-        if (interviewSession.getStatus() != InterviewSessionStatus.QUESTION_GENERATING
-                || !interviewQuestionRepository
-                .findByInterviewSessionIdOrderByQuestionOrderAsc(interviewSession.getId())
-                .isEmpty()) {
-            throw new BusinessException(ErrorCode.INTERNAL_ERROR);
-        }
+        List<InterviewQuestion> existingQuestions = interviewQuestionRepository
+                .findByInterviewSessionIdOrderByQuestionOrderAsc(interviewSession.getId());
+        GenerationMode generationMode = resolveGenerationMode(job);
+        validateCompletionState(job, interviewSession, existingQuestions, results, generationMode);
+        String sourceReviewVersionId = sourceReviewVersionId(job);
+        int firstQuestionOrder = generationMode == GenerationMode.INITIAL
+                ? 1
+                : existingQuestions.getLast().getQuestionOrder() + 1;
 
         List<InterviewQuestion> questions = new ArrayList<>();
         for (int index = 0; index < results.size(); index++) {
@@ -134,8 +144,8 @@ class InterviewQuestionGenerationJobTransactionService {
             questions.add(InterviewQuestion.create(
                     idGenerator.generate(INTERVIEW_QUESTION_ID_PREFIX),
                     interviewSession,
-                    interviewSession.getInitialSourceReviewVersionId(),
-                    index + 1,
+                    sourceReviewVersionId,
+                    firstQuestionOrder + index,
                     InterviewQuestionType.COVER_LETTER_BASED,
                     result.question()
             ));
@@ -151,12 +161,20 @@ class InterviewQuestionGenerationJobTransactionService {
                         now
                 ))
                 .toList());
-        interviewSession.activate();
+        if (generationMode == GenerationMode.INITIAL) {
+            interviewSession.activate();
+        }
+        LlmJobResultRefType resultRefType = generationMode == GenerationMode.INITIAL
+                ? LlmJobResultRefType.INTERVIEW_SESSION
+                : LlmJobResultRefType.INTERVIEW_QUESTION;
+        String resultRefId = generationMode == GenerationMode.INITIAL
+                ? interviewSession.getId()
+                : questions.getFirst().getId();
         job.markCompleted(
                 job.getProgressTotal(),
                 COMPLETED_MESSAGE,
-                LlmJobResultRefType.INTERVIEW_SESSION,
-                interviewSession.getId(),
+                resultRefType,
+                resultRefId,
                 now
         );
     }
@@ -204,11 +222,61 @@ class InterviewQuestionGenerationJobTransactionService {
     private LlmJob findInterviewQuestionGenerationJobForUpdate(String jobId) {
         LlmJob job = llmJobRepository.findByIdForUpdate(jobId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.INTERNAL_ERROR));
-        if (job.getType() != LlmJobType.INTERVIEW_QUESTION_GENERATION
-                || job.getTargetType() != LlmJobTargetType.COVER_LETTER) {
+        if (!job.getType().isInterviewQuestionGeneration()
+                || job.getTargetType() != LlmJobTargetType.COVER_LETTER
+                || job.getRequestRefType() != LlmJobRequestRefType.REVIEW_VERSION
+                || job.getRequestRefId() == null) {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR);
         }
         return job;
+    }
+
+    private GenerationMode resolveGenerationMode(LlmJob job) {
+        if (job.getType() == LlmJobType.INTERVIEW_INITIAL_QUESTION_GENERATION) {
+            return GenerationMode.INITIAL;
+        }
+        if (job.getType() == LlmJobType.INTERVIEW_ADDITIONAL_QUESTION_GENERATION) {
+            return GenerationMode.ADDITIONAL;
+        }
+        throw new BusinessException(ErrorCode.INTERNAL_ERROR);
+    }
+
+    private void validateStartState(
+            LlmJob job,
+            InterviewSession interviewSession,
+            List<InterviewQuestion> existingQuestions,
+            GenerationMode generationMode
+    ) {
+        if (job.getProgressTotal() != generationMode.questionCount) {
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR);
+        }
+        if (generationMode == GenerationMode.INITIAL) {
+            if (interviewSession.getStatus() != InterviewSessionStatus.QUESTION_GENERATING
+                    || !existingQuestions.isEmpty()) {
+                throw new BusinessException(ErrorCode.INTERNAL_ERROR);
+            }
+            return;
+        }
+        if (interviewSession.getStatus() != InterviewSessionStatus.ACTIVE || existingQuestions.isEmpty()) {
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR);
+        }
+    }
+
+    private void validateCompletionState(
+            LlmJob job,
+            InterviewSession interviewSession,
+            List<InterviewQuestion> existingQuestions,
+            List<InterviewQuestionGenerationResult> results,
+            GenerationMode generationMode
+    ) {
+        validateStartState(job, interviewSession, existingQuestions, generationMode);
+        if (results == null || results.size() != generationMode.questionCount) {
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR);
+        }
+    }
+
+    private String sourceReviewVersionId(LlmJob job) {
+        return job.getRequestRefId();
     }
 
     private String errorCode(InterviewQuestionGenerationClientException.Reason reason) {
@@ -223,5 +291,16 @@ class InterviewQuestionGenerationJobTransactionService {
             return OUTPUT_VALIDATION_ERROR_MESSAGE;
         }
         return PROVIDER_ERROR_MESSAGE;
+    }
+
+    private enum GenerationMode {
+        INITIAL(INITIAL_QUESTION_COUNT),
+        ADDITIONAL(ADDITIONAL_QUESTION_COUNT);
+
+        private final int questionCount;
+
+        GenerationMode(int questionCount) {
+            this.questionCount = questionCount;
+        }
     }
 }

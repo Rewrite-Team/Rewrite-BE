@@ -285,7 +285,7 @@ LLM 비동기 작업 상태 테이블이다.
 | Column | Nullable | Relationship / Policy |
 |---|---:|---|
 | `id` | No | PK |
-| `type` | No | `COVER_LETTER_REVIEW`, `COVER_LETTER_RE_REVIEW`, `KEYWORD_ANALYSIS`, `INTERVIEW_QUESTION_GENERATION`, `INTERVIEW_MESSAGE_FEEDBACK` |
+| `type` | No | `COVER_LETTER_REVIEW`, `COVER_LETTER_RE_REVIEW`, `KEYWORD_ANALYSIS`, `INTERVIEW_INITIAL_QUESTION_GENERATION`, `INTERVIEW_ADDITIONAL_QUESTION_GENERATION`, `INTERVIEW_MESSAGE_FEEDBACK` |
 | `status` | No | `PENDING`, `PROCESSING`, `COMPLETED`, `FAILED`, `CANCELED` |
 | `target_type` | No | 작업 대상 타입 |
 | `target_id` | No | 작업 대상 id. Polymorphic reference라 DB FK를 강제하지 않는다 |
@@ -307,6 +307,7 @@ LLM 비동기 작업 상태 테이블이다.
 Policy:
 
 - 같은 자기소개서에 대해 `PENDING` 또는 `PROCESSING` LLM Job은 동시에 하나만 허용한다.
+- 최초·추가 면접 질문 생성 Job은 모두 `request_ref_type=REVIEW_VERSION`, `request_ref_id=생성 기준 첨삭 버전 id`로 입력을 확정한다. 최초 생성은 `progress_total=5`, 추가 생성은 `progress_total=1`을 사용한다.
 - `INTERVIEW_MESSAGE_FEEDBACK` Job은 `request_ref_type=INTERVIEW_MESSAGE`, `request_ref_id=USER 메시지 id`로 처리할 답변을 확정한다.
 - `partialResult`는 영속 컬럼이 아니다. MVP에서는 서버 메모리/cache 계층에서 관리한다.
 
