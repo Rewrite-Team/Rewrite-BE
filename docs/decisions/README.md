@@ -46,7 +46,7 @@ API 계약: `../api/README.md`
 | Decision 021 | 키워드 분석 결과는 상위 20개를 제공한다 | `keyword-analysis.md` | REQ-009 | API-020 - API-021 | Active |
 | Decision 022 | 같은 자기소개서의 LLM Job은 동시에 하나만 실행한다 | `llm-jobs.md` | REQ-005, REQ-009, REQ-010 | API-015 - API-016, LLM 시작 API | Active |
 | Decision 023 | 제출 후 원본 자기소개서는 수정할 수 없다 | `cover-letters.md` | REQ-003, REQ-004, REQ-005 | API-007 - API-014 | Active |
-| Decision 024 | SSE 재연결 시 전체 결과를 재조회한다 | `llm-jobs.md` | REQ-005, REQ-009, REQ-010 | API-015 - API-016, LLM 시작 API | Active |
+| Decision 024 | SSE 재연결 시 전체 결과를 재조회한다 | `llm-jobs.md` | REQ-005, REQ-009, REQ-010 | API-015 - API-016, LLM 시작 API | Superseded by Decision 076 |
 | Decision 025 | 삭제된 자기소개서 복구 API는 제공하지 않는다 | `cover-letters.md` | REQ-003, REQ-004, REQ-005 | API-007 - API-014 | Active |
 | Decision 026 | 자기소개서당 AI 면접 세션은 하나만 유지한다 | `interviews.md` | REQ-010 | API-022 - API-023, API-025 - API-029 | Active |
 | Decision 027 | 재첨삭 후에도 기존 AI 면접 세션은 유지한다 | `interviews.md` | REQ-010 | API-022 - API-023, API-025 - API-029 | Active |
@@ -82,13 +82,13 @@ API 계약: `../api/README.md`
 | Decision 057 | REVIEW_FAILED 상태에서도 원본 수정 API는 허용하지 않는다 | `cover-letters.md` | REQ-003, REQ-004, REQ-005 | API-007 - API-014 | Active |
 | Decision 058 | REVIEW_FAILED 상태의 사용자 수동 재시도에는 제품 도메인상 횟수 제한을 두지 않는다 | `cover-letters.md` | REQ-003, REQ-004, REQ-005 | API-007 - API-014 | Active |
 | Decision 059 | REVIEW_FAILED 항목 클릭 시 AI 첨삭 실패 화면으로 이동한다 | `cover-letters.md` | REQ-003, REQ-004, REQ-005 | API-007 - API-014 | Active |
-| Decision 060 | 자기소개서 상세 응답에 최근 최초 첨삭 Job 요약을 포함한다 | `cover-letters.md` | REQ-003, REQ-004, REQ-005 | API-007 - API-014 | Active |
-| Decision 061 | 첨삭 진행 중 화면 복구는 partial text 저장 방식으로 처리한다 | `llm-jobs.md` | REQ-005, REQ-009, REQ-010 | API-015 - API-016, LLM 시작 API | Active |
-| Decision 062 | MVP에서는 partial result를 서버 메모리에 저장하고 이후 cache 저장소로 이전한다 | `llm-jobs.md` | REQ-005, REQ-009, REQ-010 | API-015 - API-016, LLM 시작 API | Active |
-| Decision 063 | PROCESSING 상태에서 partialResult가 없으면 delta 텍스트를 숨기고 완료/실패만 감지한다 | `llm-jobs.md` | REQ-005, REQ-009, REQ-010 | API-015 - API-016, LLM 시작 API | Active |
-| Decision 064 | 실패한 첨삭 Job의 partialResult는 실패 화면에 표시하지 않는다 | `llm-jobs.md` | REQ-005, REQ-009, REQ-010 | API-015 - API-016, LLM 시작 API | Active |
-| Decision 065 | 실패 화면의 사용자 메시지는 LLM Job error.code 기준으로 매핑한다 | `llm-jobs.md` | REQ-005, REQ-009, REQ-010 | API-015 - API-016, LLM 시작 API | Active |
-| Decision 066 | 알 수 없는 LLM Job error.code는 기본 fallback 메시지로 표시한다 | `llm-jobs.md` | REQ-005, REQ-009, REQ-010 | API-015 - API-016, LLM 시작 API | Active |
+| Decision 060 | 자기소개서 상세 응답에 최근 최초 첨삭 Job 요약을 포함한다 | `cover-letters.md` | REQ-003, REQ-004, REQ-005 | API-007 - API-014 | Superseded by Decision 074 |
+| Decision 061 | 첨삭 진행 중 화면 복구는 partial text 저장 방식으로 처리한다 | `llm-jobs.md` | REQ-005, REQ-009, REQ-010 | API-015 - API-016, LLM 시작 API | Superseded by Decision 075 |
+| Decision 062 | MVP에서는 partial result를 서버 메모리에 저장하고 이후 cache 저장소로 이전한다 | `llm-jobs.md` | REQ-005, REQ-009, REQ-010 | API-015 - API-016, LLM 시작 API | Superseded by Decision 075 |
+| Decision 063 | PROCESSING 상태에서 partialResult가 없으면 delta 텍스트를 숨기고 완료/실패만 감지한다 | `llm-jobs.md` | REQ-005, REQ-009, REQ-010 | API-015 - API-016, LLM 시작 API | Superseded by Decision 076 |
+| Decision 064 | 실패한 첨삭 Job의 partialResult는 실패 화면에 표시하지 않는다 | `llm-jobs.md` | REQ-005, REQ-009, REQ-010 | API-015 - API-016, LLM 시작 API | Superseded by Decision 075 |
+| Decision 065 | 실패 화면의 사용자 메시지는 LLM Job error.code 기준으로 매핑한다 | `llm-jobs.md` | REQ-005, REQ-009, REQ-010 | API-015 - API-016, LLM 시작 API | Superseded by Decision 074 |
+| Decision 066 | 알 수 없는 LLM Job error.code는 기본 fallback 메시지로 표시한다 | `llm-jobs.md` | REQ-005, REQ-009, REQ-010 | API-015 - API-016, LLM 시작 API | Superseded by Decision 074 |
 | Decision 067 | AI 면접 답변 피드백은 완료 후 assistant 메시지만 저장한다 | `interviews.md` | REQ-010 | API-022 - API-023, API-025 - API-029 | Active |
 | Decision 068 | LLM 출력 파싱 또는 구조 검증 실패는 Job 실패로 처리한다 | `llm-jobs.md` | REQ-005, REQ-009, REQ-010 | API-015 - API-016, LLM 시작 API | Active |
 | Decision 069 | 모든 사용자 리소스 접근은 소유자 검증 후 비소유 리소스는 NOT_FOUND로 응답한다 | `common.md` | REQ-001, REQ-002 | 공통 API 정책 | Active |
@@ -96,3 +96,9 @@ API 계약: `../api/README.md`
 | Decision 071 | 날짜/시간 응답은 Asia/Seoul 기준 LocalDateTime으로 반환한다 | `common.md` | REQ-001, REQ-002 | 공통 API 정책 | Active |
 | Decision 072 | 남은 자기소개서 CRUD 확장 전 DB/JPA 전환을 선행한다 | `persistence.md` | REQ-003, REQ-007 | API-007 - API-013 | Active |
 | Decision 073 | 면접 질문과 질문별 대화방은 함께 생성한다 | `interviews.md` | REQ-010 | API-022, API-026, API-028 | Active |
+| Decision 074 | 자기소개서 상세와 첨삭 버전 상세는 같은 응답 구조를 사용한다 | `cover-letters.md` | REQ-003, REQ-005, REQ-006 | API-012, API-018 | Active |
+| Decision 075 | 완성된 첨삭 문항 결과는 Job 완료 전 임시 영속 저장한다 | `review-versions.md` | REQ-005, REQ-006 | API-012, API-014, API-016, API-024 | Active |
+| Decision 076 | 첨삭 SSE는 완성된 문항 단위 이벤트와 연결 시 스냅샷을 제공한다 | `llm-jobs.md` | REQ-005, REQ-006 | API-016 | Active |
+| Decision 077 | 메인 첨삭 상태는 사용자 단일 SSE 연결로 갱신한다 | `cover-letters.md` | REQ-003, REQ-005 | API-007, API-030 | Active |
+| Decision 078 | 재첨삭은 이전 최신 최종 작성본을 입력으로 새 결과를 생성한다 | `review-versions.md` | REQ-006 | API-012, API-024 | Active |
+| Decision 079 | 최신 키워드 분석 응답은 화면용 자기소개서와 기준 버전 요약을 포함한다 | `keyword-analysis.md` | REQ-009 | API-021 | Active |

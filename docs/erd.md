@@ -13,7 +13,7 @@ API 계약은 `docs/api/README.md`와 도메인별 API 문서를 기준으로 �
 - API 응답 DTO는 Asia/Seoul 기준 `LocalDateTime`으로 변환한다.
 - 이 ERD는 MVP persistence의 논리 구조 기준이며, 실제 DB column type과 index 세부사항은 구현 이슈에서 확정한다.
 - Flyway migration 파일은 현 시점 범위에 포함하지 않는다.
-- LLM partial result는 MVP에서 서버 메모리 또는 cache 계층 책임으로 두고, 영속 테이블에 저장하지 않는다.
+- 첨삭 진행 결과는 필드별 partial text가 아니라 완성된 문항 단위 임시 결과로 영속 저장한다.
 
 ## Relationship Overview
 
@@ -28,6 +28,8 @@ erDiagram
     REVIEW_VERSIONS ||--o{ REVIEW_VERSION_QUESTION_RESULTS : contains
 
     COVER_LETTERS ||--o{ LLM_JOBS : target_when_cover_letter
+    LLM_JOBS ||--o{ REVIEW_JOB_QUESTION_RESULTS : stages
+    COVER_LETTER_QUESTIONS ||--o{ REVIEW_JOB_QUESTION_RESULTS : source
 
     COVER_LETTERS ||--o| KEYWORD_ANALYSES : has_latest
     REVIEW_VERSIONS ||--o{ KEYWORD_ANALYSES : source
@@ -117,6 +119,24 @@ erDiagram
         string error_code
         text error_message
         instant created_at
+        instant completed_at
+    }
+
+    REVIEW_JOB_QUESTION_RESULTS {
+        string id PK
+        string llm_job_id FK
+        string question_id FK
+        int question_order
+        string question
+        int max_answer_length
+        text input_answer
+        int input_answer_length
+        text ai_report
+        text rewritten_answer
+        int rewritten_answer_length
+        text final_answer
+        int final_answer_length
+        string status
         instant completed_at
     }
 
@@ -309,7 +329,37 @@ Policy:
 - 같은 자기소개서에 대해 `PENDING` 또는 `PROCESSING` LLM Job은 동시에 하나만 허용한다.
 - 최초·추가 면접 질문 생성 Job은 모두 `request_ref_type=REVIEW_VERSION`, `request_ref_id=생성 기준 첨삭 버전 id`로 입력을 확정한다. 최초 생성은 `progress_total=5`, 추가 생성은 `progress_total=1`을 사용한다.
 - `INTERVIEW_MESSAGE_FEEDBACK` Job은 `request_ref_type=INTERVIEW_MESSAGE`, `request_ref_id=USER 메시지 id`로 처리할 답변을 확정한다.
-- `partialResult`는 영속 컬럼이 아니다. MVP에서는 서버 메모리/cache 계층에서 관리한다.
+- Job 상태 조회의 `partialResult`는 호환 필드로만 유지하고 첨삭 진행 결과 저장에는 사용하지 않는다.
+
+### review_job_question_results
+
+최초 첨삭 또는 재첨삭 Job에서 완성된 문항 결과를 Job 완료 전에 보존하는 임시 테이블이다.
+
+| Column | Nullable | Relationship / Policy |
+|---|---:|---|
+| `id` | No | PK. 내부 staging ID이며 사용자-facing `questionResultId`로 노출하지 않음 |
+| `llm_job_id` | No | FK to `llm_jobs.id`; 첨삭 Job만 허용 |
+| `question_id` | No | FK to `cover_letter_questions.id` |
+| `question_order` | No | Job 입력 확정 시점의 문항 순서 스냅샷 |
+| `question` | No | Job 입력 확정 시점의 질문 스냅샷 |
+| `max_answer_length` | No | Job 입력 확정 시점의 최대 답변 길이 |
+| `input_answer` | No | 최초 첨삭은 원본 답변, 재첨삭은 source ReviewVersion의 finalAnswer |
+| `input_answer_length` | No | Unicode code point 기준 |
+| `ai_report` | Yes | 문항 결과 완성 전 null |
+| `rewritten_answer` | Yes | 문항 결과 완성 전 null |
+| `rewritten_answer_length` | Yes | 문항 결과 완성 전 null |
+| `final_answer` | Yes | 완료 시 rewrittenAnswer로 초기화 |
+| `final_answer_length` | Yes | 문항 결과 완성 전 null |
+| `status` | No | `PROCESSING`, `COMPLETED`, `FAILED` |
+| `completed_at` | Yes | 문항 결과 완성 전 null |
+
+Policy:
+
+- `(llm_job_id, question_id)`는 한 Job 안에서 유일해야 한다.
+- 각 문항 호출은 전체 자기소개서 문맥과 대상 문항을 입력으로 병렬 실행한다.
+- `ai_report`와 `rewritten_answer`가 모두 생성·검증된 뒤 `COMPLETED`로 전환하고 문항 완료 SSE를 발행한다.
+- 모든 문항이 성공하면 최종 `review_versions`, `review_version_question_results`로 확정한다.
+- Job이 최종 실패하면 임시 결과는 사용자-facing API에서 숨긴다. 삭제 또는 보존 기간은 구현 이슈에서 정한다.
 
 ### keyword_analyses
 

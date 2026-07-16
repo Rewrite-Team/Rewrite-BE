@@ -78,11 +78,19 @@ GET /cover-letters/{coverLetterId}/keyword-analysis/latest
 
 `status`는 `NOT_STARTED`, `PROCESSING`, `COMPLETED`, `FAILED` 중 하나다.
 `keywords`는 완료 상태에서만 분석 결과를 담고, 그 외 상태에서는 빈 배열이다.
+`coverLetter`는 모든 상태에서 반환한다. `sourceReviewVersion`은 분석 기준이 확정된 `PROCESSING`, `COMPLETED`, `FAILED`에서 반환하고, 분석 전 `NOT_STARTED`에서는 `null`이다. 화면에 필요하지 않은 첨삭 버전 생성 시각은 반환하지 않는다.
 
 키워드 분석 결과가 없는 경우:
 
 ```json
 {
+  "coverLetter": {
+    "id": "cl_01HZ...",
+    "title": "2026 상반기 백엔드 개발자 자기소개서",
+    "companyName": "Rewrite Corp",
+    "positionTitle": "백엔드 개발자"
+  },
+  "sourceReviewVersion": null,
   "status": "NOT_STARTED",
   "keywords": []
 }
@@ -92,6 +100,16 @@ GET /cover-letters/{coverLetterId}/keyword-analysis/latest
 
 ```json
 {
+  "coverLetter": {
+    "id": "cl_01HZ...",
+    "title": "2026 상반기 백엔드 개발자 자기소개서",
+    "companyName": "Rewrite Corp",
+    "positionTitle": "백엔드 개발자"
+  },
+  "sourceReviewVersion": {
+    "id": "rv_01HZ...",
+    "version": "v0.2"
+  },
   "status": "PROCESSING",
   "keywords": []
 }
@@ -101,6 +119,16 @@ Response:
 
 ```json
 {
+  "coverLetter": {
+    "id": "cl_01HZ...",
+    "title": "2026 상반기 백엔드 개발자 자기소개서",
+    "companyName": "Rewrite Corp",
+    "positionTitle": "백엔드 개발자"
+  },
+  "sourceReviewVersion": {
+    "id": "rv_01HZ...",
+    "version": "v0.2"
+  },
   "status": "COMPLETED",
   "keywords": [
     {
@@ -119,6 +147,16 @@ Response:
 
 ```json
 {
+  "coverLetter": {
+    "id": "cl_01HZ...",
+    "title": "2026 상반기 백엔드 개발자 자기소개서",
+    "companyName": "Rewrite Corp",
+    "positionTitle": "백엔드 개발자"
+  },
+  "sourceReviewVersion": {
+    "id": "rv_01HZ...",
+    "version": "v0.2"
+  },
   "status": "FAILED",
   "keywords": []
 }
