@@ -10,7 +10,7 @@ API 계약과 API별 상태는 `docs/api/README.md`와 `docs/api/` 하위 도메
 - `Planned`: 아직 시작하지 않음
 - `In Progress`: 구현 중
 - `Implemented`: 코드 구현 완료
-- `Verified`: 테스트와 리뷰 또는 사용자 승인이 확인됨
+- `Verified`: 관련 검증이 통과하고 리뷰 또는 사용자 승인 중 하나가 확인됨
 - `Deferred`: 후순위로 미룸
 - `Removed`: 현재 범위에서 제외
 
@@ -38,6 +38,7 @@ API 계약과 API별 상태는 `docs/api/README.md`와 `docs/api/` 하위 도메
 | [#16](https://github.com/Rewrite-Team/Rewrite-BE/issues/16) | Backend 문서 구조 및 개발 규칙 정리 | Open | 현재 문서 구조와 작업 규칙 정리 범위 |
 | [#46](https://github.com/Rewrite-Team/Rewrite-BE/issues/46) | Codecov 및 PR CI 리포트 개선 | Open | Codecov informational status, JaCoCo 수치와 Codecov 상세 링크를 포함한 고정 CI 댓글 구성 |
 | [#84](https://github.com/Rewrite-Team/Rewrite-BE/issues/84) | AI 첨삭 실시간 조회 및 키워드 화면 API 계약 개편 | In Progress | 문서 계약 확정 후 구현 이슈를 작은 단위로 분리 |
+| [#86](https://github.com/Rewrite-Team/Rewrite-BE/issues/86) | AI 개발 하네스 및 검증 루프 고도화 | In Progress | 단순한 개발 원칙, 위험도 기반 독립 리뷰, 변경 영향 완결성과 Issue·Commit·PR 품질 기준 정리 |
 
 ## Current Recommended Next Work
 
@@ -70,9 +71,9 @@ API 계약과 API별 상태는 `docs/api/README.md`와 `docs/api/` 하위 도메
 
 - 기능 구현을 시작하면 관련 feature status를 `In Progress`로 바꾼다.
 - 코드 구현이 끝났지만 검증/리뷰가 끝나지 않았으면 `Implemented`로 둔다.
-- 테스트 통과와 리뷰 또는 사용자 승인이 확인된 뒤에만 `Verified`로 바꾼다.
-- `Implemented` 또는 `Verified`로 변경할 때는 `Verification Evidence`에 테스트, 리뷰, 사용자 승인, 또는 확인한 근거를 기록한다.
+- 관련 검증이 통과하고 리뷰 또는 사용자 승인 중 하나가 확인된 뒤에만 `Verified`로 바꾼다. 테스트가 적용되지 않는 변경은 대체 검증 근거를 기록한다.
+- `Implemented` 또는 `Verified`로 변경할 때는 `Verification Evidence`에 실행한 검증과 리뷰 또는 사용자 승인 근거를 기록한다.
 - API 상태 변경은 `docs/api/README.md`의 `API Status`도 함께 갱신한다.
-- issue 또는 PR이 생성되면 `Related Issue/PR`에 번호나 링크를 기록한다.
+- 기능 상태를 추적하는 issue가 생성되면 관련 항목의 `Related Issue/PR`에 번호나 링크를 기록한다. 단순 bug, chore, 문서 전달 작업과 PR 번호는 필요할 때만 기록한다.
 - 요구사항, API 계약, 설계 결정이 바뀌면 `docs/README.md`의 Change Impact Matrix에 따라 관련 문서를 함께 갱신한다.
 - 다음 개발 후보가 완료되었거나 더 이상 적절하지 않으면 `Next Issue Slice Candidates`를 정리한다.
