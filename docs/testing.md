@@ -59,14 +59,3 @@ Jacoco가 설정되어 있으며, 테스트 후 `jacocoTestReport`가 실행된�
 build/reports/jacoco/test/html/index.html
 build/reports/jacoco/test/jacocoTestReport.xml
 ```
-
-## Pull Request CI Report
-
-- `test` job 실패는 기존과 동일하게 PR check를 실패 처리한다.
-- Codecov project/patch status는 informational로 사용하며 커버리지 수치만 제공한다.
-- 커버리지 감소나 Codecov 업로드 실패만으로 PR 병합을 차단하지 않는다.
-- `coverage` job은 JaCoCo XML의 전체 line coverage와 Codecov 업로드 결과를 output으로 제공한다.
-- `pr-report` job은 테스트 결과, line coverage, Codecov 업로드 상태와 Codecov PR 상세 링크를 고정 댓글로 표시한다.
-- 고정 댓글은 새 workflow 실행마다 기존 `github-actions[bot]` 댓글을 갱신한다.
-- PR 코드 실행 job에는 쓰기 권한을 주지 않고, checkout을 수행하지 않는 `pr-report` job에만 `pull-requests: write`를 부여한다.
-- 외부 fork PR에서는 쓰기 토큰 제한을 고려해 고정 댓글 작성을 건너뛴다.

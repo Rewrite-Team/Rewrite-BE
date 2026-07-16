@@ -38,11 +38,11 @@ OPENAI_API_KEY=your-api-key ./gradlew bootRun
 - `docs/architecture.md`: 패키지 구조와 계층 책임
 - `docs/conventions.md`: Java/Spring/API/예외 처리 규칙
 - `docs/testing.md`: 테스트 전략과 검증 명령
-- `docs/codex-workflow.md`: Codex 작업 절차와 Excel API 문서 Google Drive 동기화 절차
+- `docs/codex-workflow.md`: Codex 품질 원칙 적용, 위험도 기반 리뷰, issue/commit/PR 절차와 Excel API 문서 Google Drive 동기화 절차
 
 ## Development
 
 작업 전 `docs/README.md`에서 작업 유형별로 필요한 문서를 확인합니다.
-Codex를 통한 issue, PR, commit 절차는 `docs/codex-workflow.md`를 따릅니다.
+Codex를 통한 작업 범위 판단, 변경 영향 확인, 위험도 기반 리뷰와 issue, PR, commit 절차는 `docs/codex-workflow.md`를 따릅니다.
 Excel API 문서를 수정할 때는 같은 문서에 정의된 Google Drive 공유본 동기화 절차를 따릅니다.
 GitHub issue 또는 PR 생성 시에는 `.github` 하위 템플릿을 사용합니다.

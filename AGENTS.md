@@ -17,6 +17,15 @@
 - 기능, 기획, API, 설계 결정, 아키텍처, 테스트 기준을 변경하면 `docs/README.md`의 Change Impact Matrix에 따라 관련 문서를 함께 갱신한다.
 - 문서와 코드가 충돌하면 충돌 내용을 사용자에게 알리고, 어느 쪽을 기준으로 할지 확인한다.
 
+## Codex engineering principles
+
+- Think Before Coding: 코드 작성 전에 사용자의 실제 목표, 현재 상태, 가정, 불확실성과 완료 조건을 정리한다. 요청에 포함된 해결책도 하나의 가설로 보고 더 단순하거나 안전한 대안이 있는지 검토한다. 제품 동작, 공개 계약 또는 작업 범위를 의미 있게 바꿀 수 있는 모호성은 가능한 해석과 trade-off를 제시하고 사용자에게 확인한다. 결과에 영향을 주지 않는 작은 구현 세부사항은 기존 패턴과 가장 단순한 선택을 기준으로 판단한다.
+- Simplicity First: 확인된 요구사항과 완료 조건을 충족하는 가장 단순하고 명확한 접근을 우선한다. 요청이나 계약에 없는 기능, 추상화, 설정화, fallback, retry 또는 미래 확장성을 추가하지 않는다. 신뢰성, 보안 또는 데이터 정합성을 위한 처리는 관련 요구사항, 설계 결정이나 구체적인 실패 시나리오를 근거로 추가한다.
+- Surgical Changes: 변경은 요청과 확인된 영향 범위 안으로 제한한다. 관련 없는 리팩터링, 스타일 변경, 주석 수정, 포맷팅, 파일 재구성 또는 동작 변경을 섞지 않는다. 범위 밖 문제는 임의로 수정하지 않고 별도로 보고하며, 이번 변경으로 새롭게 사용되지 않게 된 코드와 import만 정리한다.
+- Goal-Driven Execution: 넓거나 추상적인 요청을 검증 가능한 목표와 수용 기준으로 변환한 뒤 작업한다. 구현 활동 자체가 아니라 사용자 흐름, 보존할 동작, 관련 테스트, 문서 반영과 검증 근거를 기준으로 완료를 판단한다.
+- Change Completeness: 구현 전에 코드, 테스트, API 계약, 요구사항, 설계 결정, 상태 문서와 설정에 대한 변경 영향을 확인한다. 구현 후에는 예상 영향 범위와 실제 diff를 대조하고, 식별된 각 영향 대상을 반영하거나 반영하지 않은 이유를 근거와 함께 기록한다.
+- Risk-Based Review: 메인 Codex가 작업 전체와 파일 수정을 책임진다. 위험도나 판단 불확실성이 높은 작업에서만 읽기 전용 서브 에이전트를 독립 리뷰어로 사용하고, 여러 에이전트가 같은 작업 트리를 동시에 수정하게 하지 않는다. 세부 기준은 `docs/codex-workflow.md`를 따른다.
+
 ## Architecture rules
 
 - 기능 중심 패키지 구조를 사용한다.
@@ -38,22 +47,9 @@
 
 - API를 추가하거나 변경하면 `docs/api/README.md`와 `docs/api/` 하위 관련 도메인 문서를 갱신한다.
 - API를 추가, 삭제하거나 path, request, response, error, validation, 상태 또는 구현 여부를 변경하면 같은 작업에서 `docs/api/rewrite-api-documentation.xlsx`도 반드시 갱신한다.
-- `docs/api/rewrite-api-documentation.xlsx`는 기준 원본이고, Google Drive 파일 `15eS_Q4x5kAZHkQhkwNFk08Zt3wCkxo8W`는 공유용 미러다.
-- Excel API 문서를 로컬에서 갱신하고 검증한 뒤에는 Google Drive의 기존 Excel 파일에 바이트를 덮어써서 같은 파일 ID와 URL을 유지한다. 새 Drive 파일이나 네이티브 Google Sheet를 만들지 않는다.
-- Drive 동기화 후 파일 ID, Excel MIME type, 수정 시각을 다시 확인한다. 인증 또는 업로드 실패 시 동기화 완료로 보고하지 않고 최종 응답에 실패 이유를 명시한다.
-- Excel API 문서는 프론트엔드 구현과 디버깅에 필요한 정보만 유지한다. API별 기능, 실제 요청·응답 예시, 요청·응답 필드의 의미와 제약, 정확한 HTTP 상태와 오류 코드, 인증/CSRF 요구사항, 구현 여부를 포함하고 소스 경로·중복 예시·내부 설계 설명은 제외한다.
-- Excel API 문서의 목차와 각 API 상세 시트에는 `Asia/Seoul` 기준 `최근 변경일`과 `최근 변경 시각`을 기록하고, API 계약이나 문서 내용이 바뀐 작업에서 해당 시각을 갱신한다.
-- Excel API 문서의 첫 시트는 전체 API 목차로 유지하고, 이후에는 API ID별로 하나의 상세 시트를 사용한다. 여러 API를 한 상세 시트에 합치지 않는다.
-- 첫 시트의 API ID와 `상세 보기`는 해당 API 상세 시트로 이동하는 내부 링크를 제공하고, 각 상세 시트 상단에는 첫 시트로 돌아가는 내부 링크를 유지한다.
-- Excel API 문서는 회색 계열을 기본 색상으로 사용하고, 표 본문에 행별 줄무늬 색상이나 상태별 컬러 배경을 사용하지 않는다. 제목, 섹션 헤더, 표 헤더와 코드 예시는 회색의 명도 차이로만 구분한다.
-- 각 API 상세 시트에는 필드 설명과 별도로 실제 HTTP 요청 형식과 성공 응답 형식을 코드 예시로 유지한다. path/query/header/cookie/body, HTTP status, content type과 JSON 또는 SSE 본문이 계약과 일치해야 한다.
-- 오류 표의 HTTP 열에는 `4xx/5xx`, `요청 검증` 같은 범주를 쓰지 않고 `400 Bad Request`, `401 Unauthorized`, `403 Forbidden`처럼 실제 상태를 기록한다. validation 제약은 요청 필드 표에 한 번만 기록하고 오류 표에는 `VALIDATION_ERROR` 한 행만 둔다.
-- 계약에는 있으나 아직 구현되지 않은 인증·CSRF 오류는 `계약 정의·미구현`으로 명시하여 현재 동작으로 오해하지 않게 한다.
-- Excel API 문서의 인쇄 설정은 A4 가로, 너비 1페이지 맞춤으로 유지하고, HTTP 코드 예시는 한 행이 페이지 경계에서 잘리지 않도록 렌더링한다.
-- Excel API 문서를 갱신한 뒤에는 모든 시트를 렌더링해 잘림과 가독성을 확인하고, 주요 범위와 수식 오류를 검증한다.
+- Excel API 문서의 내용·형식·검증 기준은 `docs/api/README.md`를 따르고, Google Drive 동기화는 `docs/codex-workflow.md`의 절차를 따른다.
+- `docs/api/rewrite-api-documentation.xlsx`는 기준 원본이며, 검증 후 Google Drive의 기존 파일 ID에 덮어써서 공유 URL을 유지한다. 동기화 실패는 완료로 보고하지 않는다.
 - API 변경이 요구사항, 상태, 설계 결정에 영향을 주면 `docs/requirements.md`, `docs/status.md`, `docs/decisions/` 하위 관련 문서도 함께 갱신한다.
-- API 상태는 `Planned`, `In Progress`, `Implemented`, `Verified`, `Deprecated` 중 하나로 관리한다.
-- 요청 형식, 성공 응답, 에러 응답, validation, 관련 requirement ID를 함께 기록한다.
 
 ## Progress tracking rules
 
@@ -62,9 +58,9 @@
 - 개발 이슈 범위는 요청 시점의 문서 상태와 실제 코드/테스트 상태를 확인한 뒤 정한다.
 - 하나의 개발 이슈와 PR은 독립적으로 구현, 리뷰, 검증할 수 있는 작은 단위로 나눈다.
 - 서로 다른 기능, 큰 리팩터링, 인프라 변경, 문서 정리는 가능한 한 별도 이슈와 PR로 분리한다.
-- 이슈를 만들 때 가능한 경우 관련 requirement ID와 API ID를 연결한다.
-- PR을 만들 때 관련 requirement ID, API ID, issue 번호를 본문에 포함한다.
-- 테스트 통과와 리뷰 또는 사용자 승인이 확인되지 않은 기능은 `Verified`로 표시하지 않는다.
+- 이슈를 만들 때 가능한 경우 관련 requirement ID, API ID와 Decision ID를 연결한다.
+- PR을 만들 때 관련 requirement ID, API ID, Decision ID와 issue 번호를 본문에 포함한다.
+- 관련 검증이 통과하고 리뷰 또는 사용자 승인 중 하나가 확인된 기능만 `Verified`로 표시한다. 테스트가 적용되지 않는 변경은 대체 검증 근거를 기록한다.
 - 상태를 `Implemented` 또는 `Verified`로 변경할 때는 `Verification Evidence`를 함께 갱신한다.
 - 진행 현황을 요청받으면 문서 상태와 실제 코드/테스트 확인 결과를 분리해서 보고한다.
 

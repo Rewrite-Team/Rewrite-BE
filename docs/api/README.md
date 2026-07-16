@@ -31,6 +31,20 @@ PRD: `../requirements.md`
 | Interviews | API-022 - API-023, API-025 - API-029 | `interviews.md` | `../decisions/interviews.md` |
 | Common Rules | 공통 인증, 에러, 시간, 도메인 모델 | `common.md` | `../decisions/common.md` |
 
+## Excel API 문서 관리
+
+`rewrite-api-documentation.xlsx`는 Git에서 관리하는 기준 원본이고, Google Drive의 기존 Excel 파일은 공유용 미러다. API를 추가, 삭제하거나 path, request, response, error, validation, 상태 또는 구현 여부를 변경하면 같은 작업에서 Markdown 계약과 Excel 문서를 함께 갱신한다. Drive 반영은 `../codex-workflow.md`의 동기화 절차를 따른다.
+
+- 프론트엔드 구현과 디버깅에 필요한 API별 기능, 실제 요청·응답 예시, 필드 의미와 제약, 정확한 HTTP 상태와 오류 코드, 인증·CSRF 요구사항, 구현 여부를 유지한다. 소스 경로, 중복 예시와 내부 설계 설명은 제외한다.
+- 목차와 각 API 상세 시트에는 `Asia/Seoul` 기준 `최근 변경일`과 `최근 변경 시각`을 기록하고, API 계약이나 문서 내용이 바뀌면 갱신한다.
+- 첫 시트는 전체 API 목차로 유지하고 이후에는 API ID별 상세 시트를 하나씩 사용한다. 목차의 API ID와 `상세 보기`, 각 상세 시트의 목차 링크는 내부 링크로 연결한다.
+- 회색 계열을 기본 색상으로 사용하고, 표 본문에는 행별 줄무늬나 상태별 컬러 배경을 사용하지 않는다. 제목, 섹션 헤더, 표 헤더와 코드 예시는 회색 명도 차이로 구분한다.
+- 각 상세 시트에는 필드 설명과 별도로 실제 HTTP 요청과 성공 응답 형식을 유지한다. path, query, header, cookie, body, HTTP status, content type과 JSON 또는 SSE 본문은 계약과 일치해야 한다.
+- 오류 표에는 `400 Bad Request`처럼 실제 HTTP 상태를 기록한다. validation 제약은 요청 필드 표에 한 번만 기록하고 오류 표에는 `VALIDATION_ERROR` 한 행만 둔다.
+- 계약에만 있고 아직 구현되지 않은 인증·CSRF 오류는 `계약 정의·미구현`으로 표시한다.
+- 인쇄 설정은 A4 가로, 너비 1페이지 맞춤으로 유지하고 HTTP 코드 예시가 페이지 경계에서 잘리지 않게 한다.
+- 변경 후 모든 시트를 렌더링하여 잘림과 가독성을 확인하고 주요 범위와 수식 오류를 검증한다.
+
 ## API 구현 상태 추적
 
 이 문서는 Rewrite 백엔드 API 계약과 구현 상태의 기준 문서다.
@@ -43,7 +57,7 @@ API 설계 결정과 트레이드오프는 `../decisions/README.md`를 함께 �
 - `Planned`: 아직 시작하지 않음
 - `In Progress`: 구현 중
 - `Implemented`: 코드 구현 완료
-- `Verified`: 테스트와 리뷰 또는 사용자 승인이 확인됨
+- `Verified`: 관련 검증이 통과하고 리뷰 또는 사용자 승인 중 하나가 확인됨
 - `Deprecated`: 더 이상 사용하지 않음
 
 ### API Status
