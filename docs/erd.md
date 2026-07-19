@@ -358,8 +358,8 @@ Policy:
 - `(llm_job_id, question_id)`는 한 Job 안에서 유일해야 한다.
 - 각 문항 호출은 전체 자기소개서 문맥과 대상 문항을 입력으로 병렬 실행한다.
 - `ai_report`와 `rewritten_answer`가 모두 생성·검증된 뒤 `COMPLETED`로 전환하고 문항 완료 SSE를 발행한다.
-- 모든 문항이 성공하면 최종 `review_versions`, `review_version_question_results`로 확정한다.
-- Job이 최종 실패하면 임시 결과는 사용자-facing API에서 숨긴다. 삭제 또는 보존 기간은 구현 이슈에서 정한다.
+- 모든 문항 task가 종료되고 전체 결과가 성공하면 최종 `review_versions`, `review_version_question_results`로 한 transaction에서 확정한다.
+- Job이 최종 실패하면 임시 결과는 내부 진단을 위해 보존하되 사용자-facing API에서 숨긴다. 보존 기간과 정리 배치는 후속 운영 범위로 둔다.
 
 ### keyword_analyses
 

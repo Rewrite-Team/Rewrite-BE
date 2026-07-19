@@ -12,8 +12,11 @@ import com.daon.rewrite.llmjob.entity.LlmJob;
 import com.daon.rewrite.llmjob.entity.LlmJobResultRefType;
 import com.daon.rewrite.llmjob.entity.LlmJobStatus;
 import com.daon.rewrite.llmjob.repository.LlmJobRepository;
+import com.daon.rewrite.reviewversion.client.FirstReviewResult;
 import com.daon.rewrite.reviewversion.entity.ReviewVersion;
+import com.daon.rewrite.reviewversion.entity.ReviewJobQuestionResult;
 import com.daon.rewrite.reviewversion.entity.ReviewVersionQuestionResult;
+import com.daon.rewrite.reviewversion.repository.ReviewJobQuestionResultRepository;
 import com.daon.rewrite.reviewversion.repository.ReviewVersionQuestionResultRepository;
 import com.daon.rewrite.reviewversion.repository.ReviewVersionRepository;
 import org.junit.jupiter.api.AfterEach;
@@ -45,6 +48,9 @@ class ReviewVersionServiceTest {
     private ReviewVersionQuestionResultRepository questionResultRepository;
 
     @Autowired
+    private ReviewJobQuestionResultRepository jobQuestionResultRepository;
+
+    @Autowired
     private CoverLetterRepository coverLetterRepository;
 
     @Autowired
@@ -63,6 +69,7 @@ class ReviewVersionServiceTest {
     void cleanUp() {
         questionResultRepository.deleteAll();
         reviewVersionRepository.deleteAll();
+        jobQuestionResultRepository.deleteAll();
         llmJobRepository.deleteAll();
         questionRepository.deleteAll();
         coverLetterRepository.deleteAll();
@@ -76,13 +83,12 @@ class ReviewVersionServiceTest {
         given(idGenerator.generate("rvqr")).willReturn("rvqr_1", "rvqr_2");
         given(clock.instant()).willReturn(completedAt);
 
-        CompleteFirstReviewResult result = service.completeFirstReview(
-                "job_1",
-                List.of(
-                        new ReviewQuestionResultInput("clq_2", " 두 번째 리포트 ", " 두 번째 수정본 "),
-                        new ReviewQuestionResultInput("clq_1", " 첫 번째 리포트 ", " 첫 번째 수정본😀 ")
-                )
-        );
+        completeStagedResults("job_1", List.of(
+                new FirstReviewResult("clq_1", "첫 번째 리포트", "첫 번째 수정본😀"),
+                new FirstReviewResult("clq_2", "두 번째 리포트", "두 번째 수정본")
+        ));
+
+        CompleteFirstReviewResult result = service.completeFirstReview("job_1");
 
         assertThat(result.reviewVersion().getId()).isEqualTo("rv_1");
         assertThat(result.reviewVersion().getVersion()).isEqualTo("v0.1");
@@ -114,54 +120,16 @@ class ReviewVersionServiceTest {
     }
 
     @Test
-    void completeFirstReviewRejectsInvalidQuestionMappingWithoutPartialChanges() {
+    void completeFirstReviewRejectsIncompleteStagingWithoutPartialChanges() {
         saveProcessingReview("cl_1", "job_1", 2);
+        completeStagedResults("job_1", List.of(
+                new FirstReviewResult("clq_1", "리포트", "수정본")
+        ));
 
-        List<List<ReviewQuestionResultInput>> invalidInputs = List.of(
-                List.of(new ReviewQuestionResultInput("clq_1", "리포트", "수정본")),
-                List.of(
-                        new ReviewQuestionResultInput("clq_1", "리포트", "수정본"),
-                        new ReviewQuestionResultInput("clq_1", "리포트", "수정본")
-                ),
-                List.of(
-                        new ReviewQuestionResultInput("clq_1", "리포트", "수정본"),
-                        new ReviewQuestionResultInput("clq_unknown", "리포트", "수정본")
-                )
-        );
-
-        for (List<ReviewQuestionResultInput> input : invalidInputs) {
-            assertThatThrownBy(() -> service.completeFirstReview("job_1", input))
-                    .isInstanceOf(BusinessException.class)
-                    .extracting("errorCode")
-                    .isEqualTo(ErrorCode.VALIDATION_ERROR);
-        }
-
-        assertUnchangedProcessingState();
-    }
-
-    @Test
-    void completeFirstReviewRejectsBlankOrTooLongGeneratedTextWithoutPartialChanges() {
-        saveProcessingReview("cl_1", "job_1", 2);
-
-        assertThatThrownBy(() -> service.completeFirstReview(
-                "job_1",
-                List.of(
-                        new ReviewQuestionResultInput("clq_1", " ", "수정본"),
-                        new ReviewQuestionResultInput("clq_2", "리포트", "수정본")
-                )
-        )).isInstanceOf(BusinessException.class)
+        assertThatThrownBy(() -> service.completeFirstReview("job_1"))
+                .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
-                .isEqualTo(ErrorCode.VALIDATION_ERROR);
-
-        assertThatThrownBy(() -> service.completeFirstReview(
-                "job_1",
-                List.of(
-                        new ReviewQuestionResultInput("clq_1", "리포트", "가".repeat(1001)),
-                        new ReviewQuestionResultInput("clq_2", "리포트", "수정본")
-                )
-        )).isInstanceOf(BusinessException.class)
-                .extracting("errorCode")
-                .isEqualTo(ErrorCode.VALIDATION_ERROR);
+                .isEqualTo(ErrorCode.INTERNAL_ERROR);
 
         assertUnchangedProcessingState();
     }
@@ -172,12 +140,12 @@ class ReviewVersionServiceTest {
         given(idGenerator.generate("rv")).willReturn("rv_1");
         given(idGenerator.generate("rvqr")).willReturn("rvqr_1");
         given(clock.instant()).willReturn(Instant.parse("2026-06-21T05:00:00Z"));
-        List<ReviewQuestionResultInput> input = List.of(
-                new ReviewQuestionResultInput("clq_1", "리포트", "수정본")
-        );
+        completeStagedResults("job_1", List.of(
+                new FirstReviewResult("clq_1", "리포트", "수정본")
+        ));
 
-        CompleteFirstReviewResult first = service.completeFirstReview("job_1", input);
-        CompleteFirstReviewResult second = service.completeFirstReview("job_1", input);
+        CompleteFirstReviewResult first = service.completeFirstReview("job_1");
+        CompleteFirstReviewResult second = service.completeFirstReview("job_1");
 
         assertThat(second.reviewVersion().getId()).isEqualTo(first.reviewVersion().getId());
         assertThat(reviewVersionRepository.count()).isEqualTo(1);
@@ -190,10 +158,8 @@ class ReviewVersionServiceTest {
         CoverLetter coverLetter = saveReviewingCoverLetter("cl_1", 1);
         llmJobRepository.save(LlmJob.pendingReview("job_pending", coverLetter.getId(), now, 1));
 
-        assertThatThrownBy(() -> service.completeFirstReview(
-                "job_pending",
-                List.of(new ReviewQuestionResultInput("clq_1", "리포트", "수정본"))
-        )).isInstanceOf(BusinessException.class)
+        assertThatThrownBy(() -> service.completeFirstReview("job_pending"))
+                .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.INTERNAL_ERROR);
     }
@@ -206,13 +172,12 @@ class ReviewVersionServiceTest {
         given(idGenerator.generate("rvqr")).willReturn("rvqr_3", "rvqr_4");
         given(clock.instant()).willReturn(completedAt);
 
-        CompleteFirstReviewResult result = service.completeReReview(
-                "job_1",
-                List.of(
-                        new ReviewQuestionResultInput("clq_2", " 두 번째 새 리포트 ", " 두 번째 새 수정본 "),
-                        new ReviewQuestionResultInput("clq_1", " 첫 번째 새 리포트 ", " 첫 번째 새 수정본 ")
-                )
-        );
+        completeStagedResults("job_1", List.of(
+                new FirstReviewResult("clq_1", "첫 번째 새 리포트", "첫 번째 새 수정본"),
+                new FirstReviewResult("clq_2", "두 번째 새 리포트", "두 번째 새 수정본")
+        ));
+
+        CompleteFirstReviewResult result = service.completeReReview("job_1");
 
         assertThat(result.reviewVersion().getId()).isEqualTo("rv_2");
         assertThat(result.reviewVersion().getVersion()).isEqualTo("v0.2");
@@ -246,13 +211,13 @@ class ReviewVersionServiceTest {
         given(idGenerator.generate("rv")).willReturn("rv_2");
         given(idGenerator.generate("rvqr")).willReturn("rvqr_3", "rvqr_4");
         given(clock.instant()).willReturn(Instant.parse("2026-06-21T06:00:00Z"));
-        List<ReviewQuestionResultInput> input = List.of(
-                new ReviewQuestionResultInput("clq_1", "리포트 1", "수정본 1"),
-                new ReviewQuestionResultInput("clq_2", "리포트 2", "수정본 2")
-        );
+        completeStagedResults("job_1", List.of(
+                new FirstReviewResult("clq_1", "리포트 1", "수정본 1"),
+                new FirstReviewResult("clq_2", "리포트 2", "수정본 2")
+        ));
 
-        CompleteFirstReviewResult first = service.completeReReview("job_1", input);
-        CompleteFirstReviewResult second = service.completeReReview("job_1", input);
+        CompleteFirstReviewResult first = service.completeReReview("job_1");
+        CompleteFirstReviewResult second = service.completeReReview("job_1");
 
         assertThat(second.reviewVersion().getId()).isEqualTo(first.reviewVersion().getId());
         assertThat(reviewVersionRepository.count()).isEqualTo(2);
@@ -260,18 +225,16 @@ class ReviewVersionServiceTest {
     }
 
     @Test
-    void completeReReviewRejectsInvalidQuestionMappingWithoutPartialChanges() {
+    void completeReReviewRejectsIncompleteStagingWithoutPartialChanges() {
         saveProcessingReReview("cl_1", "job_1", "더 직무 중심으로");
+        completeStagedResults("job_1", List.of(
+                new FirstReviewResult("clq_1", "리포트", "수정본")
+        ));
 
-        assertThatThrownBy(() -> service.completeReReview(
-                "job_1",
-                List.of(
-                        new ReviewQuestionResultInput("clq_1", "리포트", "수정본"),
-                        new ReviewQuestionResultInput("clq_unknown", "리포트", "수정본")
-                )
-        )).isInstanceOf(BusinessException.class)
+        assertThatThrownBy(() -> service.completeReReview("job_1"))
+                .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
-                .isEqualTo(ErrorCode.VALIDATION_ERROR);
+                .isEqualTo(ErrorCode.INTERNAL_ERROR);
 
         assertThat(reviewVersionRepository.count()).isEqualTo(1);
         assertThat(questionResultRepository.count()).isEqualTo(2);
@@ -285,6 +248,16 @@ class ReviewVersionServiceTest {
         LlmJob job = LlmJob.pendingReview(jobId, coverLetter.getId(), now, questionCount);
         job.startProcessing("첨삭을 시작합니다.");
         llmJobRepository.save(job);
+        List<CoverLetterQuestion> questions = questionRepository
+                .findByCoverLetterIdOrderByQuestionOrderAsc(coverLetter.getId());
+        jobQuestionResultRepository.saveAll(questions.stream()
+                .map(question -> ReviewJobQuestionResult.processing(
+                        "rjqr_" + question.getQuestionOrder(),
+                        job,
+                        question,
+                        question.getOriginalAnswer()
+                ))
+                .toList());
     }
 
     private void saveProcessingReReview(String coverLetterId, String jobId, String requestInstruction) {
@@ -335,9 +308,31 @@ class ReviewVersionServiceTest {
         coverLetter.completeReview(latestVersion.getId(), now.plusSeconds(120));
         coverLetterRepository.saveAndFlush(coverLetter);
 
-        LlmJob job = LlmJob.pendingReReview(jobId, coverLetter.getId(), requestInstruction, now.plusSeconds(180), 2);
+        LlmJob job = LlmJob.pendingReReview(
+                jobId,
+                coverLetter.getId(),
+                requestInstruction,
+                latestVersion.getId(),
+                now.plusSeconds(180),
+                2
+        );
         job.startProcessing("재첨삭을 시작합니다.");
         llmJobRepository.save(job);
+        jobQuestionResultRepository.saveAll(List.of(
+                ReviewJobQuestionResult.processing("rjqr_1", job, firstQuestion, firstResult.getFinalAnswer()),
+                ReviewJobQuestionResult.processing("rjqr_2", job, secondQuestion, secondResult.getFinalAnswer())
+        ));
+    }
+
+    private void completeStagedResults(String jobId, List<FirstReviewResult> inputs) {
+        Instant completedAt = Instant.parse("2026-06-21T04:00:00Z");
+        for (FirstReviewResult input : inputs) {
+            ReviewJobQuestionResult result = jobQuestionResultRepository
+                    .findByLlmJobIdAndQuestionId(jobId, input.questionId())
+                    .orElseThrow();
+            result.complete(input.aiReport(), input.rewrittenAnswer(), completedAt);
+            jobQuestionResultRepository.save(result);
+        }
     }
 
     private CoverLetter saveReviewingCoverLetter(String coverLetterId, int questionCount) {

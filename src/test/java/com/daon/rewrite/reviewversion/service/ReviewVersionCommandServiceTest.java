@@ -15,10 +15,13 @@ import com.daon.rewrite.llmjob.entity.LlmJobStatus;
 import com.daon.rewrite.llmjob.entity.LlmJobType;
 import com.daon.rewrite.llmjob.repository.LlmJobRepository;
 import com.daon.rewrite.reviewversion.entity.ReviewVersion;
+import com.daon.rewrite.reviewversion.entity.ReviewJobQuestionResult;
 import com.daon.rewrite.reviewversion.entity.ReviewVersionQuestionResult;
+import com.daon.rewrite.reviewversion.repository.ReviewJobQuestionResultRepository;
 import com.daon.rewrite.reviewversion.repository.ReviewVersionQuestionResultRepository;
 import com.daon.rewrite.reviewversion.repository.ReviewVersionRepository;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -55,6 +58,9 @@ class ReviewVersionCommandServiceTest {
     private ReviewVersionQuestionResultRepository questionResultRepository;
 
     @Autowired
+    private ReviewJobQuestionResultRepository jobQuestionResultRepository;
+
+    @Autowired
     private LlmJobRepository llmJobRepository;
 
     @MockitoBean
@@ -66,10 +72,19 @@ class ReviewVersionCommandServiceTest {
     @MockitoBean
     private Clock clock;
 
+    @MockitoBean
+    private ReReviewJobWorker reReviewJobWorker;
+
+    @BeforeEach
+    void setUpIds() {
+        given(idGenerator.generate("rjqr")).willReturn("rjqr_1", "rjqr_2");
+    }
+
     @AfterEach
     void cleanUp() {
         questionResultRepository.deleteAll();
         reviewVersionRepository.deleteAll();
+        jobQuestionResultRepository.deleteAll();
         llmJobRepository.deleteAll();
         questionRepository.deleteAll();
         coverLetterRepository.deleteAll();
@@ -234,7 +249,11 @@ class ReviewVersionCommandServiceTest {
         assertThat(result.job().getType()).isEqualTo(LlmJobType.COVER_LETTER_RE_REVIEW);
         assertThat(result.job().getStatus()).isEqualTo(LlmJobStatus.PENDING);
         assertThat(result.job().getRequestInstruction()).isEqualTo("직무 키워드를 강조해주세요.");
+        assertThat(result.job().getRequestRefId()).isEqualTo("rv_1");
         assertThat(result.job().getProgressTotal()).isEqualTo(2);
+        assertThat(jobQuestionResultRepository.findByLlmJobIdOrderByQuestionOrderAsc("job_1"))
+                .extracting(ReviewJobQuestionResult::getInputAnswer)
+                .containsExactly("첫 번째 수정본", "두 번째 수정본");
         assertThat(coverLetterRepository.findById("cl_1")).hasValueSatisfying(coverLetter ->
                 assertThat(coverLetter.getStatus()).isEqualTo(CoverLetterStatus.REVIEWED));
     }

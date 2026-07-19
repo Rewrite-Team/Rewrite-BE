@@ -32,14 +32,9 @@ Response:
       "title": "2026 상반기 백엔드 개발자 자기소개서",
       "companyName": "Rewrite Corp",
       "positionTitle": "백엔드 개발자",
-      "status": "REVIEWED",
+      "displayStatus": "REVIEWING",
       "createdAt": "2026-06-20T14:00:00",
-      "latestReviewVersionId": "rv_01HZ...",
-      "activeReviewJob": {
-        "jobId": "job_01HZ...",
-        "type": "COVER_LETTER_RE_REVIEW",
-        "status": "PROCESSING"
-      }
+      "latestReviewVersionId": "rv_01HZ..."
     }
   ],
   "page": 1,
@@ -49,12 +44,12 @@ Response:
 }
 ```
 
-`activeReviewJob`은 현재 `PENDING` 또는 `PROCESSING`인 최초 첨삭 Job(`COVER_LETTER_REVIEW`)이나 재첨삭 Job(`COVER_LETTER_RE_REVIEW`)이 있을 때만 포함하고, 없으면 `null`이다. 최초 첨삭과 재첨삭 모두 목록 카드에서 `첨삭 중`으로 표시한다. `CoverLetter.status`와 `status` query filter 의미는 유지한다.
+`displayStatus`는 메인 목록 카드가 그대로 사용하는 표시 상태이며 `WRITING | REVIEWING | REVIEWED | REVIEW_FAILED` 중 하나다. 현재 `PENDING` 또는 `PROCESSING`인 최초 첨삭이나 재첨삭 Job이 있으면 내부 `CoverLetter.status`와 관계없이 `REVIEWING`을 반환한다. 진행 중 Job이 없으면 `DRAFT → WRITING`, `REVIEWED → REVIEWED`, `REVIEW_FAILED → REVIEW_FAILED`로 변환한다. 목록 응답에는 내부 `CoverLetter.status`와 Job ID, type, status를 노출하지 않는다. 기존 `status` query filter는 persistence 상태인 `DRAFT | REVIEWING | REVIEWED | REVIEW_FAILED` 의미를 유지한다.
 
-목록 카드 클릭 시 프론트엔드는 `status`에 따라 이동 화면을 결정한다.
+목록 카드 클릭 시 프론트엔드는 `displayStatus`에 따라 이동 화면을 결정한다.
 
 ```text
-DRAFT: 등록 step 화면
+WRITING: 등록 step 화면
 REVIEWING: AI 첨삭 진행 화면
 REVIEWED: AI 첨삭 결과 화면
 REVIEW_FAILED: AI 첨삭 실패 화면
@@ -77,16 +72,22 @@ Accept: text/event-stream
 Content-Type: text/event-stream
 ```
 
-연결 직후 현재 사용자의 `PENDING` 또는 `PROCESSING` 첨삭 Job 스냅샷을 먼저 전송하고, 이후 최초 첨삭·재첨삭 Job의 시작, 완료, 실패 상태 변경을 전송한다.
+연결 직후 현재 사용자의 soft delete되지 않은 모든 자기소개서에 대해 현재 표시 상태 스냅샷을 하나씩 먼저 전송하고, 이후 최초 첨삭·재첨삭의 시작, 완료, 실패처럼 메인 화면에 필요한 변경만 전송한다. 내부 Job의 `PENDING → PROCESSING` 전환은 `displayStatus=REVIEWING`을 바꾸지 않으므로 별도 이벤트를 전송하지 않는다. `eventPhase`는 연결 직후 상태이면 `SNAPSHOT`, 이후 변경이면 `CHANGE`다.
+
+`changeType`은 `SNAPSHOT`에서 `null`이고, `CHANGE`에서 `REVIEW_STARTED | REVIEW_COMPLETED | REVIEW_FAILED` 중 하나다. `displayStatus` 계산 규칙은 API-007 목록 응답과 같다.
 
 ```text
 event: cover-letter.review-status.changed
-data: {"coverLetterId":"cl_01HZ...","coverLetterStatus":"REVIEWED","latestReviewVersionId":"rv_01HZ...","activeReviewJob":{"jobId":"job_01HZ...","type":"COVER_LETTER_RE_REVIEW","status":"PROCESSING"}}
+data: {"eventPhase":"CHANGE","coverLetterId":"cl_01HZ...","displayStatus":"REVIEWED","latestReviewVersionId":"rv_01HZ...","changeType":"REVIEW_FAILED"}
 ```
 
-완료 또는 실패 이벤트에서는 `activeReviewJob`이 `null`이다. 이벤트는 현재 페이지에 표시된 항목으로 제한하지 않고 현재 사용자의 모든 자기소개서 상태를 전달하며, 프론트엔드는 현재 목록에 없는 `coverLetterId`를 무시한다.
+프론트엔드는 스냅샷과 변경 이벤트 모두에서 목록 항목의 `displayStatus`와 `latestReviewVersionId`를 그대로 함께 갱신한다. Job 상태를 조합하거나 자기소개서 상태를 추론하지 않는다. `CHANGE`에서는 `changeType`으로 성공·실패 알림을 처리한다.
 
-이 스트림은 `Last-Event-ID` 영속 replay를 제공하지 않는다. 재연결하면 현재 활성 Job 스냅샷을 다시 받은 뒤 실시간 이벤트를 수신한다.
+따라서 목록 조회와 스트림 연결 사이에 Job이 종료되어도 `SNAPSHOT`으로 최신 표시 상태를 복구한다. 재첨삭 실패 시 기존 첨삭 결과 접근을 유지하도록 `displayStatus=REVIEWED`와 기존 `latestReviewVersionId`를 반환하고, 실시간 `CHANGE` 이벤트의 `changeType=REVIEW_FAILED`로 실패 알림을 명시한다. 최초 첨삭 실패는 `displayStatus=REVIEW_FAILED`, `latestReviewVersionId=null`, `changeType=REVIEW_FAILED`다.
+
+이벤트는 현재 페이지에 표시된 항목으로 제한하지 않고 현재 사용자의 모든 자기소개서 상태를 전달하며, 프론트엔드는 현재 목록에 없는 `coverLetterId`를 무시한다.
+
+서버는 사용자 연결을 이벤트 라우터에 먼저 등록한 뒤 스냅샷을 조회·전송하고, 그 사이 발생한 변경 이벤트는 스냅샷 전송이 끝날 때까지 연결별로 버퍼링했다가 발생 순서대로 전송한다. 이 스트림은 `Last-Event-ID` 영속 replay를 제공하지 않는다. 재연결하면 전체 현재 상태 스냅샷을 다시 받은 뒤 실시간 이벤트를 수신한다.
 
 ### 자기소개서 생성
 
@@ -482,9 +483,9 @@ questions는 1개 이상이어야 한다.
 
 `REVIEW_FAILED` 상태의 사용자 수동 재시도에는 제품 도메인상 횟수 제한을 두지 않는다. 단, LLM 비용과 남용 방지를 위한 rate limit, 사용자 quota, 운영 정책은 별도로 적용할 수 있다.
 
-새 Job이 생성되면 submit transaction commit 이후 최초 첨삭 worker가 비동기로 실행된다. worker는 전체 자기소개서 문맥과 대상 문항을 입력으로 각 문항 호출을 병렬 실행한다. 문항의 `aiReport`와 `rewrittenAnswer`가 모두 완성되면 임시 문항 결과를 영속 저장하고 `review.question.completed` 이벤트를 전송한다.
+새 Job이 생성되면 submit transaction commit 이후 최초 첨삭 worker가 비동기로 실행된다. worker는 전체 자기소개서 문맥과 대상 문항을 입력으로 각 문항 호출을 병렬 실행하고, provider 오류나 출력 검증 실패가 발생한 문항만 1회 재시도한다. 문항의 `aiReport`와 `rewrittenAnswer`가 모두 완성되면 임시 문항 결과를 영속 저장하고 `review.question.completed` 이벤트를 전송한다.
 
-모든 문항이 성공하면 임시 결과를 최종 `ReviewVersion`과 문항별 결과로 확정하고 `CoverLetter.status`를 `REVIEWED`로 변경한다. 최종 실패하면 `LlmJob.status`는 `FAILED`, `CoverLetter.status`는 `REVIEW_FAILED`가 되며 임시 결과는 사용자-facing 상세 응답에서 숨긴다.
+모든 문항 task가 종료된 뒤 모든 임시 결과가 성공하면 최종 `ReviewVersion`과 문항별 결과로 한 transaction에서 확정하고 `CoverLetter.status`를 `REVIEWED`로 변경한다. 최종 실패하면 `LlmJob.status`는 `FAILED`, `CoverLetter.status`는 `REVIEW_FAILED`가 된다. 실패 Job의 임시 결과는 내부 진단을 위해 보존하되 사용자-facing 상세 응답에서 숨긴다.
 
 이미 최초 첨삭 Job이 `PENDING` 또는 `PROCESSING` 상태이면 새 Job을 만들지 않고 기존 진행 중 Job을 반환한다.
 

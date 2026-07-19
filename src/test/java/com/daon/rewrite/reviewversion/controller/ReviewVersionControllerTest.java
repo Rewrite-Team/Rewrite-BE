@@ -315,6 +315,7 @@ class ReviewVersionControllerTest {
                     "job_1",
                     "cl_1",
                     "직무 키워드를 강조해주세요.",
+                    "rv_1",
                     Instant.parse("2026-06-21T05:50:00Z"),
                     2
             );

@@ -109,6 +109,7 @@ class FirstReviewJobEventIntegrationTest {
                     "job_1",
                     "cl_1",
                     "직무 키워드를 강조해주세요.",
+                    "rv_1",
                     now,
                     1
             ));

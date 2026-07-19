@@ -13,10 +13,9 @@ import com.daon.rewrite.llmjob.repository.LlmJobRepository;
 import com.daon.rewrite.reviewversion.client.FirstReviewClientException;
 import com.daon.rewrite.reviewversion.client.FirstReviewQuestion;
 import com.daon.rewrite.reviewversion.client.FirstReviewRequest;
-import com.daon.rewrite.reviewversion.entity.ReviewVersion;
-import com.daon.rewrite.reviewversion.entity.ReviewVersionQuestionResult;
-import com.daon.rewrite.reviewversion.repository.ReviewVersionQuestionResultRepository;
-import com.daon.rewrite.reviewversion.repository.ReviewVersionRepository;
+import com.daon.rewrite.llmjob.entity.LlmJobRequestRefType;
+import com.daon.rewrite.reviewversion.entity.ReviewJobQuestionResult;
+import com.daon.rewrite.reviewversion.repository.ReviewJobQuestionResultRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,8 +37,7 @@ class ReReviewJobTransactionService {
 
     private final LlmJobRepository llmJobRepository;
     private final CoverLetterRepository coverLetterRepository;
-    private final ReviewVersionRepository reviewVersionRepository;
-    private final ReviewVersionQuestionResultRepository questionResultRepository;
+    private final ReviewJobQuestionResultRepository questionResultRepository;
     private final Clock clock;
 
     @Transactional
@@ -56,14 +54,13 @@ class ReReviewJobTransactionService {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR);
         }
 
-        ReviewVersion latestVersion = reviewVersionRepository.findByIdAndCoverLetterId(
-                        coverLetter.getLatestReviewVersionId(),
-                        coverLetter.getId()
-                )
-                .orElseThrow(() -> new BusinessException(ErrorCode.INTERNAL_ERROR));
-        List<ReviewVersionQuestionResult> questionResults = questionResultRepository
-                .findByReviewVersionIdOrderByQuestionOrderAsc(latestVersion.getId());
-        if (questionResults.isEmpty()) {
+        if (job.getRequestRefType() != LlmJobRequestRefType.REVIEW_VERSION
+                || job.getRequestRefId() == null) {
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR);
+        }
+        List<ReviewJobQuestionResult> questionResults = questionResultRepository
+                .findByLlmJobIdOrderByQuestionOrderAsc(job.getId());
+        if (questionResults.isEmpty() || questionResults.size() != job.getProgressTotal()) {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR);
         }
 
@@ -81,7 +78,7 @@ class ReReviewJobTransactionService {
                                 result.getQuestionOrder(),
                                 result.getQuestionText(),
                                 result.getMaxAnswerLength(),
-                                result.getFinalAnswer()
+                                result.getInputAnswer()
                         ))
                         .toList()
         ));

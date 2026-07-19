@@ -130,6 +130,7 @@ public class LlmJob {
             String id,
             String coverLetterId,
             String requestInstruction,
+            String sourceReviewVersionId,
             Instant now,
             int progressTotal
     ) {
@@ -140,8 +141,8 @@ public class LlmJob {
                 LlmJobTargetType.COVER_LETTER,
                 coverLetterId,
                 requestInstruction,
-                null,
-                null,
+                LlmJobRequestRefType.REVIEW_VERSION,
+                sourceReviewVersionId,
                 progressTotal,
                 now
         );
@@ -243,6 +244,23 @@ public class LlmJob {
         this.resultRefType = resultRefType;
         this.resultRefId = resultRefId;
         this.completedAt = completedAt;
+    }
+
+    public void advanceProgress(String progressMessage) {
+        if (status != LlmJobStatus.PROCESSING || progressCurrent >= progressTotal) {
+            throw new IllegalStateException("처리 중인 Job의 진행률만 증가시킬 수 있습니다.");
+        }
+        this.progressCurrent++;
+        this.progressMessage = progressMessage;
+    }
+
+    public void markRetried() {
+        if (status != LlmJobStatus.PROCESSING) {
+            throw new IllegalStateException("처리 중인 Job만 재시도할 수 있습니다.");
+        }
+        if (attempt < maxAttempts) {
+            attempt++;
+        }
     }
 
     public void markFailed(

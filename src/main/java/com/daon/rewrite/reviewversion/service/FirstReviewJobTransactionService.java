@@ -7,6 +7,7 @@ import com.daon.rewrite.coverletter.repository.CoverLetterQuestionRepository;
 import com.daon.rewrite.coverletter.repository.CoverLetterRepository;
 import com.daon.rewrite.global.exception.BusinessException;
 import com.daon.rewrite.global.exception.ErrorCode;
+import com.daon.rewrite.global.util.IdGenerator;
 import com.daon.rewrite.llmjob.entity.LlmJob;
 import com.daon.rewrite.llmjob.entity.LlmJobStatus;
 import com.daon.rewrite.llmjob.entity.LlmJobTargetType;
@@ -15,6 +16,8 @@ import com.daon.rewrite.llmjob.repository.LlmJobRepository;
 import com.daon.rewrite.reviewversion.client.FirstReviewClientException;
 import com.daon.rewrite.reviewversion.client.FirstReviewQuestion;
 import com.daon.rewrite.reviewversion.client.FirstReviewRequest;
+import com.daon.rewrite.reviewversion.entity.ReviewJobQuestionResult;
+import com.daon.rewrite.reviewversion.repository.ReviewJobQuestionResultRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,10 +36,13 @@ class FirstReviewJobTransactionService {
     private static final String PROVIDER_ERROR_MESSAGE = "LLM 응답 생성에 실패했습니다.";
     private static final String OUTPUT_VALIDATION_ERROR_CODE = "LLM_OUTPUT_VALIDATION_FAILED";
     private static final String OUTPUT_VALIDATION_ERROR_MESSAGE = "LLM 출력 형식이 올바르지 않습니다.";
+    private static final String JOB_QUESTION_RESULT_ID_PREFIX = "rjqr";
 
     private final LlmJobRepository llmJobRepository;
     private final CoverLetterRepository coverLetterRepository;
     private final CoverLetterQuestionRepository questionRepository;
+    private final ReviewJobQuestionResultRepository jobQuestionResultRepository;
+    private final IdGenerator idGenerator;
     private final Clock clock;
 
     @Transactional
@@ -58,6 +64,14 @@ class FirstReviewJobTransactionService {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR);
         }
 
+        jobQuestionResultRepository.saveAll(questions.stream()
+                .map(question -> ReviewJobQuestionResult.processing(
+                        idGenerator.generate(JOB_QUESTION_RESULT_ID_PREFIX),
+                        job,
+                        question,
+                        question.getOriginalAnswer()
+                ))
+                .toList());
         job.startProcessing(STARTED_MESSAGE);
         return new FirstReviewWork(new FirstReviewRequest(
                 coverLetter.getTitle(),

@@ -1,21 +1,23 @@
 package com.daon.rewrite.reviewversion.service;
 
 import com.daon.rewrite.coverletter.entity.CoverLetter;
-import com.daon.rewrite.coverletter.entity.CoverLetterQuestion;
 import com.daon.rewrite.coverletter.entity.CoverLetterStatus;
-import com.daon.rewrite.coverletter.repository.CoverLetterQuestionRepository;
 import com.daon.rewrite.coverletter.repository.CoverLetterRepository;
 import com.daon.rewrite.global.exception.BusinessException;
 import com.daon.rewrite.global.exception.ErrorCode;
 import com.daon.rewrite.global.util.IdGenerator;
 import com.daon.rewrite.llmjob.entity.LlmJob;
 import com.daon.rewrite.llmjob.entity.LlmJobResultRefType;
+import com.daon.rewrite.llmjob.entity.LlmJobRequestRefType;
 import com.daon.rewrite.llmjob.entity.LlmJobStatus;
 import com.daon.rewrite.llmjob.entity.LlmJobTargetType;
 import com.daon.rewrite.llmjob.entity.LlmJobType;
 import com.daon.rewrite.llmjob.repository.LlmJobRepository;
 import com.daon.rewrite.reviewversion.entity.ReviewVersion;
+import com.daon.rewrite.reviewversion.entity.ReviewJobQuestionResult;
+import com.daon.rewrite.reviewversion.entity.ReviewJobQuestionResultStatus;
 import com.daon.rewrite.reviewversion.entity.ReviewVersionQuestionResult;
+import com.daon.rewrite.reviewversion.repository.ReviewJobQuestionResultRepository;
 import com.daon.rewrite.reviewversion.repository.ReviewVersionQuestionResultRepository;
 import com.daon.rewrite.reviewversion.repository.ReviewVersionRepository;
 import lombok.RequiredArgsConstructor;
@@ -24,10 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -39,17 +38,14 @@ public class ReviewVersionService {
 
     private final LlmJobRepository llmJobRepository;
     private final CoverLetterRepository coverLetterRepository;
-    private final CoverLetterQuestionRepository questionRepository;
     private final ReviewVersionRepository reviewVersionRepository;
     private final ReviewVersionQuestionResultRepository questionResultRepository;
+    private final ReviewJobQuestionResultRepository jobQuestionResultRepository;
     private final IdGenerator idGenerator;
     private final Clock clock;
 
     @Transactional
-    public CompleteFirstReviewResult completeFirstReview(
-            String jobId,
-            List<ReviewQuestionResultInput> inputs
-    ) {
+    public CompleteFirstReviewResult completeFirstReview(String jobId) {
         LlmJob job = llmJobRepository.findByIdForUpdate(jobId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.INTERNAL_ERROR));
         validateFirstReviewJob(job);
@@ -67,14 +63,7 @@ public class ReviewVersionService {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR);
         }
 
-        List<CoverLetterQuestion> questions = questionRepository
-                .findByCoverLetterIdOrderByQuestionOrderAsc(coverLetter.getId());
-        List<NormalizedReviewResult> normalizedResults = validateAndNormalize(
-                questions.stream()
-                        .map(question -> new ReviewSourceQuestion(question, question.getOriginalAnswer()))
-                        .toList(),
-                inputs
-        );
+        List<ReviewJobQuestionResult> stagedResults = findCompletedStagedResults(job);
 
         Instant now = Instant.now(clock);
         ReviewVersion reviewVersion = reviewVersionRepository.save(ReviewVersion.first(
@@ -83,16 +72,16 @@ public class ReviewVersionService {
                 now
         ));
 
-        List<ReviewVersionQuestionResult> questionResults = new ArrayList<>();
-        for (NormalizedReviewResult normalizedResult : normalizedResults) {
-            questionResults.add(ReviewVersionQuestionResult.create(
+        List<ReviewVersionQuestionResult> questionResults = stagedResults.stream()
+                .map(stagedResult -> ReviewVersionQuestionResult.createFromSnapshot(
                     idGenerator.generate(QUESTION_RESULT_ID_PREFIX),
                     reviewVersion,
-                    normalizedResult.source().question(),
-                    normalizedResult.aiReport(),
-                    normalizedResult.rewrittenAnswer()
-            ));
-        }
+                    stagedResult.getQuestion(),
+                    stagedResult.getInputAnswer(),
+                    stagedResult.getAiReport(),
+                    stagedResult.getRewrittenAnswer()
+                ))
+                .toList();
         questionResults = questionResultRepository.saveAll(questionResults);
 
         coverLetter.completeReview(reviewVersion.getId(), now);
@@ -108,10 +97,7 @@ public class ReviewVersionService {
     }
 
     @Transactional
-    public CompleteFirstReviewResult completeReReview(
-            String jobId,
-            List<ReviewQuestionResultInput> inputs
-    ) {
+    public CompleteFirstReviewResult completeReReview(String jobId) {
         // 재첨삭 Job 완료 처리는 동일 Job의 중복 완료 요청을 막기 위해 row lock을 잡고 진행한다.
         LlmJob job = llmJobRepository.findByIdForUpdate(jobId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.INTERNAL_ERROR));
@@ -132,20 +118,16 @@ public class ReviewVersionService {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR);
         }
 
-        ReviewVersion latestVersion = reviewVersionRepository.findByIdAndCoverLetterId(
-                        coverLetter.getLatestReviewVersionId(),
+        if (job.getRequestRefType() != LlmJobRequestRefType.REVIEW_VERSION
+                || job.getRequestRefId() == null) {
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR);
+        }
+        reviewVersionRepository.findByIdAndCoverLetterId(
+                        job.getRequestRefId(),
                         coverLetter.getId()
                 )
                 .orElseThrow(() -> new BusinessException(ErrorCode.INTERNAL_ERROR));
-        List<ReviewVersionQuestionResult> latestResults = questionResultRepository
-                .findByReviewVersionIdOrderByQuestionOrderAsc(latestVersion.getId());
-        List<NormalizedReviewResult> normalizedResults = validateAndNormalize(
-                latestResults.stream()
-                        // result.getQuestion() == 원본 질문 객체 / result.getFinalAnswer == 가장 최근에 저장된 finalAnswer
-                        .map(result -> new ReviewSourceQuestion(result.getQuestion(), result.getFinalAnswer()))
-                        .toList(),
-                inputs // 가장 최근에 ai 로 생성한 ReviewQuestionResultInput(questionId, aiReport, rewrittenAnswer) 리스트
-        );
+        List<ReviewJobQuestionResult> stagedResults = findCompletedStagedResults(job);
 
         Instant now = Instant.now(clock);
         // 성공한 재첨삭만 새 ReviewVersion으로 확정한다. 실패한 Job은 기존 최신 버전을 유지한다.
@@ -157,18 +139,16 @@ public class ReviewVersionService {
                 now
         ));
 
-        List<ReviewVersionQuestionResult> questionResults = new ArrayList<>();
-        for (NormalizedReviewResult normalizedResult : normalizedResults) {
-            // 새 버전의 originalAnswer에는 재첨삭 기준이 된 이전 최종 작성본을 스냅샷으로 남긴다.
-            questionResults.add(ReviewVersionQuestionResult.createFromSnapshot(
+        List<ReviewVersionQuestionResult> questionResults = stagedResults.stream()
+                .map(stagedResult -> ReviewVersionQuestionResult.createFromSnapshot(
                     idGenerator.generate(QUESTION_RESULT_ID_PREFIX),
                     reviewVersion,
-                    normalizedResult.source().question(),           // CoverLetterQuestion 객체
-                    normalizedResult.source().originalAnswer(),     // 가장 최근에 저장된 finalAnswer (재첨삭 기준이 된 이전 최종 작성본)
-                    normalizedResult.aiReport(),                    // 가장 최근에 ai 로 생성한 aiReport
-                    normalizedResult.rewrittenAnswer()              // 가장 최근에 ai 로 생성한 rewrittenAnswer
-            ));
-        }
+                    stagedResult.getQuestion(),
+                    stagedResult.getInputAnswer(),
+                    stagedResult.getAiReport(),
+                    stagedResult.getRewrittenAnswer()
+                ))
+                .toList();
         questionResults = questionResultRepository.saveAll(questionResults);
 
         coverLetter.completeReview(reviewVersion.getId(), now);
@@ -210,43 +190,16 @@ public class ReviewVersionService {
         return new CompleteFirstReviewResult(reviewVersion, questionResults);
     }
 
-    private List<NormalizedReviewResult> validateAndNormalize(
-            List<ReviewSourceQuestion> sources,
-            List<ReviewQuestionResultInput> inputs
-    ) {
-        if (sources.isEmpty() || inputs == null || inputs.size() != sources.size()) {
-            throw new BusinessException(ErrorCode.VALIDATION_ERROR);
+    private List<ReviewJobQuestionResult> findCompletedStagedResults(LlmJob job) {
+        List<ReviewJobQuestionResult> stagedResults = jobQuestionResultRepository
+                .findByLlmJobIdOrderByQuestionOrderAsc(job.getId());
+        if (stagedResults.size() != job.getProgressTotal()
+                || stagedResults.stream().anyMatch(
+                result -> result.getStatus() != ReviewJobQuestionResultStatus.COMPLETED
+        )) {
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR);
         }
-
-        Map<String, ReviewQuestionResultInput> inputByQuestionId = new HashMap<>();
-        for (ReviewQuestionResultInput input : inputs) {
-            if (input == null || input.questionId() == null || input.questionId().isBlank()
-                    || inputByQuestionId.putIfAbsent(input.questionId(), input) != null) {
-                throw new BusinessException(ErrorCode.VALIDATION_ERROR);
-            }
-        }
-
-        List<NormalizedReviewResult> normalizedResults = new ArrayList<>();
-        for (ReviewSourceQuestion source : sources) {
-            ReviewQuestionResultInput input = inputByQuestionId.remove(source.question().getId());
-            if (input == null) {
-                throw new BusinessException(ErrorCode.VALIDATION_ERROR);
-            }
-
-            String aiReport = normalizeRequired(input.aiReport());
-            String rewrittenAnswer = normalizeRequired(input.rewrittenAnswer());
-            if (aiReport == null
-                    || rewrittenAnswer == null
-                    || countCodePoints(rewrittenAnswer) > source.question().getMaxAnswerLength()) {
-                throw new BusinessException(ErrorCode.VALIDATION_ERROR);
-            }
-            normalizedResults.add(new NormalizedReviewResult(source, aiReport, rewrittenAnswer));
-        }
-
-        if (!inputByQuestionId.isEmpty()) {
-            throw new BusinessException(ErrorCode.VALIDATION_ERROR);
-        }
-        return normalizedResults;
+        return stagedResults;
     }
 
     private String nextVersion(String coverLetterId) {
@@ -254,28 +207,4 @@ public class ReviewVersionService {
         return "v0." + nextPatch;
     }
 
-    private String normalizeRequired(String value) {
-        if (value == null) {
-            return null;
-        }
-        String normalized = value.strip();
-        return normalized.isEmpty() ? null : normalized;
-    }
-
-    private int countCodePoints(String value) {
-        return value.codePointCount(0, value.length());
-    }
-
-    private record ReviewSourceQuestion(
-            CoverLetterQuestion question,
-            String originalAnswer
-    ) {
-    }
-
-    private record NormalizedReviewResult(
-            ReviewSourceQuestion source,
-            String aiReport,
-            String rewrittenAnswer
-    ) {
-    }
 }
