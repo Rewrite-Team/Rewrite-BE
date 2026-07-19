@@ -6,7 +6,7 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.json.JsonMapper;
 
 @Component
-public class OpenAiFirstReviewClient implements FirstReviewClient {
+public class OpenAiReviewClient implements ReviewClient {
 
     private static final String SYSTEM_PROMPT = """
             당신은 한국어 자기소개서를 첨삭하는 전문 리뷰어입니다.
@@ -29,53 +29,53 @@ public class OpenAiFirstReviewClient implements FirstReviewClient {
 
     private final ChatClient chatClient;
 
-    public OpenAiFirstReviewClient(ChatClient.Builder chatClientBuilder) {
+    public OpenAiReviewClient(ChatClient.Builder chatClientBuilder) {
         this.chatClient = chatClientBuilder.build();
     }
 
     @Override
-    public FirstReviewResult reviewQuestion(FirstReviewRequest request, String targetQuestionId) {
-        FirstReviewResult response;
+    public ReviewResult reviewQuestion(ReviewRequest request, String targetQuestionId) {
+        ReviewResult response;
         try {
             response = chatClient.prompt()
                     .system(SYSTEM_PROMPT)
                     .user(buildUserPrompt(request, targetQuestionId))
                     .call()
-                    .entity(FirstReviewResult.class);
+                    .entity(ReviewResult.class);
         } catch (JacksonException exception) {
-            throw FirstReviewClientException.outputValidationFailed(exception);
+            throw ReviewClientException.outputValidationFailed(exception);
         } catch (Exception exception) {
-            throw FirstReviewClientException.providerError(exception);
+            throw ReviewClientException.providerError(exception);
         }
 
         return validateAndNormalize(request, targetQuestionId, response);
     }
 
-    private String buildUserPrompt(FirstReviewRequest request, String targetQuestionId) {
+    private String buildUserPrompt(ReviewRequest request, String targetQuestionId) {
         return "다음 자기소개서 전체를 참고해 대상 문항 하나를 첨삭하세요.\n대상 questionId: "
                 + targetQuestionId
                 + "\n입력 JSON:\n"
                 + JSON_MAPPER.writeValueAsString(request);
     }
 
-    private FirstReviewResult validateAndNormalize(
-            FirstReviewRequest request,
+    private ReviewResult validateAndNormalize(
+            ReviewRequest request,
             String targetQuestionId,
-            FirstReviewResult response
+            ReviewResult response
     ) {
-        FirstReviewQuestion targetQuestion = request.questions().stream()
+        ReviewQuestion targetQuestion = request.questions().stream()
                 .filter(question -> question.questionId().equals(targetQuestionId))
                 .findFirst()
-                .orElseThrow(FirstReviewClientException::outputValidationFailed);
+                .orElseThrow(ReviewClientException::outputValidationFailed);
         String aiReport = response == null ? null : normalizeRequired(response.aiReport());
         String rewrittenAnswer = response == null ? null : normalizeRequired(response.rewrittenAnswer());
         if (response == null || !targetQuestionId.equals(response.questionId())
                 || aiReport == null || rewrittenAnswer == null
                 || countCodePoints(rewrittenAnswer) > targetQuestion.maxAnswerLength()) {
-            throw FirstReviewClientException.outputValidationFailed();
+            throw ReviewClientException.outputValidationFailed();
         }
 
-        return new FirstReviewResult(targetQuestionId, aiReport, rewrittenAnswer);
+        return new ReviewResult(targetQuestionId, aiReport, rewrittenAnswer);
     }
 
     private String normalizeRequired(String value) {

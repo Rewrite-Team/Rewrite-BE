@@ -45,7 +45,7 @@ public class ReviewVersionService {
     private final Clock clock;
 
     @Transactional
-    public CompleteFirstReviewResult completeFirstReview(String jobId) {
+    public CompleteReviewResult completeFirstReview(String jobId) {
         LlmJob job = llmJobRepository.findByIdForUpdate(jobId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.INTERNAL_ERROR));
         validateFirstReviewJob(job);
@@ -93,11 +93,11 @@ public class ReviewVersionService {
                 now
         );
 
-        return new CompleteFirstReviewResult(reviewVersion, questionResults);
+        return new CompleteReviewResult(reviewVersion, questionResults);
     }
 
     @Transactional
-    public CompleteFirstReviewResult completeReReview(String jobId) {
+    public CompleteReviewResult completeReReview(String jobId) {
         // 재첨삭 Job 완료 처리는 동일 Job의 중복 완료 요청을 막기 위해 row lock을 잡고 진행한다.
         LlmJob job = llmJobRepository.findByIdForUpdate(jobId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.INTERNAL_ERROR));
@@ -160,7 +160,7 @@ public class ReviewVersionService {
                 now
         );
 
-        return new CompleteFirstReviewResult(reviewVersion, questionResults);
+        return new CompleteReviewResult(reviewVersion, questionResults);
     }
 
     private void validateFirstReviewJob(LlmJob job) {
@@ -177,7 +177,7 @@ public class ReviewVersionService {
         }
     }
 
-    private CompleteFirstReviewResult findCompletedResult(LlmJob job) {
+    private CompleteReviewResult findCompletedResult(LlmJob job) {
         if (job.getResultRefType() != LlmJobResultRefType.REVIEW_VERSION
                 || job.getResultRefId() == null) {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR);
@@ -187,7 +187,7 @@ public class ReviewVersionService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.INTERNAL_ERROR));
         List<ReviewVersionQuestionResult> questionResults = questionResultRepository
                 .findByReviewVersionIdOrderByQuestionOrderAsc(reviewVersion.getId());
-        return new CompleteFirstReviewResult(reviewVersion, questionResults);
+        return new CompleteReviewResult(reviewVersion, questionResults);
     }
 
     private List<ReviewJobQuestionResult> findCompletedStagedResults(LlmJob job) {

@@ -9,10 +9,10 @@ import com.daon.rewrite.global.util.IdGenerator;
 import com.daon.rewrite.llmjob.entity.LlmJob;
 import com.daon.rewrite.llmjob.entity.LlmJobStatus;
 import com.daon.rewrite.llmjob.repository.LlmJobRepository;
-import com.daon.rewrite.reviewversion.client.FirstReviewClient;
-import com.daon.rewrite.reviewversion.client.FirstReviewClientException;
-import com.daon.rewrite.reviewversion.client.FirstReviewRequest;
-import com.daon.rewrite.reviewversion.client.FirstReviewResult;
+import com.daon.rewrite.reviewversion.client.ReviewClient;
+import com.daon.rewrite.reviewversion.client.ReviewClientException;
+import com.daon.rewrite.reviewversion.client.ReviewRequest;
+import com.daon.rewrite.reviewversion.client.ReviewResult;
 import com.daon.rewrite.reviewversion.entity.ReviewJobQuestionResult;
 import com.daon.rewrite.reviewversion.entity.ReviewVersion;
 import com.daon.rewrite.reviewversion.entity.ReviewVersionQuestionResult;
@@ -64,7 +64,7 @@ class ReReviewJobWorkerTest {
     private ReviewJobQuestionResultRepository jobQuestionResultRepository;
 
     @MockitoBean
-    private FirstReviewClient firstReviewClient;
+    private ReviewClient reviewClient;
 
     @MockitoBean
     private IdGenerator idGenerator;
@@ -92,9 +92,9 @@ class ReReviewJobWorkerTest {
         );
         sourceResults.getFirst().updateFinalAnswer("요청 후 변경된 최종본");
         versionQuestionResultRepository.save(sourceResults.getFirst());
-        given(firstReviewClient.reviewQuestion(any(), anyString())).willAnswer(invocation -> {
+        given(reviewClient.reviewQuestion(any(), anyString())).willAnswer(invocation -> {
             String questionId = invocation.getArgument(1);
-            return new FirstReviewResult(questionId, questionId + " 새 리포트", questionId + " 새 수정본");
+            return new ReviewResult(questionId, questionId + " 새 리포트", questionId + " 새 수정본");
         });
         given(idGenerator.generate("rv")).willReturn("rv_2");
         given(idGenerator.generate("rvqr")).willReturn("rvqr_3", "rvqr_4");
@@ -102,8 +102,8 @@ class ReReviewJobWorkerTest {
 
         worker.execute("job_1");
 
-        ArgumentCaptor<FirstReviewRequest> requestCaptor = ArgumentCaptor.forClass(FirstReviewRequest.class);
-        then(firstReviewClient).should(times(2)).reviewQuestion(requestCaptor.capture(), anyString());
+        ArgumentCaptor<ReviewRequest> requestCaptor = ArgumentCaptor.forClass(ReviewRequest.class);
+        then(reviewClient).should(times(2)).reviewQuestion(requestCaptor.capture(), anyString());
         assertThat(requestCaptor.getAllValues().getFirst().questions())
                 .extracting("originalAnswer")
                 .containsExactly("첫 번째 최종본", "두 번째 최종본");
@@ -123,13 +123,13 @@ class ReReviewJobWorkerTest {
     void retriesFailedQuestionAndKeepsExistingVersionOnFinalFailure() {
         Instant failedAt = Instant.parse("2026-06-25T05:00:00Z");
         savePendingReReviewJob("cl_1", "job_1", "직무 키워드를 강조해주세요.");
-        given(firstReviewClient.reviewQuestion(any(), anyString()))
-                .willThrow(FirstReviewClientException.outputValidationFailed());
+        given(reviewClient.reviewQuestion(any(), anyString()))
+                .willThrow(ReviewClientException.outputValidationFailed());
         given(clock.instant()).willReturn(failedAt);
 
         worker.execute("job_1");
 
-        then(firstReviewClient).should(times(4)).reviewQuestion(any(), anyString());
+        then(reviewClient).should(times(4)).reviewQuestion(any(), anyString());
         assertThat(coverLetterRepository.findById("cl_1")).hasValueSatisfying(coverLetter -> {
             assertThat(coverLetter.getStatus()).isEqualTo(CoverLetterStatus.REVIEWED);
             assertThat(coverLetter.getLatestReviewVersionId()).isEqualTo("rv_1");

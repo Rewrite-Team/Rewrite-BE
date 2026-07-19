@@ -6,7 +6,7 @@ import com.daon.rewrite.llmjob.entity.LlmJob;
 import com.daon.rewrite.llmjob.entity.LlmJobStatus;
 import com.daon.rewrite.llmjob.entity.LlmJobType;
 import com.daon.rewrite.llmjob.repository.LlmJobRepository;
-import com.daon.rewrite.reviewversion.client.FirstReviewResult;
+import com.daon.rewrite.reviewversion.client.ReviewResult;
 import com.daon.rewrite.reviewversion.entity.ReviewJobQuestionResult;
 import com.daon.rewrite.reviewversion.entity.ReviewJobQuestionResultStatus;
 import com.daon.rewrite.reviewversion.repository.ReviewJobQuestionResultRepository;
@@ -26,7 +26,7 @@ class ReviewJobQuestionTransactionService {
     private final Clock clock;
 
     @Transactional
-    public boolean completeQuestion(String jobId, FirstReviewResult result) {
+    public boolean completeQuestion(String jobId, ReviewResult result) {
         LlmJob job = findReviewJobForUpdate(jobId);
         if (job.getStatus() != LlmJobStatus.PROCESSING) {
             return false;

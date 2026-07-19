@@ -13,7 +13,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-class OpenAiFirstReviewClientTest {
+class OpenAiReviewClientTest {
 
     @Test
     void reviewsTargetQuestionWithWholeCoverLetterContext() {
@@ -24,10 +24,10 @@ class OpenAiFirstReviewClientTest {
                   "rewrittenAnswer": " 첫 번째 수정본 "
                 }
                 """);
-        FirstReviewClient client = new OpenAiFirstReviewClient(ChatClient.builder(chatModel));
-        FirstReviewRequest request = request();
+        ReviewClient client = new OpenAiReviewClient(ChatClient.builder(chatModel));
+        ReviewRequest request = request();
 
-        FirstReviewResult result = client.reviewQuestion(request, "clq_1");
+        ReviewResult result = client.reviewQuestion(request, "clq_1");
 
         assertThat(result.questionId()).isEqualTo("clq_1");
         assertThat(result.aiReport()).isEqualTo("첫 번째 리포트");
@@ -71,7 +71,7 @@ class OpenAiFirstReviewClientTest {
         );
 
         for (String response : invalidResponses) {
-            FirstReviewClient client = clientReturning(response);
+            ReviewClient client = clientReturning(response);
 
             assertOutputValidationFailure(() -> client.reviewQuestion(request(), "clq_1"));
         }
@@ -92,7 +92,7 @@ class OpenAiFirstReviewClientTest {
         );
 
         for (String response : invalidResponses) {
-            FirstReviewClient client = clientReturning(response);
+            ReviewClient client = clientReturning(response);
 
             assertOutputValidationFailure(() -> client.reviewQuestion(request(), "clq_1"));
         }
@@ -100,7 +100,7 @@ class OpenAiFirstReviewClientTest {
 
     @Test
     void classifiesMalformedJsonAsOutputValidationFailure() {
-        FirstReviewClient client = clientReturning("not-json");
+        ReviewClient client = clientReturning("not-json");
 
         assertOutputValidationFailure(() -> client.reviewQuestion(request(), "clq_1"));
     }
@@ -111,12 +111,12 @@ class OpenAiFirstReviewClientTest {
         ChatModel failingModel = prompt -> {
             throw cause;
         };
-        FirstReviewClient client = new OpenAiFirstReviewClient(ChatClient.builder(failingModel));
+        ReviewClient client = new OpenAiReviewClient(ChatClient.builder(failingModel));
 
         assertThatThrownBy(() -> client.reviewQuestion(request(), "clq_1"))
-                .isInstanceOfSatisfying(FirstReviewClientException.class, exception -> {
+                .isInstanceOfSatisfying(ReviewClientException.class, exception -> {
                     assertThat(exception.getReason())
-                            .isEqualTo(FirstReviewClientException.Reason.PROVIDER_ERROR);
+                            .isEqualTo(ReviewClientException.Reason.PROVIDER_ERROR);
                     assertThat(exception.getCause()).isSameAs(cause);
                 });
     }
@@ -130,16 +130,16 @@ class OpenAiFirstReviewClientTest {
                   "rewrittenAnswer": "수정본"
                 }
                 """);
-        FirstReviewClient client = new OpenAiFirstReviewClient(ChatClient.builder(chatModel));
+        ReviewClient client = new OpenAiReviewClient(ChatClient.builder(chatModel));
 
-        client.reviewQuestion(new FirstReviewRequest(
+        client.reviewQuestion(new ReviewRequest(
                 "백엔드 자기소개서",
                 "다온",
                 "백엔드 개발자",
                 "https://example.com/jobs/1",
                 "Spring 경험 우대",
                 "직무 키워드를 더 강조해주세요.",
-                List.of(new FirstReviewQuestion("clq_1", 1, "지원 동기는?", 1000, "최종 작성본"))
+                List.of(new ReviewQuestion("clq_1", 1, "지원 동기는?", 1000, "최종 작성본"))
         ), "clq_1");
 
         assertThat(chatModel.capturedPrompt().getSystemMessage().getText())
@@ -148,27 +148,27 @@ class OpenAiFirstReviewClientTest {
                 .contains("직무 키워드를 더 강조해주세요.", "최종 작성본");
     }
 
-    private FirstReviewClient clientReturning(String response) {
-        return new OpenAiFirstReviewClient(ChatClient.builder(new CapturingChatModel(response)));
+    private ReviewClient clientReturning(String response) {
+        return new OpenAiReviewClient(ChatClient.builder(new CapturingChatModel(response)));
     }
 
     private void assertOutputValidationFailure(ThrowingCall call) {
         assertThatThrownBy(call::invoke)
-                .isInstanceOfSatisfying(FirstReviewClientException.class, exception ->
+                .isInstanceOfSatisfying(ReviewClientException.class, exception ->
                         assertThat(exception.getReason())
-                                .isEqualTo(FirstReviewClientException.Reason.OUTPUT_VALIDATION_FAILED));
+                                .isEqualTo(ReviewClientException.Reason.OUTPUT_VALIDATION_FAILED));
     }
 
-    private FirstReviewRequest request() {
-        return new FirstReviewRequest(
+    private ReviewRequest request() {
+        return new ReviewRequest(
                 "백엔드 자기소개서",
                 "다온",
                 "백엔드 개발자",
                 "https://example.com/jobs/1",
                 "Spring 경험 우대",
                 List.of(
-                        new FirstReviewQuestion("clq_1", 1, "지원 동기는?", 1000, "첫 번째 원본 답변"),
-                        new FirstReviewQuestion("clq_2", 2, "직무 역량은?", 500, "두 번째 원본 답변")
+                        new ReviewQuestion("clq_1", 1, "지원 동기는?", 1000, "첫 번째 원본 답변"),
+                        new ReviewQuestion("clq_2", 2, "직무 역량은?", 500, "두 번째 원본 답변")
                 )
         );
     }

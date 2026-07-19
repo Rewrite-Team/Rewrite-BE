@@ -12,7 +12,7 @@ import com.daon.rewrite.llmjob.entity.LlmJob;
 import com.daon.rewrite.llmjob.entity.LlmJobResultRefType;
 import com.daon.rewrite.llmjob.entity.LlmJobStatus;
 import com.daon.rewrite.llmjob.repository.LlmJobRepository;
-import com.daon.rewrite.reviewversion.client.FirstReviewResult;
+import com.daon.rewrite.reviewversion.client.ReviewResult;
 import com.daon.rewrite.reviewversion.entity.ReviewVersion;
 import com.daon.rewrite.reviewversion.entity.ReviewJobQuestionResult;
 import com.daon.rewrite.reviewversion.entity.ReviewVersionQuestionResult;
@@ -84,11 +84,11 @@ class ReviewVersionServiceTest {
         given(clock.instant()).willReturn(completedAt);
 
         completeStagedResults("job_1", List.of(
-                new FirstReviewResult("clq_1", "첫 번째 리포트", "첫 번째 수정본😀"),
-                new FirstReviewResult("clq_2", "두 번째 리포트", "두 번째 수정본")
+                new ReviewResult("clq_1", "첫 번째 리포트", "첫 번째 수정본😀"),
+                new ReviewResult("clq_2", "두 번째 리포트", "두 번째 수정본")
         ));
 
-        CompleteFirstReviewResult result = service.completeFirstReview("job_1");
+        CompleteReviewResult result = service.completeFirstReview("job_1");
 
         assertThat(result.reviewVersion().getId()).isEqualTo("rv_1");
         assertThat(result.reviewVersion().getVersion()).isEqualTo("v0.1");
@@ -123,7 +123,7 @@ class ReviewVersionServiceTest {
     void completeFirstReviewRejectsIncompleteStagingWithoutPartialChanges() {
         saveProcessingReview("cl_1", "job_1", 2);
         completeStagedResults("job_1", List.of(
-                new FirstReviewResult("clq_1", "리포트", "수정본")
+                new ReviewResult("clq_1", "리포트", "수정본")
         ));
 
         assertThatThrownBy(() -> service.completeFirstReview("job_1"))
@@ -141,11 +141,11 @@ class ReviewVersionServiceTest {
         given(idGenerator.generate("rvqr")).willReturn("rvqr_1");
         given(clock.instant()).willReturn(Instant.parse("2026-06-21T05:00:00Z"));
         completeStagedResults("job_1", List.of(
-                new FirstReviewResult("clq_1", "리포트", "수정본")
+                new ReviewResult("clq_1", "리포트", "수정본")
         ));
 
-        CompleteFirstReviewResult first = service.completeFirstReview("job_1");
-        CompleteFirstReviewResult second = service.completeFirstReview("job_1");
+        CompleteReviewResult first = service.completeFirstReview("job_1");
+        CompleteReviewResult second = service.completeFirstReview("job_1");
 
         assertThat(second.reviewVersion().getId()).isEqualTo(first.reviewVersion().getId());
         assertThat(reviewVersionRepository.count()).isEqualTo(1);
@@ -173,11 +173,11 @@ class ReviewVersionServiceTest {
         given(clock.instant()).willReturn(completedAt);
 
         completeStagedResults("job_1", List.of(
-                new FirstReviewResult("clq_1", "첫 번째 새 리포트", "첫 번째 새 수정본"),
-                new FirstReviewResult("clq_2", "두 번째 새 리포트", "두 번째 새 수정본")
+                new ReviewResult("clq_1", "첫 번째 새 리포트", "첫 번째 새 수정본"),
+                new ReviewResult("clq_2", "두 번째 새 리포트", "두 번째 새 수정본")
         ));
 
-        CompleteFirstReviewResult result = service.completeReReview("job_1");
+        CompleteReviewResult result = service.completeReReview("job_1");
 
         assertThat(result.reviewVersion().getId()).isEqualTo("rv_2");
         assertThat(result.reviewVersion().getVersion()).isEqualTo("v0.2");
@@ -212,12 +212,12 @@ class ReviewVersionServiceTest {
         given(idGenerator.generate("rvqr")).willReturn("rvqr_3", "rvqr_4");
         given(clock.instant()).willReturn(Instant.parse("2026-06-21T06:00:00Z"));
         completeStagedResults("job_1", List.of(
-                new FirstReviewResult("clq_1", "리포트 1", "수정본 1"),
-                new FirstReviewResult("clq_2", "리포트 2", "수정본 2")
+                new ReviewResult("clq_1", "리포트 1", "수정본 1"),
+                new ReviewResult("clq_2", "리포트 2", "수정본 2")
         ));
 
-        CompleteFirstReviewResult first = service.completeReReview("job_1");
-        CompleteFirstReviewResult second = service.completeReReview("job_1");
+        CompleteReviewResult first = service.completeReReview("job_1");
+        CompleteReviewResult second = service.completeReReview("job_1");
 
         assertThat(second.reviewVersion().getId()).isEqualTo(first.reviewVersion().getId());
         assertThat(reviewVersionRepository.count()).isEqualTo(2);
@@ -228,7 +228,7 @@ class ReviewVersionServiceTest {
     void completeReReviewRejectsIncompleteStagingWithoutPartialChanges() {
         saveProcessingReReview("cl_1", "job_1", "더 직무 중심으로");
         completeStagedResults("job_1", List.of(
-                new FirstReviewResult("clq_1", "리포트", "수정본")
+                new ReviewResult("clq_1", "리포트", "수정본")
         ));
 
         assertThatThrownBy(() -> service.completeReReview("job_1"))
@@ -324,9 +324,9 @@ class ReviewVersionServiceTest {
         ));
     }
 
-    private void completeStagedResults(String jobId, List<FirstReviewResult> inputs) {
+    private void completeStagedResults(String jobId, List<ReviewResult> inputs) {
         Instant completedAt = Instant.parse("2026-06-21T04:00:00Z");
-        for (FirstReviewResult input : inputs) {
+        for (ReviewResult input : inputs) {
             ReviewJobQuestionResult result = jobQuestionResultRepository
                     .findByLlmJobIdAndQuestionId(jobId, input.questionId())
                     .orElseThrow();

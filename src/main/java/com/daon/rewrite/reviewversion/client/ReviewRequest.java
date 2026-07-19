@@ -2,27 +2,27 @@ package com.daon.rewrite.reviewversion.client;
 
 import java.util.List;
 
-public record FirstReviewRequest(
+public record ReviewRequest(
         String title,
         String companyName,
         String positionTitle,
         String jobPostingUrl,
         String preferences,
         String requestInstruction,
-        List<FirstReviewQuestion> questions
+        List<ReviewQuestion> questions
 ) {
 
-    public FirstReviewRequest {
+    public ReviewRequest {
         questions = List.copyOf(questions);
     }
 
-    public FirstReviewRequest(
+    public ReviewRequest(
             String title,
             String companyName,
             String positionTitle,
             String jobPostingUrl,
             String preferences,
-            List<FirstReviewQuestion> questions
+            List<ReviewQuestion> questions
     ) {
         this(title, companyName, positionTitle, jobPostingUrl, preferences, null, questions);
     }

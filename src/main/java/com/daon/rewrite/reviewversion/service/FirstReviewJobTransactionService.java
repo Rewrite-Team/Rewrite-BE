@@ -13,9 +13,9 @@ import com.daon.rewrite.llmjob.entity.LlmJobStatus;
 import com.daon.rewrite.llmjob.entity.LlmJobTargetType;
 import com.daon.rewrite.llmjob.entity.LlmJobType;
 import com.daon.rewrite.llmjob.repository.LlmJobRepository;
-import com.daon.rewrite.reviewversion.client.FirstReviewClientException;
-import com.daon.rewrite.reviewversion.client.FirstReviewQuestion;
-import com.daon.rewrite.reviewversion.client.FirstReviewRequest;
+import com.daon.rewrite.reviewversion.client.ReviewClientException;
+import com.daon.rewrite.reviewversion.client.ReviewQuestion;
+import com.daon.rewrite.reviewversion.client.ReviewRequest;
 import com.daon.rewrite.reviewversion.entity.ReviewJobQuestionResult;
 import com.daon.rewrite.reviewversion.repository.ReviewJobQuestionResultRepository;
 import lombok.RequiredArgsConstructor;
@@ -46,7 +46,7 @@ class FirstReviewJobTransactionService {
     private final Clock clock;
 
     @Transactional
-    public FirstReviewWork start(String jobId) {
+    public ReviewWork start(String jobId) {
         LlmJob job = findFirstReviewJobForUpdate(jobId);
         if (job.getStatus() != LlmJobStatus.PENDING) {
             return null;
@@ -73,14 +73,14 @@ class FirstReviewJobTransactionService {
                 ))
                 .toList());
         job.startProcessing(STARTED_MESSAGE);
-        return new FirstReviewWork(new FirstReviewRequest(
+        return new ReviewWork(new ReviewRequest(
                 coverLetter.getTitle(),
                 coverLetter.getCompanyName(),
                 coverLetter.getPositionTitle(),
                 coverLetter.getJobPostingUrl(),
                 coverLetter.getPreferences(),
                 questions.stream()
-                        .map(question -> new FirstReviewQuestion(
+                        .map(question -> new ReviewQuestion(
                                 question.getId(),
                                 question.getQuestionOrder(),
                                 question.getQuestion(),
@@ -92,7 +92,7 @@ class FirstReviewJobTransactionService {
     }
 
     @Transactional
-    public void fail(String jobId, FirstReviewClientException.Reason reason) {
+    public void fail(String jobId, ReviewClientException.Reason reason) {
         LlmJob job = findFirstReviewJobForUpdate(jobId);
         if (job.getStatus() == LlmJobStatus.COMPLETED || job.getStatus() == LlmJobStatus.FAILED) {
             return;
@@ -122,15 +122,15 @@ class FirstReviewJobTransactionService {
         return job;
     }
 
-    private String errorCode(FirstReviewClientException.Reason reason) {
-        if (reason == FirstReviewClientException.Reason.OUTPUT_VALIDATION_FAILED) {
+    private String errorCode(ReviewClientException.Reason reason) {
+        if (reason == ReviewClientException.Reason.OUTPUT_VALIDATION_FAILED) {
             return OUTPUT_VALIDATION_ERROR_CODE;
         }
         return PROVIDER_ERROR_CODE;
     }
 
-    private String errorMessage(FirstReviewClientException.Reason reason) {
-        if (reason == FirstReviewClientException.Reason.OUTPUT_VALIDATION_FAILED) {
+    private String errorMessage(ReviewClientException.Reason reason) {
+        if (reason == ReviewClientException.Reason.OUTPUT_VALIDATION_FAILED) {
             return OUTPUT_VALIDATION_ERROR_MESSAGE;
         }
         return PROVIDER_ERROR_MESSAGE;

@@ -9,9 +9,9 @@ import com.daon.rewrite.global.util.IdGenerator;
 import com.daon.rewrite.llmjob.entity.LlmJob;
 import com.daon.rewrite.llmjob.entity.LlmJobStatus;
 import com.daon.rewrite.llmjob.repository.LlmJobRepository;
-import com.daon.rewrite.reviewversion.client.FirstReviewClient;
-import com.daon.rewrite.reviewversion.client.FirstReviewClientException;
-import com.daon.rewrite.reviewversion.client.FirstReviewResult;
+import com.daon.rewrite.reviewversion.client.ReviewClient;
+import com.daon.rewrite.reviewversion.client.ReviewClientException;
+import com.daon.rewrite.reviewversion.client.ReviewResult;
 import com.daon.rewrite.reviewversion.entity.ReviewJobQuestionResult;
 import com.daon.rewrite.reviewversion.entity.ReviewJobQuestionResultStatus;
 import com.daon.rewrite.reviewversion.repository.ReviewJobQuestionResultRepository;
@@ -62,7 +62,7 @@ class FirstReviewJobWorkerTest {
     private ReviewJobQuestionResultRepository jobQuestionResultRepository;
 
     @MockitoBean
-    private FirstReviewClient firstReviewClient;
+    private ReviewClient reviewClient;
 
     @MockitoBean
     private IdGenerator idGenerator;
@@ -85,11 +85,11 @@ class FirstReviewJobWorkerTest {
         Instant completedAt = Instant.parse("2026-06-25T05:00:00Z");
         savePendingReviewJob("cl_1", "job_1", 2);
         CountDownLatch concurrentCalls = new CountDownLatch(2);
-        given(firstReviewClient.reviewQuestion(any(), anyString())).willAnswer(invocation -> {
+        given(reviewClient.reviewQuestion(any(), anyString())).willAnswer(invocation -> {
             concurrentCalls.countDown();
             assertThat(concurrentCalls.await(1, TimeUnit.SECONDS)).isTrue();
             String questionId = invocation.getArgument(1);
-            return new FirstReviewResult(questionId, questionId + " 리포트", questionId + " 수정본");
+            return new ReviewResult(questionId, questionId + " 리포트", questionId + " 수정본");
         });
         given(idGenerator.generate("rjqr")).willReturn("rjqr_1", "rjqr_2");
         given(idGenerator.generate("rv")).willReturn("rv_1");
@@ -99,7 +99,7 @@ class FirstReviewJobWorkerTest {
         worker.execute("job_1");
         worker.execute("job_1");
 
-        then(firstReviewClient).should(times(2)).reviewQuestion(any(), anyString());
+        then(reviewClient).should(times(2)).reviewQuestion(any(), anyString());
         assertThat(jobQuestionResultRepository.findByLlmJobIdOrderByQuestionOrderAsc("job_1"))
                 .extracting(ReviewJobQuestionResult::getStatus)
                 .containsExactly(
@@ -124,14 +124,14 @@ class FirstReviewJobWorkerTest {
     void retriesOnlyFailedQuestionOnceThenFailsWithoutCreatingVersion() {
         Instant failedAt = Instant.parse("2026-06-25T05:00:00Z");
         savePendingReviewJob("cl_1", "job_1", 1);
-        given(firstReviewClient.reviewQuestion(any(), anyString()))
-                .willThrow(FirstReviewClientException.providerError(new IllegalStateException("provider down")));
+        given(reviewClient.reviewQuestion(any(), anyString()))
+                .willThrow(ReviewClientException.providerError(new IllegalStateException("provider down")));
         given(idGenerator.generate("rjqr")).willReturn("rjqr_1");
         given(clock.instant()).willReturn(failedAt);
 
         worker.execute("job_1");
 
-        then(firstReviewClient).should(times(2)).reviewQuestion(any(), anyString());
+        then(reviewClient).should(times(2)).reviewQuestion(any(), anyString());
         assertThat(jobQuestionResultRepository.findByLlmJobIdOrderByQuestionOrderAsc("job_1"))
                 .extracting(ReviewJobQuestionResult::getStatus)
                 .containsExactly(ReviewJobQuestionResultStatus.FAILED);

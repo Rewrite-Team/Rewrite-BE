@@ -1,6 +1,6 @@
 package com.daon.rewrite.reviewversion.client;
 
-public record FirstReviewResult(
+public record ReviewResult(
         String questionId,
         String aiReport,
         String rewrittenAnswer

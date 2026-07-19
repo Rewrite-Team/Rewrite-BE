@@ -1,14 +1,15 @@
 package com.daon.rewrite.reviewversion.service;
 
-import com.daon.rewrite.reviewversion.client.FirstReviewClient;
-import com.daon.rewrite.reviewversion.client.FirstReviewClientException;
-import com.daon.rewrite.reviewversion.client.FirstReviewQuestion;
-import com.daon.rewrite.reviewversion.client.FirstReviewRequest;
-import com.daon.rewrite.reviewversion.client.FirstReviewResult;
+import com.daon.rewrite.reviewversion.client.ReviewClient;
+import com.daon.rewrite.reviewversion.client.ReviewClientException;
+import com.daon.rewrite.reviewversion.client.ReviewQuestion;
+import com.daon.rewrite.reviewversion.client.ReviewRequest;
+import com.daon.rewrite.reviewversion.client.ReviewResult;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 
@@ -17,23 +18,23 @@ class ReviewQuestionJobRunner {
 
     private static final int MAX_ATTEMPTS = 2;
 
-    private final FirstReviewClient firstReviewClient;
+    private final ReviewClient reviewClient;
     private final ReviewJobQuestionTransactionService transactionService;
     private final Executor executor;
 
     ReviewQuestionJobRunner(
-            FirstReviewClient firstReviewClient,
+            ReviewClient reviewClient,
             ReviewJobQuestionTransactionService transactionService,
             @Qualifier("reviewQuestionExecutor") Executor executor
     ) {
-        this.firstReviewClient = firstReviewClient;
+        this.reviewClient = reviewClient;
         this.transactionService = transactionService;
         this.executor = executor;
     }
 
-    FirstReviewClientException.Reason run(String jobId, FirstReviewRequest request) {
+    Optional<ReviewClientException.Reason> run(String jobId, ReviewRequest request) {
         // 문항별 비동기 작업 생성
-        List<CompletableFuture<QuestionOutcome>> futures = request.questions().stream()
+        List<CompletableFuture<Optional<ReviewClientException.Reason>>> futures = request.questions().stream()
                 .map(question -> CompletableFuture.supplyAsync(
                         () -> reviewQuestion(jobId, request, question),
                         executor
@@ -53,42 +54,29 @@ class ReviewQuestionJobRunner {
         // 모든 문항의 결과를 확인해서 처음 발견된 실패 사유를 반환한다.
         return futures.stream()
                 .map(CompletableFuture::join)
-                .filter(outcome -> outcome.failureReason() != null)  // 실패한 결과만 남기기
-                .map(QuestionOutcome::failureReason)
-                .findFirst()    // 첫번째 실패 사유를 Optional<Reason> 으로 반환
-                .orElse(null);  // 실패사유가 없으면 null 반환
+                .flatMap(Optional::stream)
+                .findFirst();
     }
 
-    private QuestionOutcome reviewQuestion(
+    private Optional<ReviewClientException.Reason> reviewQuestion(
             String jobId,
-            FirstReviewRequest request,
-            FirstReviewQuestion question
+            ReviewRequest request,
+            ReviewQuestion question
     ) {
         for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
             try {
-                FirstReviewResult result = firstReviewClient.reviewQuestion(request, question.questionId());
+                ReviewResult result = reviewClient.reviewQuestion(request, question.questionId());
                 transactionService.completeQuestion(jobId, result);
-                return QuestionOutcome.success();
-            } catch (FirstReviewClientException exception) {
+                return Optional.empty();
+            } catch (ReviewClientException exception) {
                 if (attempt < MAX_ATTEMPTS) {
                     transactionService.markRetry(jobId);
                     continue;
                 }
                 transactionService.failQuestion(jobId, question.questionId());
-                return QuestionOutcome.failure(exception.getReason());
+                return Optional.of(exception.getReason());
             }
         }
         throw new IllegalStateException("첨삭 문항 실행 횟수가 올바르지 않습니다.");
-    }
-
-    private record QuestionOutcome(FirstReviewClientException.Reason failureReason) {
-
-        private static QuestionOutcome success() {
-            return new QuestionOutcome(null);
-        }
-
-        private static QuestionOutcome failure(FirstReviewClientException.Reason reason) {
-            return new QuestionOutcome(reason);
-        }
     }
 }
