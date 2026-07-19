@@ -135,7 +135,9 @@ Content-Type: text/event-stream
 API 응답 DTO로 변환할 때는 `ZoneId.of("Asia/Seoul")` 기준으로 변환한 `LocalDateTime`을 사용한다. 따라서 날짜/시간 응답 값은 timezone offset이 없는 ISO 8601 local date-time 문자열이다.
 
 ```json
-"createdAt": "2026-06-20T14:00:00"
+{
+  "createdAt": "2026-06-20T14:00:00"
+}
 ```
 
 화면 표기 형식은 프론트엔드에서 변환한다.

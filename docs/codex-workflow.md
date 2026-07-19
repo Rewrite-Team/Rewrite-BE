@@ -43,7 +43,7 @@
 - 새 동작이나 변경된 동작을 검증할 테스트
 - 관련 `REQ-*`, API ID, Decision ID와 상태 문서
 - 설정, 빌드, CI, ERD, migration과 외부 공유 문서
-- API 변경 시 Markdown 계약, Excel 기준 원본과 Google Drive 미러
+- API 변경 시 Markdown 계약, 실제 코드와 Notion 프론트엔드용 동기화 문서
 
 구현 후에는 예상 영향 범위와 실제 diff를 대조하고, 이전 필드·path·상태값이나 호출부가 남았는지 저장소 전체에서 검색한다. 식별된 영향 대상은 모두 반영하거나, 반영할 필요가 없는 이유를 최종 응답이나 PR 본문에 남긴다.
 
@@ -51,22 +51,19 @@
 
 문서 변경 영향과 완료 여부는 `docs/README.md`의 Change Impact Matrix와 Completion Checklist를 단일 기준으로 확인한다. 갱신하지 않은 문서나 외부 미러가 있으면 영향이 없다고 판단한 이유 또는 실행하지 못한 이유를 최종 응답이나 PR 본문에 남긴다.
 
-## Excel API 문서 Google Drive 동기화
+## Notion API 문서 동기화
 
-`docs/api/rewrite-api-documentation.xlsx`는 Git에서 관리하는 기준 원본이다. 아래 Google Drive Excel 파일은 프론트엔드 공유용 미러로 사용한다.
+Git 저장소의 Markdown 문서와 실제 코드는 API 계약과 구현 상태의 기준 원본이다. Notion `Rewrite API (자동 동기화)` 데이터베이스는 프론트엔드 개발자가 사용하는 읽기 편한 동기화 문서이며, Notion에서 직접 수정한 내용은 저장소로 역동기화하지 않는다.
 
-- File ID: `15eS_Q4x5kAZHkQhkwNFk08Zt3wCkxo8W`
-- URL: `https://docs.google.com/spreadsheets/d/15eS_Q4x5kAZHkQhkwNFk08Zt3wCkxo8W/edit`
-- MIME type: `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`
+API 계약 또는 구현 상태가 변경되면 Codex는 다음 순서로 처리한다.
 
-Codex가 Excel API 문서를 수정할 때는 다음 순서로 처리한다.
-
-1. 로컬 Excel 문서를 갱신한다.
-2. 모든 시트를 렌더링하고 주요 범위, 수식 오류, 잘림과 가독성을 검증한다.
-3. Google Drive의 기존 File ID에 로컬 Excel 파일 바이트를 덮어쓴다.
-4. Drive metadata를 다시 조회해 File ID와 MIME type이 유지되고 수정 시각이 갱신됐는지 확인한다.
-5. 새 Drive 파일을 만들거나 네이티브 Google Sheet로 변환하지 않는다.
-6. 인증 또는 업로드가 실패하면 로컬 문서 검증 결과와 Drive 동기화 실패를 분리해 보고한다.
+1. 관련 Markdown 계약, 실제 controller/DTO와 테스트를 확인해 기준 원본을 확정한다.
+2. `API ID`로 Notion 데이터베이스를 조회한다. 같은 ID가 있으면 현재 페이지를 다시 읽고 사용자 변경을 보존한 범위에서 갱신하며, 없으면 새 페이지를 만든다.
+3. 속성 `Name`, `Method`, `Path`, `상태`, `사용 화면`, `설명`, `API ID`를 저장소 기준으로 갱신한다. 제목은 `API-007 · 내 자기소개서 목록` 형식이며 `API ID`는 숨김 고유 키다.
+4. 상세 페이지에는 호출 요약, Endpoint, Request, Success Response, Error Handling, Frontend Behavior, 필요한 조건부 섹션, 참고 정보를 작성한다. 실제 HTTP 요청과 성공 응답 JSON을 포함하고 JSON 문법을 검증한다. Request와 Success Response의 필드 경로·타입·필수 여부·nullable·설명을 표로 기록하고 배열 내부 필드는 `items[].id`처럼 펼친다. Error Handling은 HTTP 상태·오류 코드·발생 조건·프론트엔드 처리 방법을 표로 기록한다. 오류 코드가 계약에 정의되지 않았으면 빈 값, `-`, `계약 참조` 대신 `오류 코드 미정` 또는 `API별 오류 없음`을 사용하며, 비동기 Job 실패 상태를 HTTP 오류 응답 표에 넣지 않는다.
+5. 프론트엔드에 영향을 주는 validation, 오류 처리, redirect, Cookie, CSRF, polling, SSE, 이벤트 중복 제거, nullable·enum·상태별 화면 규칙을 반영한다. 내부 클래스, DB, transaction, worker 구조는 제외한다.
+6. 공통 오류 응답 구조는 공통 페이지에만 정의하고, 개별 API에는 실제 발생 가능한 오류만 기록한다.
+7. 생성 또는 갱신 뒤 `API ID`, Method, Path, 상태, 사용 화면과 페이지 본문을 다시 조회해 Markdown 계약과 일치하는지 확인한다. 실패하면 저장소 문서 검증 결과와 Notion 동기화 실패를 분리해 보고한다.
 
 ## 승인 게이트
 

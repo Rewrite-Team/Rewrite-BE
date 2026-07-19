@@ -1,41 +1,31 @@
 package com.daon.rewrite.reviewversion.service;
 
-import com.daon.rewrite.reviewversion.client.FirstReviewClient;
-import com.daon.rewrite.reviewversion.client.FirstReviewClientException;
-import com.daon.rewrite.reviewversion.client.FirstReviewResult;
+import com.daon.rewrite.reviewversion.client.ReviewClientException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
 public class ReReviewJobWorker {
 
     private final ReReviewJobTransactionService transactionService;
-    private final FirstReviewClient firstReviewClient;
+    private final ReviewQuestionJobRunner jobRunner;
     private final ReviewVersionService reviewVersionService;
 
     public void execute(String jobId) {
-        FirstReviewWork work = transactionService.start(jobId);
+        ReviewWork work = transactionService.start(jobId);
         if (work == null) {
             return;
         }
 
-        try {
-            List<FirstReviewResult> results = firstReviewClient.review(work.request());
-            reviewVersionService.completeReReview(
-                    jobId,
-                    results.stream()
-                            .map(result -> new ReviewQuestionResultInput(
-                                    result.questionId(),
-                                    result.aiReport(),
-                                    result.rewrittenAnswer()
-                            ))
-                            .toList()
-            );
-        } catch (FirstReviewClientException exception) {
-            transactionService.fail(jobId, exception.getReason());
+        Optional<ReviewClientException.Reason> failureReason = jobRunner.run(jobId, work.request());
+        if (failureReason.isPresent()) {
+            transactionService.fail(jobId, failureReason.get());
+            return;
         }
+
+        reviewVersionService.completeReReview(jobId);
     }
 }

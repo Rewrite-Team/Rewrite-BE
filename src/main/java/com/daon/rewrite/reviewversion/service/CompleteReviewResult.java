@@ -5,12 +5,12 @@ import com.daon.rewrite.reviewversion.entity.ReviewVersionQuestionResult;
 
 import java.util.List;
 
-public record CompleteFirstReviewResult(
+public record CompleteReviewResult(
         ReviewVersion reviewVersion,
         List<ReviewVersionQuestionResult> questionResults
 ) {
 
-    public CompleteFirstReviewResult {
+    public CompleteReviewResult {
         questionResults = List.copyOf(questionResults);
     }
 }

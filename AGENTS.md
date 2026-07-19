@@ -46,9 +46,14 @@
 ## API documentation rules
 
 - API를 추가하거나 변경하면 `docs/api/README.md`와 `docs/api/` 하위 관련 도메인 문서를 갱신한다.
-- API를 추가, 삭제하거나 path, request, response, error, validation, 상태 또는 구현 여부를 변경하면 같은 작업에서 `docs/api/rewrite-api-documentation.xlsx`도 반드시 갱신한다.
-- Excel API 문서의 내용·형식·검증 기준은 `docs/api/README.md`를 따르고, Google Drive 동기화는 `docs/codex-workflow.md`의 절차를 따른다.
-- `docs/api/rewrite-api-documentation.xlsx`는 기준 원본이며, 검증 후 Google Drive의 기존 파일 ID에 덮어써서 공유 URL을 유지한다. 동기화 실패는 완료로 보고하지 않는다.
+- Git 저장소의 Markdown 문서와 실제 코드는 API 계약과 구현 상태의 기준 원본이다.
+- API를 추가, 삭제하거나 path, request, response, error, validation, 상태 또는 구현 여부를 변경하면 같은 작업에서 Notion `Rewrite API (자동 동기화)` 데이터베이스도 갱신한다.
+- Notion은 프론트엔드 개발자가 보는 동기화 문서이며, `API ID`를 고유 키로 사용한다. Notion에서 직접 수정한 내용은 저장소로 역동기화하지 않는다.
+- Notion 페이지에는 프론트엔드 구현에 영향을 주는 호출 방법, 요청·응답, validation, 오류 처리, 화면 상태·polling·SSE·redirect·Cookie·CSRF만 기록한다. 내부 Service, Repository, Entity, DB, transaction, worker 구조는 기록하지 않는다.
+- Notion의 Request와 Success Response에는 필드 경로, 타입, 필수 여부, nullable 조건과 설명을 표로 기록한다. 배열 내부 필드는 `items[].id`처럼 펼친다.
+- Notion의 Error Handling은 HTTP 상태, 오류 코드, 발생 조건과 프론트엔드 처리 방법을 표로 기록한다.
+- 오류 코드가 계약에 정의되지 않았으면 빈 값, `-`, `계약 참조`를 사용하지 않고 `오류 코드 미정` 또는 `API별 오류 없음`으로 명시한다. 비동기 Job 실패 상태를 HTTP 오류 응답과 혼합하지 않는다.
+- Notion 갱신 절차와 검증 기준은 `docs/codex-workflow.md`를 따른다. 동기화에 실패하면 저장소 문서 검증과 Notion 동기화 실패를 분리해 보고한다.
 - API 변경이 요구사항, 상태, 설계 결정에 영향을 주면 `docs/requirements.md`, `docs/status.md`, `docs/decisions/` 하위 관련 문서도 함께 갱신한다.
 
 ## Progress tracking rules

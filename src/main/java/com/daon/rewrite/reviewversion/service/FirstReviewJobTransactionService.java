@@ -7,14 +7,17 @@ import com.daon.rewrite.coverletter.repository.CoverLetterQuestionRepository;
 import com.daon.rewrite.coverletter.repository.CoverLetterRepository;
 import com.daon.rewrite.global.exception.BusinessException;
 import com.daon.rewrite.global.exception.ErrorCode;
+import com.daon.rewrite.global.util.IdGenerator;
 import com.daon.rewrite.llmjob.entity.LlmJob;
 import com.daon.rewrite.llmjob.entity.LlmJobStatus;
 import com.daon.rewrite.llmjob.entity.LlmJobTargetType;
 import com.daon.rewrite.llmjob.entity.LlmJobType;
 import com.daon.rewrite.llmjob.repository.LlmJobRepository;
-import com.daon.rewrite.reviewversion.client.FirstReviewClientException;
-import com.daon.rewrite.reviewversion.client.FirstReviewQuestion;
-import com.daon.rewrite.reviewversion.client.FirstReviewRequest;
+import com.daon.rewrite.reviewversion.client.ReviewClientException;
+import com.daon.rewrite.reviewversion.client.ReviewQuestion;
+import com.daon.rewrite.reviewversion.client.ReviewRequest;
+import com.daon.rewrite.reviewversion.entity.ReviewJobQuestionResult;
+import com.daon.rewrite.reviewversion.repository.ReviewJobQuestionResultRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,14 +36,17 @@ class FirstReviewJobTransactionService {
     private static final String PROVIDER_ERROR_MESSAGE = "LLM 응답 생성에 실패했습니다.";
     private static final String OUTPUT_VALIDATION_ERROR_CODE = "LLM_OUTPUT_VALIDATION_FAILED";
     private static final String OUTPUT_VALIDATION_ERROR_MESSAGE = "LLM 출력 형식이 올바르지 않습니다.";
+    private static final String JOB_QUESTION_RESULT_ID_PREFIX = "rjqr";
 
     private final LlmJobRepository llmJobRepository;
     private final CoverLetterRepository coverLetterRepository;
     private final CoverLetterQuestionRepository questionRepository;
+    private final ReviewJobQuestionResultRepository jobQuestionResultRepository;
+    private final IdGenerator idGenerator;
     private final Clock clock;
 
     @Transactional
-    public FirstReviewWork start(String jobId) {
+    public ReviewWork start(String jobId) {
         LlmJob job = findFirstReviewJobForUpdate(jobId);
         if (job.getStatus() != LlmJobStatus.PENDING) {
             return null;
@@ -58,15 +64,23 @@ class FirstReviewJobTransactionService {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR);
         }
 
+        jobQuestionResultRepository.saveAll(questions.stream()
+                .map(question -> ReviewJobQuestionResult.processing(
+                        idGenerator.generate(JOB_QUESTION_RESULT_ID_PREFIX),
+                        job,
+                        question,
+                        question.getOriginalAnswer()
+                ))
+                .toList());
         job.startProcessing(STARTED_MESSAGE);
-        return new FirstReviewWork(new FirstReviewRequest(
+        return new ReviewWork(new ReviewRequest(
                 coverLetter.getTitle(),
                 coverLetter.getCompanyName(),
                 coverLetter.getPositionTitle(),
                 coverLetter.getJobPostingUrl(),
                 coverLetter.getPreferences(),
                 questions.stream()
-                        .map(question -> new FirstReviewQuestion(
+                        .map(question -> new ReviewQuestion(
                                 question.getId(),
                                 question.getQuestionOrder(),
                                 question.getQuestion(),
@@ -78,7 +92,7 @@ class FirstReviewJobTransactionService {
     }
 
     @Transactional
-    public void fail(String jobId, FirstReviewClientException.Reason reason) {
+    public void fail(String jobId, ReviewClientException.Reason reason) {
         LlmJob job = findFirstReviewJobForUpdate(jobId);
         if (job.getStatus() == LlmJobStatus.COMPLETED || job.getStatus() == LlmJobStatus.FAILED) {
             return;
@@ -108,15 +122,15 @@ class FirstReviewJobTransactionService {
         return job;
     }
 
-    private String errorCode(FirstReviewClientException.Reason reason) {
-        if (reason == FirstReviewClientException.Reason.OUTPUT_VALIDATION_FAILED) {
+    private String errorCode(ReviewClientException.Reason reason) {
+        if (reason == ReviewClientException.Reason.OUTPUT_VALIDATION_FAILED) {
             return OUTPUT_VALIDATION_ERROR_CODE;
         }
         return PROVIDER_ERROR_CODE;
     }
 
-    private String errorMessage(FirstReviewClientException.Reason reason) {
-        if (reason == FirstReviewClientException.Reason.OUTPUT_VALIDATION_FAILED) {
+    private String errorMessage(ReviewClientException.Reason reason) {
+        if (reason == ReviewClientException.Reason.OUTPUT_VALIDATION_FAILED) {
             return OUTPUT_VALIDATION_ERROR_MESSAGE;
         }
         return PROVIDER_ERROR_MESSAGE;

@@ -690,7 +690,7 @@ Decision 039에서 최종 작성본은 빈 문자열로 저장할 수 없다고 
 
 최초 첨삭과 재첨삭은 문항별 OpenAI 호출을 병렬 실행한다. 각 호출에는 전체 자기소개서 문맥과 대상 문항을 전달하고, 문항의 `aiReport`와 `rewrittenAnswer`가 모두 완성되고 검증되면 Job과 연결된 임시 문항 결과로 DB에 저장한다.
 
-모든 문항이 성공한 경우에만 임시 결과를 최종 `ReviewVersion`과 `ReviewVersionQuestionResult`로 확정한다. 최종 실패한 Job은 새 `ReviewVersion`을 만들지 않으며 임시 결과를 사용자-facing API에서 숨긴다.
+모든 문항 task가 종료되고 모든 임시 결과가 성공한 경우에만 최종 `ReviewVersion`과 `ReviewVersionQuestionResult`로 한 transaction에서 확정한다. 최종 실패한 Job은 새 `ReviewVersion`을 만들지 않는다. 실패 Job의 임시 결과는 MVP에서 내부 진단을 위해 보존하되 사용자-facing API에서 숨기며, 보존 기간과 정리 배치는 후속 운영 범위로 둔다.
 
 ### 선택 이유
 
@@ -705,7 +705,7 @@ Decision 039에서 최종 작성본은 빈 문자열로 저장할 수 없다고 
 
 ### 결정
 
-재첨삭 Job은 요청 시점의 최신 `ReviewVersion`을 `requestRef`로 고정하고, 각 문항의 `finalAnswer`를 새 첨삭 입력으로 사용한다. 진행 상세의 `originalAnswer`는 이 실제 입력값을 반환한다.
+재첨삭 Job은 요청 transaction에서 요청 시점의 최신 `ReviewVersion`을 `requestRef`로 고정하고, 각 문항의 `finalAnswer`를 임시 입력 스냅샷으로 함께 저장한다. 진행 상세의 `originalAnswer`는 이 실제 입력값을 반환한다.
 
 새 Job 시작 시 이전 버전의 `aiReport`, `rewrittenAnswer`, `finalAnswer`를 진행 결과에 복사하지 않는다. 새 문항 결과가 완성될 때마다 해당 문항의 AI 필드와 `finalAnswer`를 새 결과로 채우며, `finalAnswer` 초깃값은 `rewrittenAnswer`와 같다.
 

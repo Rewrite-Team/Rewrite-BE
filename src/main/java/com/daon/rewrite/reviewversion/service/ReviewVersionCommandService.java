@@ -15,7 +15,9 @@ import com.daon.rewrite.llmjob.entity.LlmJobTargetType;
 import com.daon.rewrite.llmjob.repository.LlmJobRepository;
 import com.daon.rewrite.llmjob.service.LlmJobCreatedEvent;
 import com.daon.rewrite.reviewversion.entity.ReviewVersion;
+import com.daon.rewrite.reviewversion.entity.ReviewJobQuestionResult;
 import com.daon.rewrite.reviewversion.entity.ReviewVersionQuestionResult;
+import com.daon.rewrite.reviewversion.repository.ReviewJobQuestionResultRepository;
 import com.daon.rewrite.reviewversion.repository.ReviewVersionQuestionResultRepository;
 import com.daon.rewrite.reviewversion.repository.ReviewVersionRepository;
 import lombok.RequiredArgsConstructor;
@@ -39,6 +41,7 @@ public class ReviewVersionCommandService {
     private static final int MAX_FINAL_ANSWER_LENGTH = 5000;
     private static final int MAX_REQUEST_INSTRUCTION_LENGTH = 1000;
     private static final String LLM_JOB_ID_PREFIX = "job";
+    private static final String JOB_QUESTION_RESULT_ID_PREFIX = "rjqr";
     private static final List<LlmJobStatus> RUNNING_JOB_STATUSES = List.of(
             LlmJobStatus.PENDING,
             LlmJobStatus.PROCESSING
@@ -48,6 +51,7 @@ public class ReviewVersionCommandService {
     private final CoverLetterRepository coverLetterRepository;
     private final ReviewVersionRepository reviewVersionRepository;
     private final ReviewVersionQuestionResultRepository questionResultRepository;
+    private final ReviewJobQuestionResultRepository jobQuestionResultRepository;
     private final LlmJobRepository llmJobRepository;
     private final IdGenerator idGenerator;
     private final Clock clock;
@@ -61,7 +65,7 @@ public class ReviewVersionCommandService {
     ) {
         CurrentUser currentUser = currentUserProvider.currentUser();
         CoverLetter coverLetter = coverLetterRepository
-                .findByIdAndOwnerIdAndDeletedAtIsNull(coverLetterId, currentUser.id())
+                .findActiveByIdAndOwnerIdForUpdate(coverLetterId, currentUser.id())
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
         ReviewVersion reviewVersion = reviewVersionRepository.findByIdAndCoverLetterId(versionId, coverLetter.getId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
@@ -114,9 +118,18 @@ public class ReviewVersionCommandService {
                 idGenerator.generate(LLM_JOB_ID_PREFIX),
                 coverLetter.getId(),
                 normalizedInstruction,
+                coverLetter.getLatestReviewVersionId(),
                 Instant.now(clock),
                 latestResults.size()
         ));
+        jobQuestionResultRepository.saveAll(latestResults.stream()
+                .map(result -> ReviewJobQuestionResult.processing(
+                        idGenerator.generate(JOB_QUESTION_RESULT_ID_PREFIX),
+                        job,
+                        result.getQuestion(),
+                        result.getFinalAnswer()
+                ))
+                .toList());
         eventPublisher.publishEvent(new LlmJobCreatedEvent(job.getId()));
 
         return new RequestReReviewResult(coverLetter.getId(), job);

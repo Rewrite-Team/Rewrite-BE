@@ -1632,15 +1632,17 @@ API-012는 `DRAFT`, `REVIEWING`, `REVIEW_FAILED`, `REVIEWED` 모든 상태에서
 
 ### 결정
 
-API-007 목록 항목에 현재 최초 첨삭 또는 재첨삭 Job 요약인 `activeReviewJob`을 추가한다. 메인 화면은 카드마다 연결하지 않고 API-030 `GET /cover-letters/stream` 연결 하나로 현재 사용자의 첨삭 상태 변경을 수신한다.
+API-007 목록 항목은 내부 자기소개서·Job 상태 대신 메인 화면 표시용 `displayStatus=WRITING|REVIEWING|REVIEWED|REVIEW_FAILED`를 반환한다. 현재 최초 첨삭 또는 재첨삭 Job이 `PENDING`이나 `PROCESSING`이면 `displayStatus=REVIEWING`으로 계산한다. 메인 화면은 카드마다 연결하지 않고 API-030 `GET /cover-letters/stream` 연결 하나로 현재 사용자의 첨삭 상태 변경을 수신한다.
 
-연결 직후 현재 활성 Job 스냅샷을 전송하고 이후 시작, 완료, 실패 이벤트를 전송한다. 완료 또는 실패 시 `activeReviewJob`은 `null`이다.
+연결 직후 soft delete되지 않은 모든 자기소개서의 현재 표시 상태 스냅샷을 전송하고 이후 시작, 완료, 실패처럼 메인 화면에 필요한 이벤트를 전송한다. API-030 이벤트는 `eventPhase=SNAPSHOT|CHANGE`로 두 단계를 구분하고, `CHANGE`의 `changeType=REVIEW_STARTED|REVIEW_COMPLETED|REVIEW_FAILED`로 변경 원인을 명시한다. `PENDING → PROCESSING`은 표시 상태를 바꾸지 않으므로 메인 스트림에 노출하지 않는다.
+
+프론트엔드는 모든 이벤트에서 `displayStatus`와 `latestReviewVersionId`를 목록 항목에 그대로 함께 반영하고 내부 상태를 조합하지 않는다. 재첨삭 실패는 기존 결과 접근을 유지하기 위해 `displayStatus=REVIEWED`로 반환하고 `changeType=REVIEW_FAILED`로 알린다. 서버는 연결을 이벤트 라우터에 등록한 뒤 스냅샷을 조회·전송하며, 그 사이 발생한 변경 이벤트를 연결별로 버퍼링해 스냅샷 다음에 발생 순서대로 전송한다.
 
 ### 선택 이유
 
-목록 카드 수에 비례해 SSE 연결을 만들 필요가 없고, 최초 첨삭과 `CoverLetter.status=REVIEWED`를 유지하는 재첨삭을 같은 방식으로 `첨삭 중` 표시할 수 있다.
+목록 카드 수에 비례해 SSE 연결을 만들 필요가 없고, 서버가 메인 화면 상태를 계산하므로 프론트엔드가 서로 다른 두 상태 모델을 조합하지 않아도 된다. 전체 현재 상태 스냅샷은 목록 조회와 스트림 연결 사이에 종료된 Job으로 인한 stale 상태를 해소한다. `changeType`은 재첨삭 실패 시에도 `displayStatus`나 `latestReviewVersionId` 변화를 비교하지 않고 실패를 식별하게 한다.
 
 ### 트레이드오프
 
-- 장점: 연결 수가 사용자당 하나로 고정되고 목록 상태가 실시간으로 갱신된다.
-- 단점: 서버가 사용자별 이벤트 라우팅과 연결 직후 스냅샷 조회를 지원해야 한다.
+- 장점: 연결 수가 사용자당 하나로 고정되고 목록 상태가 실시간으로 갱신된다. 프론트엔드는 표시 상태를 그대로 사용하고 최초 첨삭과 재첨삭의 성공·실패를 같은 이벤트 계약으로 구분하며, 연결 시점의 상태 변경 누락도 복구한다.
+- 단점: 서버가 화면 표시 상태 계산, 사용자별 이벤트 라우팅, 전체 현재 상태 스냅샷 조회와 스냅샷 전송 중 변경 이벤트 버퍼링을 지원해야 한다. 자기소개서 수에 비례해 연결 직후 이벤트 수가 증가한다.

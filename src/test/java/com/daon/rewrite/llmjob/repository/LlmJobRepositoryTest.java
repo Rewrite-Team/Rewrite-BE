@@ -63,6 +63,7 @@ class LlmJobRepositoryTest {
                 "job_1",
                 "cl_1",
                 "직무 키워드를 강조해주세요.",
+                "rv_1",
                 now,
                 3
         );
@@ -78,6 +79,8 @@ class LlmJobRepositoryTest {
         assertThat(found.getTargetType()).isEqualTo(LlmJobTargetType.COVER_LETTER);
         assertThat(found.getTargetId()).isEqualTo("cl_1");
         assertThat(found.getRequestInstruction()).isEqualTo("직무 키워드를 강조해주세요.");
+        assertThat(found.getRequestRefType()).isEqualTo(LlmJobRequestRefType.REVIEW_VERSION);
+        assertThat(found.getRequestRefId()).isEqualTo("rv_1");
         assertThat(found.getProgressCurrent()).isZero();
         assertThat(found.getProgressTotal()).isEqualTo(3);
         assertThat(found.getCreatedAt()).isEqualTo(now);

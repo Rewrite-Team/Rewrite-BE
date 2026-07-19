@@ -74,7 +74,7 @@ class FirstReviewJobEventIntegrationTest {
     }
 
     @Test
-    void submitSchedulesFirstReviewWorkerAfterCommit() {
+    void submitSchedulesReviewWorkerAfterCommit() {
         Instant now = Instant.parse("2026-06-25T01:00:00Z");
         given(currentUserProvider.currentUser()).willReturn(new CurrentUser("user_1", "테스트", null));
         given(idGenerator.generate("job")).willReturn("job_1");
@@ -109,6 +109,7 @@ class FirstReviewJobEventIntegrationTest {
                     "job_1",
                     "cl_1",
                     "직무 키워드를 강조해주세요.",
+                    "rv_1",
                     now,
                     1
             ));
