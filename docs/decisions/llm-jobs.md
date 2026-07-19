@@ -650,7 +650,7 @@ partial result는 진행 중 화면 복구를 위한 임시 데이터다. 서버
 
 ## Decision 064: 실패한 첨삭 Job의 partialResult는 실패 화면에 표시하지 않는다
 
-> Superseded by Decision 075. 실패한 첨삭 Job의 임시 문항 결과는 사용자-facing API에서 숨긴다.
+> Superseded by Decision 082. 실패한 첨삭 Job에서도 성공한 임시 문항 결과를 API-012에 포함한다.
 
 ### 결정
 
@@ -708,6 +708,23 @@ latestFirstReviewJob.completedAt
 - 단점
   - 사용자는 실패 전까지 어느 정도 생성됐는지 볼 수 없다.
   - 디버깅용 partial 내용 확인은 운영 로그나 내부 도구에 의존해야 한다.
+
+## Decision 085: Job 상태 조회는 복구에 필요한 필드만 반환한다
+
+### 결정
+
+API-015 Job 상태 조회는 `status`, `progress`, `resultRef`, `error`만 반환한다. Job ID는 path와 중복되므로 제외하고 type, target, 내부 재시도 횟수, partial result와 생성·완료 시각도 공개 응답에서 제외한다.
+
+API-015는 실시간 진행의 주 경로가 아니라 SSE 재연결·이벤트 유실과 별도 SSE가 없는 키워드 분석·면접 Job의 상태 복구 경로로 유지한다.
+
+### 선택 이유
+
+최초·재첨삭은 API-012와 API-016으로 진행 화면을 구성하지만, 면접 추가 질문과 답변 피드백 등은 Job의 최종 실패 상태를 확인할 공통 fallback이 필요하다. 복구에 사용하지 않는 내부 필드를 제거하면 Job 구현과 프론트엔드 계약의 결합을 줄일 수 있다.
+
+### 트레이드오프
+
+- 장점: 모든 LLM Job에 공통 복구 경로를 유지하면서 응답을 최소화한다.
+- 단점: 운영용 Job 메타데이터가 필요하면 별도 내부 조회가 필요하다.
 
 
 
@@ -939,15 +956,38 @@ LLM 출력은 사용자에게 직접 보이는 결과 데이터다. 구조가 �
 
 ### 결정
 
-API-016은 최초 첨삭과 재첨삭에 공통으로 문항의 `aiReport`와 `rewrittenAnswer`가 모두 완성된 시점에 `review.question.completed` 이벤트 하나를 전송한다. 필드별 또는 토큰별 delta 이벤트는 제공하지 않는다.
+API-016은 최초 첨삭과 재첨삭에 공통으로 연결 직후 `job.snapshot`과 `review.questions.snapshot`을 순서대로 전송한다. 공통 스냅샷은 현재 Job `status`, `progress`, 완료 결과 `resultRef` 또는 실패 `error`를 포함하고, 첨삭 문항 스냅샷은 완료 문항 `items`를 포함한다.
 
-연결 직후 해당 Job에 임시 영속 저장된 완료 문항 결과를 같은 이벤트 형식으로 먼저 전송한 뒤 실시간 이벤트를 전송한다. 이벤트는 중복될 수 있으며 클라이언트는 `questionId`로 upsert하고 `order`로 정렬한다. `Last-Event-ID` 기반 영속 replay는 제공하지 않는다.
+문항의 `aiReport`와 `rewrittenAnswer`가 모두 완성된 시점에는 `review.question.completed` 이벤트 하나를 전송한다. 이벤트에는 완성된 문항 결과와 갱신된 `progress`를 포함하며, 필드별 또는 토큰별 delta 이벤트는 제공하지 않는다. Job 종료는 `job.completed` 또는 `job.failed`로 전달한다.
+
+서버는 연결을 먼저 등록하고 스냅샷 전송 중 발생한 변경 이벤트를 버퍼링한 뒤 이어서 전송한다. 이벤트는 중복될 수 있으며 클라이언트는 `questionId`로 upsert하고 `order`로 정렬한다. `Last-Event-ID` 기반 영속 replay는 제공하지 않고 재연결할 때 최신 스냅샷을 다시 전송한다. 연결 유지는 SSE comment heartbeat를 사용한다.
+
+Job ID는 path에 있으므로 이벤트 데이터에 포함하지 않는다. 연결 시점 상태는 스냅샷으로 전달하므로 `job.started`를 사용하지 않으며 진행률은 문항 완료 이벤트에 포함하므로 별도 `job.progress`도 사용하지 않는다.
 
 ### 선택 이유
 
-AI 리포트와 수정본은 한 문항의 완결된 결과로 함께 사용한다. 문항 단위 전송은 불완전한 필드 조합을 피하고, 연결 직후 스냅샷은 상세 조회와 SSE 연결 사이의 이벤트 누락을 방지한다.
+AI 리포트와 수정본은 한 문항의 완결된 결과로 함께 사용한다. 문항 단위 전송은 불완전한 필드 조합을 피하고, 상태와 완료 문항을 함께 담은 연결 직후 스냅샷은 상세 조회와 SSE 연결 사이의 이벤트 누락과 종료 이벤트 유실을 복구한다.
 
 ### 트레이드오프
 
 - 장점: 프론트엔드 상태 병합이 단순하고 새로고침·재연결 복구가 안정적이다.
 - 단점: 토큰 스트리밍처럼 글자가 생성되는 즉시 보이는 효과는 제공하지 않는다.
+
+## Decision 090: API-016은 첨삭·키워드 분석·면접 Job의 공통 SSE다
+
+### 결정
+
+API-016은 최초 첨삭·재첨삭, 키워드 분석, 초기·추가 면접 질문 생성, 면접 답변 피드백에 공통으로 사용한다. 모든 Job은 연결 직후 `job.snapshot`을 전송하고, 첨삭 Job은 `review.questions.snapshot`과 `review.question.completed`를 추가로 전송한다. 면접 답변 피드백 Job은 `interview.feedback.delta`로 1부터 증가하는 `sequence`와 `contentDelta`를 전송한다. 키워드 분석과 초기·추가 면접 질문 생성은 중간 도메인 이벤트 없이 `job.completed` 또는 `job.failed`만 전달한다.
+
+완료 `resultRef.type`은 Job에 따라 `REVIEW_VERSION`, `KEYWORD_ANALYSIS`, `INTERVIEW_SESSION`, `INTERVIEW_QUESTION`, `INTERVIEW_MESSAGE`를 사용한다. 키워드 분석 완료 후 API-021을, 초기 면접 질문 생성 완료 후 API-025와 API-026을, 추가 면접 질문 생성 완료 후 API-026을, 면접 피드백 완료 후 API-029를 다시 조회한다. 도메인 조회 응답은 진행 중이거나 최근 실패한 Job ID를 제공해 새로고침 후 SSE에 다시 연결할 수 있게 하며, SSE 연결 실패 시 polling fallback으로 사용한다.
+
+면접 피드백 delta는 현재 연결의 실시간 표시 효과만 제공하며 영속 저장하거나 replay하지 않는다. 재연결 시 이전 delta가 유실되면 이후 delta의 불완전한 뒷부분을 표시하지 않고 진행 상태만 보여준 뒤, 완료된 전체 assistant 메시지를 API-029로 조회한다.
+
+### 선택 이유
+
+중간 결과가 없는 작업도 시작 직후 완료 시점을 실시간으로 알릴 필요가 있다. 하나의 Job SSE 계약을 재사용하면 도메인별 스트림 API를 추가하지 않고도 시작, 새로고침 복구, 완료 후 결과 재조회를 같은 흐름으로 통일할 수 있다.
+
+### 트레이드오프
+
+- 장점: 비동기 시작 API와 프론트엔드의 Job 추적 흐름이 일관된다.
+- 단점: 공통 이벤트와 첨삭 전용 이벤트를 구분해 처리해야 하며, 연결 실패에 대비한 도메인 polling fallback도 유지해야 한다.

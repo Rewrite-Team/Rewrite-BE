@@ -102,3 +102,19 @@ API 계약: `../api/README.md`
 | Decision 077 | 메인 첨삭 상태는 사용자 단일 SSE 연결로 갱신한다 | `cover-letters.md` | REQ-003, REQ-005 | API-007, API-030 | Active |
 | Decision 078 | 재첨삭은 이전 최신 최종 작성본을 입력으로 새 결과를 생성한다 | `review-versions.md` | REQ-006 | API-012, API-024 | Active |
 | Decision 079 | 최신 키워드 분석 응답은 화면용 자기소개서와 기준 버전 요약을 포함한다 | `keyword-analysis.md` | REQ-009 | API-021 | Active |
+| Decision 080 | 자기소개서 생성 응답은 id만 반환한다 | `cover-letters.md` | REQ-003 | API-008 | Active |
+| Decision 081 | 등록 단계 저장 응답은 성공 여부만 반환한다 | `cover-letters.md` | REQ-004 | API-009 - API-011 | Active |
+| Decision 082 | 실패한 첨삭 Job의 성공 문항 결과를 상세 응답에 포함한다 | `review-versions.md` | REQ-005, REQ-006 | API-012, API-016, API-024 | Active |
+| Decision 083 | 자기소개서 삭제 응답은 성공 여부만 반환한다 | `cover-letters.md` | REQ-003 | API-013 | Active |
+| Decision 084 | 최초 첨삭 제출 응답은 표시 상태와 Job ID만 반환한다 | `cover-letters.md` | REQ-005 | API-014 | Active |
+| Decision 085 | Job 상태 조회는 복구에 필요한 필드만 반환한다 | `llm-jobs.md` | REQ-005, REQ-009, REQ-010 | API-015 | Active |
+| Decision 086 | 재첨삭 시작 응답은 표시 상태와 Job ID만 반환한다 | `review-versions.md` | REQ-006 | API-024 | Active |
+| Decision 087 | 최종 작성본 저장은 버전 검증 후 성공 여부만 반환한다 | `review-versions.md` | REQ-006 | API-019 | Active |
+| Decision 088 | 키워드 분석 시작은 최신 버전을 자동 선택하고 Job 정보만 반환한다 | `keyword-analysis.md` | REQ-009 | API-020 | Active |
+| Decision 089 | 키워드 분석 상태는 결과 조회 API를 polling한다 | `keyword-analysis.md` | REQ-009 | API-020, API-021 | Superseded by Decision 090 |
+| Decision 090 | API-016은 첨삭·키워드 분석·면접 Job의 공통 SSE다 | `llm-jobs.md` | REQ-005, REQ-006, REQ-009, REQ-010 | API-016, API-020 - API-023, API-025, API-029 | Active |
+| Decision 091 | 모의면접 시작은 최신 첨삭 버전을 자동 선택하고 공통 Job SSE로 추적한다 | `interviews.md` | REQ-010 | API-016, API-022, API-025 - API-026 | Active |
+| Decision 092 | 면접 질문 목록은 화면과 대화 진입에 필요한 필드만 반환한다 | `interviews.md` | REQ-010 | API-026 | Active |
+| Decision 093 | 추가 면접 질문 생성은 Job ID만 반환하고 현재 세션 조회로 복구한다 | `interviews.md` | REQ-010 | API-016, API-025 - API-027 | Active |
+| Decision 094 | 면접 메시지 조회는 표시 문장과 점수만 공개하고 피드백 Job을 복구한다 | `interviews.md` | REQ-010 | API-016, API-023, API-029 | Active |
+| Decision 095 | 사용자 답변 전송은 메시지 ID와 Job ID만 반환한다 | `interviews.md` | REQ-010 | API-016, API-023 | Active |

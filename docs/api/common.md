@@ -128,6 +128,16 @@ Accept: text/event-stream
 Content-Type: text/event-stream
 ```
 
+### 성공 응답
+
+성공 응답은 공통 `data` envelope로 감싸지 않고 API별 응답 DTO를 최상위 JSON 객체로 직접 반환한다.
+
+단일 리소스는 객체를 직접 반환하고, 목록은 `items` 배열을 포함하는 객체로 반환한다. 페이지네이션 목록은 `items`, `page`, `size`, `totalItems`, `totalPages`를 같은 최상위 객체에 포함한다.
+
+nullable 필드는 값이 없을 때 필드를 생략하지 않고 `null`을 반환한다. 배열은 nullable로 사용하지 않고 값이 없으면 빈 배열 `[]`을 반환한다.
+
+새 자기소개서 초안 생성은 `201 Created`를 반환한다. 일반 조회, 저장·수정·삭제와 기존 Job을 반환할 수 있는 LLM Job 시작 요청은 응답 객체와 함께 `200 OK`를 반환한다. SSE 연결은 `200 OK`, OAuth 흐름은 성공·실패 결과에 맞는 redirect 응답을 사용한다.
+
 ### 날짜 형식
 
 서버 내부의 모든 시간 값은 `Instant`로 저장하고 처리한다.
@@ -161,6 +171,8 @@ API 응답 DTO로 변환할 때는 `ZoneId.of("Asia/Seoul")` 기준으로 변환
   }
 }
 ```
+
+`details`는 항상 배열로 반환하며 상세 정보가 없으면 빈 배열 `[]`을 사용한다. 프론트엔드는 `HTTP 상태 + error.code`를 분기 기준으로 사용하고, 사용자 문구는 `error.code` 기준으로 매핑한다.
 
 대표 에러 코드:
 
@@ -408,9 +420,9 @@ LLM 출력 파싱 실패, 필수 필드 누락, 타입 불일치, 범위 위반�
 
 첨삭 Job(`COVER_LETTER_REVIEW`, `COVER_LETTER_RE_REVIEW`)은 문항별 호출을 병렬 실행하고, 문항의 `aiReport`와 `rewrittenAnswer`가 모두 완성된 결과만 Job과 연결된 임시 문항 결과로 영속 저장한다. API-012는 이 완료 문항을 진행 상세에 포함하고 API-016은 같은 결과를 `review.question.completed` 이벤트로 전송한다.
 
-Job 상태 조회의 `partialResult`는 호환 필드로 유지하지만 첨삭 진행 화면 복구에 사용하지 않고 `null`을 반환한다. 필드별 partial text와 토큰별 첨삭 delta는 저장하거나 전송하지 않는다.
+Job 상태 조회는 복구에 필요한 상태, 진행률, 결과 참조와 오류만 반환한다. 필드별 partial text와 토큰별 첨삭 delta는 저장하거나 전송하지 않는다.
 
-모든 문항이 성공하면 임시 결과를 `ReviewVersionQuestionResult`로 확정하고 `ReviewVersion`을 생성한다. 최종 실패한 Job은 새 버전을 만들지 않으며 임시 결과를 사용자-facing API에서 숨긴다.
+모든 문항이 성공하면 임시 결과를 `ReviewVersionQuestionResult`로 확정하고 `ReviewVersion`을 생성한다. 최종 실패한 Job은 새 버전을 만들지 않지만, 성공한 임시 문항 결과는 API-012에서 읽기 전용 부분 결과로 반환한다.
 
 ### KeywordAnalysis
 

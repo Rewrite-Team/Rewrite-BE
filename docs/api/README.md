@@ -69,27 +69,27 @@ API 설계 결정과 트레이드오프는 `../decisions/README.md`를 함께 �
 | API-004 | POST | `/auth/refresh` | Planned | REQ-008 | refresh token rotation |
 | API-005 | GET | `/user/me` | Planned | REQ-008 | 내 정보 조회 |
 | API-006 | POST | `/auth/logout` | Planned | REQ-008 | 로그아웃 |
-| API-007 | GET | `/cover-letters` | In Progress | REQ-003 | 화면 표시용 `displayStatus`를 포함하는 목록 계약 확정, 구현 필요 |
-| API-008 | POST | `/cover-letters` | Implemented | REQ-003 | 자기소개서 초안 생성 |
-| API-009 | PUT | `/cover-letters/{coverLetterId}/basic-info` | Implemented | REQ-004 | 등록 step1 저장 |
-| API-010 | PUT | `/cover-letters/{coverLetterId}/preferences` | Implemented | REQ-004 | 등록 step2 저장 |
-| API-011 | PUT | `/cover-letters/{coverLetterId}/questions` | Implemented | REQ-004 | 등록 step3 저장 |
-| API-012 | GET | `/cover-letters/{coverLetterId}` | Planned | REQ-003 | 자기소개서 상세 |
-| API-013 | DELETE | `/cover-letters/{coverLetterId}` | Implemented | REQ-003 | 자기소개서 soft delete |
-| API-014 | POST | `/cover-letters/{coverLetterId}/submit` | Implemented | REQ-005 | 최초 첨삭 Job 생성, 문항별 병렬 호출·1회 재시도, 입력/완료 staging 저장과 전체 성공 시 버전 확정 구현됨 |
-| API-015 | GET | `/llm-jobs/{jobId}` | Implemented | REQ-005 | LLM Job 상태 조회 |
-| API-016 | GET | `/llm-jobs/{jobId}/stream` | Planned | REQ-005 | SSE 스트리밍 |
+| API-007 | GET | `/cover-letters` | In Progress | REQ-003 | 화면 표시용 `displayStatus` 응답·필터 계약 확정, 구현 필요 |
+| API-008 | POST | `/cover-letters` | In Progress | REQ-003 | 생성 응답을 `id` 단일 필드로 확정, 구현 변경 필요 |
+| API-009 | PUT | `/cover-letters/{coverLetterId}/basic-info` | In Progress | REQ-004 | 저장 응답을 `success` 단일 필드로 확정, 구현 변경 필요 |
+| API-010 | PUT | `/cover-letters/{coverLetterId}/preferences` | In Progress | REQ-004 | 저장 응답을 `success` 단일 필드로 확정, 구현 변경 필요 |
+| API-011 | PUT | `/cover-letters/{coverLetterId}/questions` | In Progress | REQ-004 | 저장 응답을 `success` 단일 필드로 확정, 구현 변경 필요 |
+| API-012 | GET | `/cover-letters/{coverLetterId}` | In Progress | REQ-003, REQ-005, REQ-006 | 상태 공통 상세 응답과 실패 Job 부분 성공 문항 공개 계약 확정, 구현 필요 |
+| API-013 | DELETE | `/cover-letters/{coverLetterId}` | In Progress | REQ-003 | 삭제 응답을 `success` 단일 필드로 확정, 구현 변경 필요 |
+| API-014 | POST | `/cover-letters/{coverLetterId}/submit` | In Progress | REQ-005 | 응답을 `displayStatus`, `jobId`로 확정, 구현 변경 필요 |
+| API-015 | GET | `/llm-jobs/{jobId}` | In Progress | REQ-005, REQ-009, REQ-010 | 복구용 경량 Job 상태 응답으로 확정, 구현 변경 필요 |
+| API-016 | GET | `/llm-jobs/{jobId}/stream` | In Progress | REQ-005, REQ-006, REQ-009, REQ-010 | 공통 Job 스냅샷·종료, 첨삭 문항, 면접 피드백 delta 이벤트 계약 확정, 구현 필요 |
 | API-017 | GET | `/cover-letters/{coverLetterId}/review-versions` | Implemented | REQ-006 | 첨삭 버전 목록 |
 | API-018 | GET | `/cover-letters/{coverLetterId}/review-versions/{versionId}` | In Progress | REQ-006 | 조회 구현됨, API-012와 공통 상세 응답 계약 전환 필요 |
-| API-019 | PUT | `/cover-letters/{coverLetterId}/review-versions/{versionId}/final-answers` | Implemented | REQ-006 | 최종 작성본 일괄 저장 |
-| API-020 | POST | `/cover-letters/{coverLetterId}/keyword-analysis` | Implemented | REQ-009 | 키워드 분석 시작/재분석 |
-| API-021 | GET | `/cover-letters/{coverLetterId}/keyword-analysis/latest` | In Progress | REQ-009 | 조회 구현됨, 자기소개서·분석 기준 버전 요약 응답 추가 필요 |
-| API-022 | POST | `/cover-letters/{coverLetterId}/interviews` | Implemented | REQ-010 | 면접 세션과 초기 질문 생성 Job 생성 |
-| API-023 | POST | `/interview-threads/{threadId}/messages` | Implemented | REQ-010 | USER 답변 저장, 피드백 Job 실행, ASSISTANT 피드백 메시지 저장 |
-| API-024 | POST | `/cover-letters/{coverLetterId}/review-versions` | Implemented | REQ-006 | 요청 시점 최신 버전·최종 작성본 입력 고정, 문항별 병렬 호출·1회 재시도와 staging 기반 버전 확정 구현됨 |
-| API-025 | GET | `/cover-letters/{coverLetterId}/interview` | Implemented | REQ-010 | 현재 면접 세션 조회 |
-| API-026 | GET | `/interviews/{interviewSessionId}/questions` | Implemented | REQ-010 | 유형 구분 없는 자기소개서 기반 면접 질문 목록 |
-| API-027 | POST | `/interviews/{interviewSessionId}/questions` | Implemented | REQ-010 | 최신 첨삭 버전 기준 자기소개서 기반 면접 질문과 thread 1개 추가 생성 |
+| API-019 | PUT | `/cover-letters/{coverLetterId}/review-versions/{versionId}/final-answers` | In Progress | REQ-006 | `versionId` 동시성 검증을 유지하고 저장 응답을 `success` 단일 필드로 확정, 구현 변경 필요 |
+| API-020 | POST | `/cover-letters/{coverLetterId}/keyword-analysis` | In Progress | REQ-009 | 요청 body 제거, `status`·`jobId` 응답과 동일 분석 중복 요청의 기존 Job 반환 계약 확정, 구현 변경 필요 |
+| API-021 | GET | `/cover-letters/{coverLetterId}/keyword-analysis/latest` | In Progress | REQ-009 | 화면 메타데이터와 조건부 `jobId`, SSE 복구용 polling fallback 계약 확정, 구현 변경 필요 |
+| API-022 | POST | `/cover-letters/{coverLetterId}/interviews` | In Progress | REQ-010 | 최신 버전 자동 선택, 기존 Job 멱등 반환과 공통 Job SSE 계약 확정, 구현 변경 필요 |
+| API-023 | POST | `/interview-threads/{threadId}/messages` | In Progress | REQ-010 | `userMessageId`·`jobId` 응답과 API-016 실시간 피드백 delta 연결 계약 확정, 구현 변경 필요 |
+| API-024 | POST | `/cover-letters/{coverLetterId}/review-versions` | In Progress | REQ-006 | 응답을 `displayStatus`, `jobId`로 단순화하고 동일 재첨삭 중복 요청 시 기존 Job 반환 계약 확정, 구현 변경 필요 |
+| API-025 | GET | `/cover-letters/{coverLetterId}/interview` | In Progress | REQ-010 | 현재 세션과 초기·추가 질문 생성용 조건부 `jobId`, SSE 복구 계약 확정, 구현 변경 필요 |
+| API-026 | GET | `/interviews/{interviewSessionId}/questions` | In Progress | REQ-010 | 단일 `items` 구조와 화면에 필요한 질문 필드만 반환하도록 구현 변경 필요 |
+| API-027 | POST | `/interviews/{interviewSessionId}/questions` | In Progress | REQ-010 | `jobId` 단일 응답, 동일 Job 멱등 반환과 공통 Job SSE 계약 확정, 구현 변경 필요 |
 | API-028 | POST | `/interviews/{interviewSessionId}/threads` | Deprecated | REQ-010 | 질문 생성 시 thread를 함께 저장하므로 사용하지 않음 |
-| API-029 | GET | `/interview-threads/{threadId}/messages` | Implemented | REQ-010 | 대화 메시지 조회 |
-| API-030 | GET | `/cover-letters/stream` | Planned | REQ-003, REQ-005 | 사용자 단일 연결 기반 목록 표시 상태 SSE, `changeType`으로 시작·완료·실패 명시 |
+| API-029 | GET | `/interview-threads/{threadId}/messages` | In Progress | REQ-010 | 표시 문장·점수 중심 메시지와 조건부 `jobId` 응답 계약 확정, 구현 변경 필요 |
+| API-030 | GET | `/cover-letters/stream` | Planned | REQ-003, REQ-005 | 사용자 단일 연결에서 전체 상태 스냅샷 후 단건 표시 상태 변경 SSE 제공 |

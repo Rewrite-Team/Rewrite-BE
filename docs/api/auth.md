@@ -107,7 +107,8 @@ Failure:
 {
   "error": {
     "code": "UNAUTHORIZED",
-    "message": "유효하지 않은 refresh token입니다."
+    "message": "유효하지 않은 refresh token입니다.",
+    "details": []
   }
 }
 ```
@@ -129,6 +130,8 @@ Response:
   "createdAt": "2026-06-20T14:00:00"
 }
 ```
+
+`profileImageUrl`은 카카오 프로필 이미지가 없는 사용자에게 `null`이며, 나머지 필드는 non-null이다. `provider`는 현재 `KAKAO`를 사용한다.
 
 ### 로그아웃
 
