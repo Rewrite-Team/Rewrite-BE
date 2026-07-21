@@ -560,7 +560,7 @@ MVP에서는 모든 생성 질문이 바로 답변 가능한 대상이며 thread
 
 API-022는 request body를 받지 않고 호출 시점의 최신 성공 첨삭 버전을 초기 질문 생성 기준으로 사용한다. 새 세션은 새 `interviewSessionId`와 `jobId`를 반환하고, `FAILED` 재시도는 같은 세션과 새 Job을 사용한다. 이미 `QUESTION_GENERATING`이면 기존 세션과 기존 Job을 반환하며, 이미 `ACTIVE`이면 기존 세션과 `jobId=null`을 반환한다.
 
-프론트엔드는 non-null `jobId`로 API-016 공통 Job SSE에 연결한다. API-025도 `QUESTION_GENERATING`이면 현재 Job ID, `FAILED`이면 최근 실패 Job ID, `ACTIVE`이면 `null`을 반환한다. 완료 후 API-025와 API-026을 다시 조회하고, SSE 연결 실패 시 API-025 polling으로 최종 상태를 복구한다.
+프론트엔드는 non-null `jobId`로 API-016 공통 Job SSE에 연결한다. API-025는 AI 면접 화면 표시에 필요한 `coverLetter { id, title, companyName, positionTitle }` 요약을 항상 반환한다. 또한 `QUESTION_GENERATING`이면 현재 Job ID, `FAILED`이면 최근 실패 Job ID, `ACTIVE`이면 `null`을 반환한다. 완료 후 API-025와 API-026을 다시 조회하고, SSE 연결 실패 시 API-025 polling으로 최종 상태를 복구한다.
 
 ### 선택 이유
 

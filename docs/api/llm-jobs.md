@@ -91,7 +91,7 @@ Content-Type: text/event-stream
 
 ```text
 event: job.snapshot
-data: {"status":"PROCESSING","progress":{"current":1,"total":3,"message":"2번 문항을 첨삭하고 있습니다."},"resultRef":null,"error":null}
+data: {"jobType":"COVER_LETTER_REVIEW","status":"PROCESSING","progress":{"current":1,"total":3,"message":"2번 문항을 첨삭하고 있습니다."},"resultRef":null,"error":null}
 
 event: review.questions.snapshot
 data: {"items":[{"questionId":"clq_01HZ...","order":1,"aiReport":"직무 경험과 성과의 연결을 보강하는 것이 좋습니다.","rewrittenAnswer":"저는 백엔드 개발자로서...","rewrittenAnswerLength":320,"finalAnswer":"저는 백엔드 개발자로서...","finalAnswerLength":320}]}
@@ -106,19 +106,40 @@ event: job.completed
 data: {"resultRef":{"type":"REVIEW_VERSION","id":"rv_01HZ..."}}
 
 event: job.failed
-data: {"progress":{"current":2,"total":3,"message":"첨삭에 실패했습니다."},"error":{"code":"REVIEW_FAILED","message":"첨삭 처리에 실패했습니다."}}
+data: {"progress":{"current":2,"total":3,"message":"첨삭에 실패했습니다."},"error":{"code":"LLM_PROVIDER_ERROR","message":"AI 처리에 실패했습니다."}}
 ```
 
-`job.snapshot.status`는 `PENDING | PROCESSING | COMPLETED | FAILED | CANCELED` 중 하나다. `progress`와 그 하위 필드는 항상 non-null이다. `resultRef`는 결과 리소스가 확정된 완료 Job에서만 non-null이며 `error`는 실패한 Job에서만 non-null이다. `review.questions.snapshot.items`는 완료된 문항이 없으면 빈 배열이다.
+`job.snapshot.jobType`은 `COVER_LETTER_REVIEW | COVER_LETTER_RE_REVIEW | KEYWORD_ANALYSIS | INTERVIEW_INITIAL_QUESTION_GENERATION | INTERVIEW_ADDITIONAL_QUESTION_GENERATION | INTERVIEW_MESSAGE_FEEDBACK` 중 하나다. `job.snapshot.status`는 `PENDING | PROCESSING | COMPLETED | FAILED | CANCELED` 중 하나다. `jobType`, `progress`와 그 하위 필드는 항상 non-null이다. `resultRef`는 결과 리소스가 확정된 완료 Job에서만 non-null이며 `error`는 실패한 Job에서만 non-null이다. `review.questions.snapshot.items`는 완료된 문항이 없으면 빈 배열이다.
 
 스냅샷과 문항 완료 이벤트의 문항 결과는 `questionId`, `order`, `aiReport`, `rewrittenAnswer`, `rewrittenAnswerLength`, `finalAnswer`, `finalAnswerLength`를 사용한다. 문항 이벤트는 `aiReport`와 `rewrittenAnswer`가 모두 완성되고 검증된 시점에 한 번 전송하며, `progress`를 함께 반환한다. 필드별 또는 토큰별 delta 이벤트는 제공하지 않는다. 최초 첨삭과 재첨삭에 같은 이벤트 계약을 사용한다.
 
 면접 답변 피드백 Job은 `interview.feedback.delta`로 `sequence`와 `contentDelta`를 전송한다. `sequence`는 Job 안에서 1부터 증가하며 클라이언트는 중복 이벤트를 무시하고 순서대로 `contentDelta`를 이어 붙인다. delta는 현재 SSE 연결의 표시 효과만 위한 임시 데이터이며 서버가 영속 저장하거나 `Last-Event-ID`로 replay하지 않는다. 최종 ASSISTANT `content`와 `score`는 `job.completed` 이후 API-029를 다시 조회해 확정한다.
 
-Job ID는 path와 중복되므로 이벤트 데이터에 포함하지 않는다. Job 종류도 연결한 Job으로 이미 결정되므로 포함하지 않는다. `job.started`와 별도 `job.progress` 이벤트는 사용하지 않고, 연결 시점 상태는 `job.snapshot`으로 전달한다. 첨삭 진행률 변경은 `review.question.completed`에 포함한다.
+Job ID는 path와 중복되므로 이벤트 데이터에 포함하지 않는다. 공통 스트림을 사용하는 프론트엔드가 연결·재연결 시 Job 종류를 명확히 식별할 수 있도록 `job.snapshot`에는 `jobType`을 포함한다. `job.started`와 별도 `job.progress` 이벤트는 사용하지 않고, 연결 시점 상태는 `job.snapshot`으로 전달한다. 첨삭 진행률 변경은 `review.question.completed`에 포함한다.
 
 이미 종료된 Job에 연결하면 `job.snapshot`의 `status`, `resultRef` 또는 `error`로 최종 상태를 전달한 뒤 연결을 종료한다. 실시간 처리 중 종료된 경우에는 `job.completed` 또는 `job.failed`를 전송하고 연결을 종료한다. 완료 `resultRef.type`은 Job에 따라 `REVIEW_VERSION`, `KEYWORD_ANALYSIS`, `INTERVIEW_SESSION`, `INTERVIEW_QUESTION`, `INTERVIEW_MESSAGE` 중 하나다.
 
 키워드 분석과 초기·추가 면접 질문 생성은 중간 도메인 이벤트를 제공하지 않는다. `job.completed`를 받으면 키워드 분석은 API-021을, 초기 면접 질문 생성은 API-025와 API-026을, 추가 면접 질문 생성은 API-026을, 면접 답변 피드백은 API-029를 다시 조회한다. SSE 연결 또는 재연결에 실패하면 도메인 조회 또는 API-015 polling으로 최종 상태를 복구한다.
 
 면접 피드백 생성 중 재연결하면 이전 delta를 복구하지 않는다. 클라이언트는 불완전한 뒷부분만 이어서 표시하지 않고 진행 상태만 보여준 뒤, 완료 시 API-029의 저장된 전체 assistant 메시지로 교체한다. `job.failed`를 받으면 현재 연결에서 조합한 임시 문장을 제거하고 실패 상태를 표시한다.
+
+HTTP 오류와 Job 실패는 구분한다. API-015의 `status=FAILED`와 API-016의 `job.failed`는 정상 `200` 조회 또는 정상 SSE 연결에서 받은 비동기 작업 결과이며 HTTP `ErrorResponse`가 아니다.
+
+공개 `job.failed.error.code`는 다음 세 값만 사용한다.
+
+| 오류 코드 | 발생 조건 | 프론트엔드 처리 |
+|---|---|---|
+| `LLM_PROVIDER_ERROR` | timeout, provider 장애·요청 제한, 출력 형식 검증 실패 등 사용자가 구분해 처리할 필요가 없는 AI 실패 | 공통 AI 처리 실패 안내와 기능별 수동 재시도를 제공한다. |
+| `LLM_CONTEXT_LENGTH_EXCEEDED` | 입력 문맥이 처리 가능한 길이를 초과함 | 입력이 너무 길다는 안내를 표시하고 자동 재시도하지 않는다. |
+| `LLM_CONTENT_FILTERED` | 입력 또는 생성 결과를 처리할 수 없음 | 내용을 수정하라는 안내를 표시하고 자동 재시도하지 않는다. |
+
+### API-015~016 HTTP 오류 처리
+
+COMMON의 인증과 예상하지 못한 서버 오류 처리를 기본으로 적용한다.
+
+| API | HTTP 상태 | 오류 코드 | 발생 조건 | 프론트엔드 처리 |
+|---|---:|---|---|---|
+| API-015 | 404 | `NOT_FOUND` | Job 없음, 비소유 자기소개서 또는 삭제된 자기소개서에 연결된 Job | polling을 종료하고 원래 도메인 화면 또는 목록을 다시 조회한다. |
+| API-016 | 404 | `NOT_FOUND` | Job 없음, 접근 불가 또는 삭제된 자기소개서에 연결된 Job | 스트림 재연결을 중단하고 API-015 또는 도메인 조회로 최종 확인한다. |
+
+브라우저 SSE 클라이언트가 초기 연결의 HTTP body를 읽지 못할 수 있으므로 API-016 `onerror`에서 오류 코드를 직접 추측하지 않는다. API-015 또는 도메인 조회를 호출해 인증 실패, 대상 없음과 진행 상태를 확인하고, 연결 장애가 지속되면 polling으로 전환한다.

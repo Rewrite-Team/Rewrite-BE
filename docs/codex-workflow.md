@@ -55,10 +55,12 @@
 
 Git 저장소의 Markdown 문서와 실제 코드는 API 계약과 구현 상태의 기준 원본이다. Notion `Rewrite API (자동 동기화)` 데이터베이스는 프론트엔드 개발자가 사용하는 읽기 편한 동기화 문서이며, Notion에서 직접 수정한 내용은 저장소로 역동기화하지 않는다.
 
+API와 관련된 설계, 구현, 수정, 리뷰 또는 문서화 작업을 시작할 때마다 코드나 저장소 문서를 변경하기 전에 관련 `API ID`의 Notion 페이지를 먼저 조회한다. 새 API는 사용할 `API ID`로 기존 페이지 존재 여부를 확인한다. 조회 결과는 현재 프론트엔드 공개 문서와 저장소 기준 원본의 차이를 파악하는 용도로 사용하며, Notion을 조회할 수 없으면 작업을 진행하지 않고 사용자에게 알린다.
+
 API 계약 또는 구현 상태가 변경되면 Codex는 다음 순서로 처리한다.
 
-1. 관련 Markdown 계약, 실제 controller/DTO와 테스트를 확인해 기준 원본을 확정한다.
-2. `API ID`로 Notion 데이터베이스를 조회한다. 같은 ID가 있으면 현재 페이지를 다시 읽고 사용자 변경을 보존한 범위에서 갱신하며, 없으면 새 페이지를 만든다.
+1. 작업 시작 시 조회한 Notion 페이지와 관련 Markdown 계약, 실제 controller/DTO 및 테스트를 비교해 기준 원본과 동기화 범위를 확정한다.
+2. 같은 `API ID`의 Notion 페이지가 있으면 사용자 변경을 보존한 범위에서 갱신하며, 없으면 새 페이지를 만든다.
 3. 속성 `Name`, `Method`, `Path`, `상태`, `사용 화면`, `설명`, `API ID`를 저장소 기준으로 갱신한다. 제목은 `API-007 · 내 자기소개서 목록` 형식이며 `API ID`는 숨김 고유 키다.
 4. 상세 페이지에는 호출 요약, Endpoint, Request, Success Response, Error Handling, Frontend Behavior, 필요한 조건부 섹션, 참고 정보를 작성한다. 실제 HTTP 요청과 성공 응답 JSON을 포함하고 JSON 문법을 검증한다. Request와 Success Response의 필드 경로·타입·필수 여부·nullable·설명을 표로 기록하고 배열 내부 필드는 `items[].id`처럼 펼친다. Error Handling은 HTTP 상태·오류 코드·발생 조건·프론트엔드 처리 방법을 표로 기록한다. 오류 코드가 계약에 정의되지 않았으면 빈 값, `-`, `계약 참조` 대신 `오류 코드 미정` 또는 `API별 오류 없음`을 사용하며, 비동기 Job 실패 상태를 HTTP 오류 응답 표에 넣지 않는다.
 5. 프론트엔드에 영향을 주는 validation, 오류 처리, redirect, Cookie, CSRF, polling, SSE, 이벤트 중복 제거, nullable·enum·상태별 화면 규칙을 반영한다. 내부 클래스, DB, transaction, worker 구조는 제외한다.

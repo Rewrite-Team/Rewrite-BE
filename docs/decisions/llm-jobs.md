@@ -901,7 +901,8 @@ JSON 파싱 실패
 -> 서버 자동 재시도 1회
 -> 재시도 결과도 구조 검증 실패
 -> LlmJob.status=FAILED
--> error.code=LLM_OUTPUT_VALIDATION_FAILED
+-> 공개 error.code=LLM_PROVIDER_ERROR
+-> 내부 로그에는 LLM 출력 구조 검증 실패 원인 기록
 ```
 
 적용 Job type:
@@ -956,13 +957,13 @@ LLM 출력은 사용자에게 직접 보이는 결과 데이터다. 구조가 �
 
 ### 결정
 
-API-016은 최초 첨삭과 재첨삭에 공통으로 연결 직후 `job.snapshot`과 `review.questions.snapshot`을 순서대로 전송한다. 공통 스냅샷은 현재 Job `status`, `progress`, 완료 결과 `resultRef` 또는 실패 `error`를 포함하고, 첨삭 문항 스냅샷은 완료 문항 `items`를 포함한다.
+API-016은 최초 첨삭과 재첨삭에 공통으로 연결 직후 `job.snapshot`과 `review.questions.snapshot`을 순서대로 전송한다. 공통 스냅샷은 현재 Job `jobType`, `status`, `progress`, 완료 결과 `resultRef` 또는 실패 `error`를 포함하고, 첨삭 문항 스냅샷은 완료 문항 `items`를 포함한다.
 
 문항의 `aiReport`와 `rewrittenAnswer`가 모두 완성된 시점에는 `review.question.completed` 이벤트 하나를 전송한다. 이벤트에는 완성된 문항 결과와 갱신된 `progress`를 포함하며, 필드별 또는 토큰별 delta 이벤트는 제공하지 않는다. Job 종료는 `job.completed` 또는 `job.failed`로 전달한다.
 
 서버는 연결을 먼저 등록하고 스냅샷 전송 중 발생한 변경 이벤트를 버퍼링한 뒤 이어서 전송한다. 이벤트는 중복될 수 있으며 클라이언트는 `questionId`로 upsert하고 `order`로 정렬한다. `Last-Event-ID` 기반 영속 replay는 제공하지 않고 재연결할 때 최신 스냅샷을 다시 전송한다. 연결 유지는 SSE comment heartbeat를 사용한다.
 
-Job ID는 path에 있으므로 이벤트 데이터에 포함하지 않는다. 연결 시점 상태는 스냅샷으로 전달하므로 `job.started`를 사용하지 않으며 진행률은 문항 완료 이벤트에 포함하므로 별도 `job.progress`도 사용하지 않는다.
+Job ID는 path에 있으므로 이벤트 데이터에 포함하지 않는다. 공통 스트림의 Job 종류는 `job.snapshot.jobType`으로 식별한다. 연결 시점 상태는 스냅샷으로 전달하므로 `job.started`를 사용하지 않으며 진행률은 문항 완료 이벤트에 포함하므로 별도 `job.progress`도 사용하지 않는다.
 
 ### 선택 이유
 
@@ -977,7 +978,7 @@ AI 리포트와 수정본은 한 문항의 완결된 결과로 함께 사용한�
 
 ### 결정
 
-API-016은 최초 첨삭·재첨삭, 키워드 분석, 초기·추가 면접 질문 생성, 면접 답변 피드백에 공통으로 사용한다. 모든 Job은 연결 직후 `job.snapshot`을 전송하고, 첨삭 Job은 `review.questions.snapshot`과 `review.question.completed`를 추가로 전송한다. 면접 답변 피드백 Job은 `interview.feedback.delta`로 1부터 증가하는 `sequence`와 `contentDelta`를 전송한다. 키워드 분석과 초기·추가 면접 질문 생성은 중간 도메인 이벤트 없이 `job.completed` 또는 `job.failed`만 전달한다.
+API-016은 최초 첨삭·재첨삭, 키워드 분석, 초기·추가 면접 질문 생성, 면접 답변 피드백에 공통으로 사용한다. 모든 Job은 연결 직후 Job 종류를 나타내는 `jobType`과 현재 상태를 담은 `job.snapshot`을 전송하고, 첨삭 Job은 `review.questions.snapshot`과 `review.question.completed`를 추가로 전송한다. 면접 답변 피드백 Job은 `interview.feedback.delta`로 1부터 증가하는 `sequence`와 `contentDelta`를 전송한다. 키워드 분석과 초기·추가 면접 질문 생성은 중간 도메인 이벤트 없이 `job.completed` 또는 `job.failed`만 전달한다.
 
 완료 `resultRef.type`은 Job에 따라 `REVIEW_VERSION`, `KEYWORD_ANALYSIS`, `INTERVIEW_SESSION`, `INTERVIEW_QUESTION`, `INTERVIEW_MESSAGE`를 사용한다. 키워드 분석 완료 후 API-021을, 초기 면접 질문 생성 완료 후 API-025와 API-026을, 추가 면접 질문 생성 완료 후 API-026을, 면접 피드백 완료 후 API-029를 다시 조회한다. 도메인 조회 응답은 진행 중이거나 최근 실패한 Job ID를 제공해 새로고침 후 SSE에 다시 연결할 수 있게 하며, SSE 연결 실패 시 polling fallback으로 사용한다.
 

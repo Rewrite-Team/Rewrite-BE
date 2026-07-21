@@ -147,8 +147,7 @@ Response:
 
 Error Response:
 
-공통 인증 도입 후 인증되지 않은 요청은 `UNAUTHORIZED`를 반환한다.
-개발 단계에서는 `DevCurrentUserProvider`를 사용하므로 이 API 자체에서 별도 인증 실패를 발생시키지 않는다.
+인증과 CSRF 오류는 `docs/api/common.md`의 공통 처리 규칙을 따른다. 요청 본문이 없으므로 API-008에 별도 validation 또는 도메인 오류는 없다.
 
 ```json
 {
@@ -166,16 +165,16 @@ Error Response:
 PUT /cover-letters/{coverLetterId}/basic-info
 ```
 
-등록 step1의 기본 정보를 전체 replace 방식으로 저장한다. 요청 본문은 step1 기본 정보 전체를 포함해야 하며, 서버는 요청 본문 값으로 기존 기본 정보를 교체한다.
+등록 step1의 현재 입력 상태를 임시저장한다. 별도 임시저장 API를 두지 않고 이 API를 전체 replace 방식의 DRAFT 스냅샷 저장에 사용한다. 누락·`null`·trim 후 빈 문자열인 필드는 `null`로 저장하며, 프론트엔드는 자동 저장 시 step1 폼 전체를 전송한다.
 
 Request:
 
 ```json
 {
   "title": "2026 상반기 백엔드 개발자 자기소개서",
-  "companyName": "Rewrite Corp",
-  "positionTitle": "백엔드 개발자",
-  "jobPostingUrl": "https://example.com/jobs/1"
+  "companyName": null,
+  "positionTitle": null,
+  "jobPostingUrl": null
 }
 ```
 
@@ -183,13 +182,13 @@ Validation:
 
 ```text
 coverLetter.status는 DRAFT여야 한다.
-title: 필수, trim 후 Unicode code point 기준 1~50자
-companyName: 필수, trim 후 Unicode code point 기준 1~30자
-positionTitle: 필수, trim 후 Unicode code point 기준 1~30자
-jobPostingUrl: 선택, nullable, trim 후 최대 500자, URL 형식
+title: 선택, nullable, 값이 있으면 trim 후 Unicode code point 기준 최대 50자
+companyName: 선택, nullable, 값이 있으면 trim 후 Unicode code point 기준 최대 30자
+positionTitle: 선택, nullable, 값이 있으면 trim 후 Unicode code point 기준 최대 30자
+jobPostingUrl: 선택, nullable, 값이 있으면 trim 후 최대 500자 및 URL 형식
 ```
 
-서버는 `title`, `companyName`, `positionTitle`의 앞뒤 공백을 제거한 뒤 길이를 검증하고, 공백이 제거된 값을 저장한다. trim 후 빈 문자열이면 `VALIDATION_ERROR`를 반환한다.
+서버는 문자열의 앞뒤 공백을 제거한다. 누락·`null`·trim 후 빈 문자열은 미입력값인 `null`로 저장하고, 값이 있으면 최대 길이와 URL 형식을 검증한다. 필수값 완성 여부는 API-014 제출 시 최종 검증한다.
 
 서버는 `jobPostingUrl`의 앞뒤 공백을 제거한 뒤 URL 형식을 검증하고, 공백이 제거된 값을 저장한다. `jobPostingUrl`이 누락되거나 `null`이거나 trim 후 빈 문자열이면 `null`로 저장한다. `jobPostingUrl`은 URL 형식만 검증한다. 백엔드는 해당 URL이 실제로 접근 가능한지, 로그인 없이 열리는지, 채용공고가 만료되지 않았는지는 검증하지 않는다.
 
@@ -213,12 +212,12 @@ Response:
 }
 ```
 
-프론트엔드는 성공 응답을 받으면 등록 2단계로 이동한다. 저장한 기본 정보와 내부 자기소개서 상태는 응답하지 않는다.
+프론트엔드는 성공 응답을 임시저장 완료로 처리한다. 다음 단계 이동 여부는 프론트엔드의 현재 입력 검증과 사용자 동작으로 결정하며, 저장한 기본 정보와 내부 자기소개서 상태는 응답하지 않는다.
 
 Error Codes:
 
 ```text
-400 VALIDATION_ERROR: 요청 필드 validation 실패
+400 VALIDATION_ERROR: 입력된 필드의 최대 길이 또는 URL 형식 validation 실패
 401 UNAUTHORIZED: 인증되지 않은 요청
 404 NOT_FOUND: 자기소개서가 없거나 현재 사용자가 소유하지 않은 경우
 409 COVER_LETTER_NOT_DRAFT: 대상 자기소개서가 DRAFT가 아닌 경우
@@ -230,13 +229,13 @@ Error Codes:
 PUT /cover-letters/{coverLetterId}/preferences
 ```
 
-등록 step2의 채용 우대사항을 전체 replace 방식으로 저장한다. 요청의 `preferences` 값이 기존 우대사항 전체 텍스트를 대체한다.
+등록 step2의 현재 입력 상태를 임시저장한다. 별도 임시저장 API를 두지 않고 이 API를 전체 replace 방식의 DRAFT 스냅샷 저장에 사용한다. 요청의 `preferences`가 누락·`null`·trim 후 빈 문자열이면 `null`로 저장한다.
 
 Request:
 
 ```json
 {
-  "preferences": "Spring Boot 경험, 대용량 트래픽 처리 경험 우대"
+  "preferences": null
 }
 ```
 
@@ -244,10 +243,10 @@ Validation:
 
 ```text
 coverLetter.status는 DRAFT여야 한다.
-preferences: 필수, trim 후 Unicode code point 기준 1~3000자
+preferences: 선택, nullable, 값이 있으면 trim 후 Unicode code point 기준 최대 3000자
 ```
 
-서버는 `preferences`의 앞뒤 공백을 제거한 뒤 길이를 검증하고, 공백이 제거된 값을 저장한다. trim 후 빈 문자열이면 `VALIDATION_ERROR`를 반환한다.
+서버는 `preferences`의 앞뒤 공백을 제거한다. 누락·`null`·trim 후 빈 문자열은 `null`로 저장하고, 값이 있으면 최대 길이를 검증한다. 필수값 완성 여부는 API-014 제출 시 최종 검증한다.
 
 Conflict Response:
 
@@ -269,12 +268,12 @@ Response:
 }
 ```
 
-프론트엔드는 성공 응답을 받으면 등록 3단계로 이동한다. 저장한 우대사항과 내부 자기소개서 상태는 응답하지 않는다.
+프론트엔드는 성공 응답을 임시저장 완료로 처리한다. 다음 단계 이동 여부는 프론트엔드의 현재 입력 검증과 사용자 동작으로 결정하며, 저장한 우대사항과 내부 자기소개서 상태는 응답하지 않는다.
 
 Error Codes:
 
 ```text
-400 VALIDATION_ERROR: preferences validation 실패
+400 VALIDATION_ERROR: 입력된 preferences의 최대 길이 validation 실패
 401 UNAUTHORIZED: 인증되지 않은 요청
 404 NOT_FOUND: 자기소개서가 없거나 현재 사용자가 소유하지 않은 경우
 409 COVER_LETTER_NOT_DRAFT: 대상 자기소개서가 DRAFT가 아닌 경우
@@ -282,9 +281,9 @@ Error Codes:
 
 ### 질문과 답변 저장
 
-등록 step3에서 문항 전체를 저장한다.
+등록 step3의 현재 문항 입력 상태를 임시저장한다.
 
-이 API는 전체 replace 방식이다. 요청의 `questions` 배열이 해당 자기소개서의 최종 문항 목록이 되며, 이전에 임시저장되어 있던 문항 중 요청에 포함되지 않은 문항은 삭제된다.
+별도 임시저장 API를 두지 않고 이 API를 전체 replace 방식의 DRAFT 스냅샷 저장에 사용한다. 요청의 `questions` 배열이 해당 자기소개서의 현재 문항 목록이 되며, 이전에 임시저장되어 있던 문항 중 요청에 포함되지 않은 문항은 삭제된다. `questions`가 누락·`null`·빈 배열이면 현재 문항을 모두 삭제한다.
 
 ```http
 PUT /cover-letters/{coverLetterId}/questions
@@ -298,12 +297,7 @@ Request:
     {
       "question": "지원 동기를 작성해주세요.",
       "maxAnswerLength": 1000,
-      "originalAnswer": "제가 지원한 이유는..."
-    },
-    {
-      "question": "직무 관련 경험을 작성해주세요.",
-      "maxAnswerLength": 1500,
-      "originalAnswer": "저는 프로젝트에서..."
+      "originalAnswer": null
     }
   ]
 }
@@ -313,17 +307,18 @@ Validation:
 
 ```text
 coverLetter.status는 DRAFT여야 한다.
-questions: 1개 이상, 제품 정책상 최대 개수 제한 없음
-questions[].question: 필수, trim 후 Unicode code point 기준 1~300자
-questions[].maxAnswerLength: 필수, 100~5000
-questions[].originalAnswer: 필수, trim 후 Unicode code point 기준 1~5000자
+questions: 선택, nullable, 빈 배열 허용, 제품 정책상 최대 개수 제한 없음
+questions[]: null이 아닌 객체
+questions[].question: 선택, nullable, 값이 있으면 trim 후 Unicode code point 기준 최대 300자
+questions[].maxAnswerLength: 선택, nullable, 값이 있으면 100~5000
+questions[].originalAnswer: 선택, nullable, 값이 있으면 trim 후 Unicode code point 기준 최대 5000자
 ```
 
 서버는 요청 `questions` 배열의 순서를 기준으로 문항 `order`를 1부터 재부여해 저장한다. 클라이언트는 요청에서 `order`를 보내지 않는다.
 
 문항 개수에는 API validation 상한을 두지 않는다. 단, HTTP request body size, DB 저장 한계, LLM provider context limit 같은 인프라/운영 한계는 별도로 적용될 수 있다. 문항 수가 많아 LLM 입력 한계를 초과하면 첨삭 Job은 `FAILED`가 될 수 있다.
 
-서버는 `questions[].question`과 `questions[].originalAnswer`의 앞뒤 공백을 제거한 뒤 길이를 검증하고, 공백이 제거된 값을 저장한다. trim 후 빈 문자열이면 `VALIDATION_ERROR`를 반환한다.
+서버는 `questions[].question`과 `questions[].originalAnswer`의 앞뒤 공백을 제거한다. 누락·`null`·trim 후 빈 문자열은 `null`로 저장하고, 값이 있으면 최대 길이를 검증한다. `maxAnswerLength`도 값이 있을 때만 범위를 검증한다. 문항 및 문항 필드의 필수값 완성 여부는 API-014 제출 시 최종 검증한다.
 
 Response:
 
@@ -333,12 +328,12 @@ Response:
 }
 ```
 
-프론트엔드는 성공 응답을 받으면 제출 확인 단계로 이동한다. 서버가 부여한 문항 ID와 순서, 저장한 질문·답변과 수정 시각은 응답하지 않는다.
+프론트엔드는 성공 응답을 임시저장 완료로 처리한다. 제출 확인 단계 이동 여부는 프론트엔드의 현재 입력 검증과 사용자 동작으로 결정한다. 서버가 부여한 문항 ID와 순서, 저장한 질문·답변과 수정 시각은 응답하지 않는다.
 
 Error Codes:
 
 ```text
-400 VALIDATION_ERROR: questions 또는 문항 필드 validation 실패
+400 VALIDATION_ERROR: 문항 객체가 null이거나 입력된 문항 필드의 최대 길이·범위 validation 실패
 401 UNAUTHORIZED: 인증되지 않은 요청
 404 NOT_FOUND: 자기소개서가 없거나 현재 사용자가 소유하지 않은 경우
 409 COVER_LETTER_NOT_DRAFT: 대상 자기소개서가 DRAFT가 아닌 경우
@@ -353,16 +348,8 @@ Validation Error Response:
     "message": "요청 값이 올바르지 않습니다.",
     "details": [
       {
-        "field": "questions[0].question",
-        "reason": "질문을 입력해야 합니다."
-      },
-      {
         "field": "questions[0].maxAnswerLength",
         "reason": "최대 답변 글자 수는 100자 이상 5000자 이하여야 합니다."
-      },
-      {
-        "field": "questions[0].originalAnswer",
-        "reason": "답변을 입력해야 합니다."
       }
     ]
   }
@@ -383,7 +370,7 @@ Conflict Response:
 
 ### 자기소개서 상세 조회
 
-등록 step4 확인 화면, 최초·재첨삭 진행 화면, 최신 첨삭 결과 화면에서 공통으로 사용한다. `DRAFT`, `REVIEWING`, `REVIEW_FAILED`, `REVIEWED` 모든 상태에서 같은 응답 구조를 반환한다.
+등록 step1~step4의 임시저장 복구 화면, 최초·재첨삭 진행 화면, 최신 첨삭 결과 화면에서 공통으로 사용한다. `DRAFT`, `REVIEWING`, `REVIEW_FAILED`, `REVIEWED` 모든 상태에서 같은 응답 구조를 반환한다.
 
 ```http
 GET /cover-letters/{coverLetterId}
@@ -418,8 +405,8 @@ Response:
       "message": "첨삭에 실패했습니다."
     },
     "error": {
-      "code": "LLM_PROVIDER_TIMEOUT",
-      "message": "AI 응답 시간이 초과되었습니다."
+      "code": "LLM_PROVIDER_ERROR",
+      "message": "AI 처리에 실패했습니다."
     }
   },
   "questions": [
@@ -458,7 +445,7 @@ Response:
 상태별 응답 정책:
 
 ```text
-WRITING: reviewVersion=null, reviewJob=null. 현재 저장된 원본 문항을 반환한다.
+WRITING: reviewVersion=null, reviewJob=null. 현재 임시저장된 기본 정보와 nullable 원본 문항을 반환한다.
 최초 첨삭 REVIEWING: reviewVersion=null, 진행 중 reviewJob과 현재 Job 문항 스냅샷을 반환한다.
 재첨삭 REVIEWING: 이전 최신 성공 reviewVersion, 진행 중 reviewJob과 현재 Job 문항 스냅샷을 반환한다.
 최초 첨삭 REVIEW_FAILED: reviewVersion=null, 실패한 reviewJob과 실패한 최신 Job 문항 스냅샷을 반환한다.
@@ -476,7 +463,7 @@ REVIEWED: 최신 성공 reviewVersion과 해당 버전 questions를 반환하고
 
 최초·재첨삭 Job이 최종 실패해도 현재 Job에서 성공한 문항의 AI 필드는 그대로 반환하고, 실패하거나 완료되지 않은 문항의 AI 필드는 `null`로 반환한다. AI와 무관한 문항 필드는 모든 문항에서 그대로 반환한다.
 
-`questions`는 항상 배열이며 문항이 없으면 `[]`이다. `questionResultId`는 확정된 `ReviewVersion` 문항 결과 ID이며 원본 또는 임시 Job 문항에서는 `null`이다. 원본 문항 필드는 non-null이고, AI·최종 작성본 필드는 결과가 없는 문항에서 `null`이다. 확정된 버전 결과에서는 모든 AI·최종 작성본 필드가 non-null이다.
+`questions`는 항상 배열이며 문항이 없으면 `[]`이다. `questionResultId`는 확정된 `ReviewVersion` 문항 결과 ID이며 원본 또는 임시 Job 문항에서는 `null`이다. `WRITING`에서는 임시저장 상태에 따라 `question`, `maxAnswerLength`, `originalAnswer`, `originalAnswerLength`가 `null`일 수 있다. 제출이 성공한 이후의 원본 문항 필드는 모두 non-null이다. AI·최종 작성본 필드는 결과가 없는 문항에서 `null`이고, 확정된 버전 결과에서는 모두 non-null이다.
 
 `REVIEWED` 상태에서도 최신 결과를 보기 위해 API-018을 다시 호출하지 않는다. API-018은 버전 히스토리에서 선택한 특정 버전을 조회할 때만 사용한다.
 
@@ -541,7 +528,7 @@ questions는 1개 이상이어야 한다.
 
 이미 `REVIEWED` 상태이면 새 Job을 만들지 않고 기존 최신 `ReviewVersion` 정보를 반환한다.
 
-필수 step 데이터가 누락된 경우 `VALIDATION_ERROR`를 반환하고, `details`에 누락된 field와 reason을 포함한다.
+API-009~011이 미완성 DRAFT를 저장할 수 있으므로 API-014를 필수값 완성 여부의 단일 최종 검증 경계로 사용한다. 필수 step 데이터가 누락된 경우 `VALIDATION_ERROR`를 반환하고, `details`에 누락된 field와 reason을 포함하며 Job은 생성하지 않는다.
 
 Validation Error Response:
 
@@ -626,3 +613,27 @@ Not Found Response:
 ```
 
 진행 중 LLM Job을 `CANCELED`로 전환하는 동작은 계약에 포함되며 현재 삭제 service에 구현 변경이 필요하다.
+
+### API-007~014, API-030 오류 처리
+
+COMMON의 `UNAUTHORIZED`, `CSRF_TOKEN_INVALID`, 예상하지 못한 `5xx` 처리를 기본으로 적용한다. 아래에는 화면에서 별도 분기가 필요한 오류만 기록한다.
+
+| API | HTTP 상태 | 오류 코드 | 발생 조건 | 프론트엔드 처리 |
+|---|---:|---|---|---|
+| API-007 | 400 | `VALIDATION_ERROR` | `page < 1`, `size`가 1~9 범위를 벗어남, 알 수 없는 `displayStatus` | query를 `page=1`, `size=9`, 필터 없음으로 정규화한 뒤 한 번 다시 조회한다. 전체 페이지를 넘은 정상 page는 빈 목록으로 처리한다. |
+| API-008 | - | `API별 오류 없음` | 별도 입력과 도메인 분기 없음 | 공통 오류 처리만 적용한다. |
+| API-009 | 400 | `VALIDATION_ERROR` | 입력된 기본 정보의 최대 길이 또는 URL 형식 위반 | `details[].field`와 `reason`을 해당 입력에 표시한다. |
+| API-009 | 404 | `NOT_FOUND` | 자기소개서 없음·비소유·삭제 | 자동저장을 중단하고 목록으로 이동한다. |
+| API-009 | 409 | `COVER_LETTER_NOT_DRAFT` | 자기소개서가 `DRAFT`가 아님 | 대기 중 자동저장을 폐기하고 API-012를 재조회해 읽기 전용 또는 현재 상태 화면으로 전환한다. |
+| API-010 | 400 | `VALIDATION_ERROR` | `preferences` 최대 길이 위반 | 해당 입력에 `details[].reason`을 표시한다. |
+| API-010 | 404 | `NOT_FOUND` | 자기소개서 없음·비소유·삭제 | 자동저장을 중단하고 목록으로 이동한다. |
+| API-010 | 409 | `COVER_LETTER_NOT_DRAFT` | 자기소개서가 `DRAFT`가 아님 | 대기 중 자동저장을 폐기하고 API-012를 재조회한다. |
+| API-011 | 400 | `VALIDATION_ERROR` | null 문항 객체 또는 문항 필드 길이·범위 위반 | `details[].field`의 `questions[index].field`를 해당 문항 입력에 연결한다. |
+| API-011 | 404 | `NOT_FOUND` | 자기소개서 없음·비소유·삭제 | 자동저장을 중단하고 목록으로 이동한다. |
+| API-011 | 409 | `COVER_LETTER_NOT_DRAFT` | 자기소개서가 `DRAFT`가 아님 | 대기 중 자동저장을 폐기하고 API-012를 재조회한다. |
+| API-012 | 404 | `NOT_FOUND` | 자기소개서 없음·비소유·삭제 | 대상이 없거나 접근할 수 없음을 안내하고 목록으로 이동한다. |
+| API-013 | 404 | `NOT_FOUND` | 자기소개서 없음·비소유·이미 삭제 | 목록에서 대상을 제거하고 목록 화면을 유지한다. 이미 없는 대상이므로 실패 토스트는 표시하지 않는다. |
+| API-014 | 400 | `VALIDATION_ERROR` | 제출 필수값 누락 또는 길이·범위 위반 | `details[].field`를 등록 step에 매핑하고 최초 오류가 있는 단계로 이동한다. |
+| API-014 | 404 | `NOT_FOUND` | 자기소개서 없음·비소유·삭제 | 대상 없음 안내 후 목록으로 이동한다. |
+| API-014 | 409 | `LLM_JOB_ALREADY_RUNNING` | 최초 첨삭 외 다른 AI Job이 진행 중 | 다른 AI 작업이 진행 중임을 안내하고 제출 화면을 유지하며 자동 재시도하지 않는다. 동일 최초 첨삭 중복 요청은 오류가 아니라 기존 `jobId`를 담은 성공이다. |
+| API-030 | - | `API별 오류 없음` | 네트워크 또는 SSE 연결 종료 | 재연결하고 실패가 지속되면 API-007을 재조회해 상태를 복구한다. Job 실패는 `displayStatus=REVIEW_FAILED`로 처리한다. |

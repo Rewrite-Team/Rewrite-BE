@@ -110,6 +110,8 @@ PATCH
 DELETE
 ```
 
+API-003 CSRF 토큰 조회는 access token 인증과 CSRF 헤더 없이 호출한다. 상태 변경 API에서 토큰 누락·만료·불일치를 확인하면 `403 CSRF_TOKEN_INVALID`를 반환한다. 프론트엔드는 API-003으로 토큰을 다시 받은 뒤 원래 요청을 한 번만 재시도하고, 같은 오류가 반복되면 재시도를 중단한다.
+
 ### Content Type
 
 ```http
@@ -174,48 +176,49 @@ API 응답 DTO로 변환할 때는 `ZoneId.of("Asia/Seoul")` 기준으로 변환
 
 `details`는 항상 배열로 반환하며 상세 정보가 없으면 빈 배열 `[]`을 사용한다. 프론트엔드는 `HTTP 상태 + error.code`를 분기 기준으로 사용하고, 사용자 문구는 `error.code` 기준으로 매핑한다.
 
+프론트엔드는 공통 오류를 중앙 interceptor에서 처리한다.
+
+- 인증 필요 API의 `401 UNAUTHORIZED`: API-004를 single-flight로 한 번만 호출하고 대기 중인 원 요청을 각각 한 번만 재시도한다. API-004가 `401`이거나 재시도한 원 요청이 다시 `401`이면 로그인 화면으로 이동하며 갱신을 반복하지 않는다.
+- 상태 변경 API의 `403 CSRF_TOKEN_INVALID`: API-003으로 토큰을 다시 받은 뒤 원 요청을 한 번만 재시도한다. 같은 오류가 반복되면 중단한다.
+- 네트워크 오류와 예상하지 못한 `5xx`: 공통 일시 오류를 표시한다. API별로 명시하지 않은 상태 변경 요청은 중복 실행 위험 때문에 자동 재전송하지 않는다.
+- 개별 API 문서에는 해당 화면에서 별도 분기가 필요한 validation, 리소스 없음, 상태 충돌 오류만 기록한다. 공통 `401`, `403`, `5xx`를 기계적으로 반복하지 않는다.
+- 프론트엔드는 서버 `error.message`를 그대로 노출하지 않고 알려진 `error.code`를 사용자 문구에 매핑한다. 알 수 없는 코드는 공통 오류 문구를 사용한다.
+
 대표 에러 코드:
 
 ```text
 UNAUTHORIZED
+CSRF_TOKEN_INVALID
 NOT_FOUND
 VALIDATION_ERROR
 CONFLICT
-LLM_JOB_NOT_READY
-LLM_JOB_FAILED
 LLM_JOB_ALREADY_RUNNING
 COVER_LETTER_NOT_DRAFT
 REVIEW_VERSION_NOT_LATEST
 INTERNAL_ERROR
 ```
 
+`CSRF_TOKEN_INVALID`는 모든 `POST`, `PUT`, `PATCH`, `DELETE`에 적용되는 공통 오류다. 프론트엔드는 서버의 `error.message`를 그대로 표시하지 않고 CSRF 토큰 재발급과 단일 재시도 흐름을 사용한다.
+
 LLM Job의 `error.code`는 프론트엔드 사용자 메시지 매핑 기준으로 사용한다. 프론트엔드는 provider 원문이나 `error.message`를 그대로 사용자에게 노출하지 않고, `error.code`별 사용자 친화 문구를 표시한다.
 
-대표 LLM Job error code:
+공개 LLM Job error code는 프론트엔드의 다음 행동이 달라지는 최소 집합만 사용한다. timeout, provider 장애·요청 제한, 출력 형식 검증 실패처럼 프론트 처리가 같은 원인은 서버 로그에서는 구분하되 공개 응답에서는 `LLM_PROVIDER_ERROR`로 정규화한다.
 
 ```text
-LLM_PROVIDER_TIMEOUT
-LLM_PROVIDER_UNAVAILABLE
-LLM_PROVIDER_RATE_LIMITED
+LLM_PROVIDER_ERROR
 LLM_CONTEXT_LENGTH_EXCEEDED
 LLM_CONTENT_FILTERED
-LLM_OUTPUT_VALIDATION_FAILED
-LLM_PROVIDER_ERROR
 ```
 
 권장 사용자 메시지:
 
 ```text
-LLM_PROVIDER_TIMEOUT: AI 응답 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.
-LLM_PROVIDER_UNAVAILABLE: AI 서비스가 일시적으로 불안정합니다. 잠시 후 다시 시도해주세요.
-LLM_PROVIDER_RATE_LIMITED: 요청이 일시적으로 많아 처리하지 못했습니다. 잠시 후 다시 시도해주세요.
+LLM_PROVIDER_ERROR: AI 처리에 실패했습니다. 잠시 후 다시 시도해주세요.
 LLM_CONTEXT_LENGTH_EXCEEDED: 입력 내용이 너무 길어 AI가 처리하지 못했습니다.
-LLM_CONTENT_FILTERED: 입력 내용 또는 생성 결과가 처리 정책에 맞지 않아 첨삭에 실패했습니다.
-LLM_OUTPUT_VALIDATION_FAILED: AI 응답 형식이 올바르지 않아 처리하지 못했습니다. 잠시 후 다시 시도해주세요.
-LLM_PROVIDER_ERROR: AI 첨삭에 실패했습니다. 잠시 후 다시 시도해주세요.
+LLM_CONTENT_FILTERED: 입력 내용 또는 생성 결과를 처리할 수 없습니다. 내용을 수정한 뒤 다시 시도해주세요.
 ```
 
-프론트엔드가 알 수 없는 LLM Job `error.code`를 받은 경우에도 `error.message`를 그대로 표시하지 않는다. 기본 fallback 메시지로 `AI 첨삭에 실패했습니다. 잠시 후 다시 시도해주세요.`를 표시한다.
+프론트엔드가 알 수 없는 LLM Job `error.code`를 받은 경우에도 `error.message`를 그대로 표시하지 않는다. `LLM_PROVIDER_ERROR`와 같은 기본 AI 처리 실패 문구를 표시한다.
 
 ### 글자 수 산정
 
@@ -305,12 +308,13 @@ MVP에서는 삭제된 자기소개서 목록 조회 API와 사용자-facing 복
 제약:
 
 ```text
-question: trim 후 Unicode code point 기준 1~300자
-maxAnswerLength: 100~5000
-originalAnswer: trim 후 Unicode code point 기준 1~5000자
+DRAFT 임시저장: question, maxAnswerLength, originalAnswer는 nullable
+제출 시 question: trim 후 Unicode code point 기준 1~300자
+제출 시 maxAnswerLength: 100~5000
+제출 시 originalAnswer: trim 후 Unicode code point 기준 1~5000자
 ```
 
-서버는 `question`과 `originalAnswer`의 앞뒤 공백을 제거한 뒤 길이를 검증하고, 공백이 제거된 값을 저장한다. trim 후 빈 문자열이면 `VALIDATION_ERROR`를 반환한다.
+서버는 `question`과 `originalAnswer`의 앞뒤 공백을 제거한다. DRAFT 저장에서는 누락·`null`·trim 후 빈 문자열을 `null`로 저장하고, 값이 있으면 최대 길이와 숫자 범위를 검증한다. API-014 제출 시에는 모든 필드의 필수값과 최소 길이·범위를 최종 검증한다.
 
 ### ReviewVersion
 
@@ -412,7 +416,7 @@ CANCELED
 
 LLM Job은 실패 시 서버에서 1회 자동 재시도한다. 최초 시도와 재시도를 포함해 `maxAttempts`는 2이다. 두 번 모두 실패하면 `FAILED` 상태가 된다.
 
-LLM 출력 파싱 실패, 필수 필드 누락, 타입 불일치, 범위 위반처럼 서버가 기대한 결과 구조로 검증할 수 없는 응답도 LLM Job 실패로 처리한다. 이 경우 가능한 필드만 부분 저장하거나 서버가 임의 기본값으로 보정하지 않는다. 자동 재시도 1회 후에도 구조 검증에 실패하면 `FAILED`와 `LLM_OUTPUT_VALIDATION_FAILED`로 저장한다.
+LLM 출력 파싱 실패, 필수 필드 누락, 타입 불일치, 범위 위반처럼 서버가 기대한 결과 구조로 검증할 수 없는 응답도 LLM Job 실패로 처리한다. 이 경우 가능한 필드만 부분 저장하거나 서버가 임의 기본값으로 보정하지 않는다. 자동 재시도 1회 후에도 구조 검증에 실패하면 `FAILED`로 저장하고, 공개 오류 코드는 프론트 처리가 같은 `LLM_PROVIDER_ERROR`로 정규화한다. 내부 로그와 관측 정보에는 출력 검증 실패 원인을 별도로 보존한다.
 
 같은 자기소개서에 대해 진행 중인 LLM Job은 동시에 하나만 허용한다. `PENDING` 또는 `PROCESSING` 상태의 Job이 있으면 새 LLM Job 시작 요청은 `CONFLICT`와 `LLM_JOB_ALREADY_RUNNING`을 반환한다.
 

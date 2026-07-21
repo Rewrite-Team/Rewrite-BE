@@ -27,7 +27,12 @@ GET /cover-letters/{coverLetterId}/interview
 
 ```json
 {
-  "coverLetterId": "cl_01HZ...",
+  "coverLetter": {
+    "id": "cl_01HZ...",
+    "title": "백엔드 자기소개서",
+    "companyName": "Rewrite Corp",
+    "positionTitle": "백엔드 개발자"
+  },
   "interviewSession": null
 }
 ```
@@ -36,7 +41,12 @@ GET /cover-letters/{coverLetterId}/interview
 
 ```json
 {
-  "coverLetterId": "cl_01HZ...",
+  "coverLetter": {
+    "id": "cl_01HZ...",
+    "title": "백엔드 자기소개서",
+    "companyName": "Rewrite Corp",
+    "positionTitle": "백엔드 개발자"
+  },
   "interviewSession": {
     "id": "is_01HZ...",
     "initialSourceReviewVersionId": "rv_01HZ...",
@@ -48,6 +58,7 @@ GET /cover-letters/{coverLetterId}/interview
 ```
 
 면접 세션이 없는 것은 정상 상태이므로 `200 OK`와 `interviewSession: null`을 반환한다.
+`coverLetter`는 면접 세션 존재 여부와 관계없이 항상 반환하며, AI 면접 화면의 자기소개서 제목, 회사명, 직무 표시에 사용한다. `id`, `title`, `companyName`, `positionTitle`은 모두 non-null이다.
 자기소개서가 존재하지 않거나 현재 사용자 소유가 아니거나 soft delete된 경우에는 `NOT_FOUND`를 반환한다.
 재첨삭 후에도 기존 면접 세션을 유지하므로 자기소개서의 현재 상태와 관계없이 세션을 조회한다.
 `interviewSession.jobId`는 아직 화면에서 처리해야 하는 질문 생성 Job이 있을 때 반환한다. `QUESTION_GENERATING`에서는 실행 중이거나 실패한 초기 질문 생성 Job ID를 반환한다. `ACTIVE`에서는 추가 질문 생성 Job이 `PENDING`, `PROCESSING`, `FAILED`이면 해당 Job ID를 반환하고, 처리할 질문 생성 Job이 없으면 `null`이다. 면접 답변 피드백 Job은 질문별 thread에 속하므로 API-025에 포함하지 않는다.
@@ -305,3 +316,25 @@ provider 호출 또는 출력 검증에 실패하면 Job은 `FAILED`로 종료�
 면접 평가 생성의 핵심 정보는 내부 구조화된 `feedback`이다. 프론트엔드에는 이를 표시 문장으로 만든 `content`와 답변 품질을 빠르게 가늠하기 위한 보조 지표인 `score`만 제공한다.
 
 `score`는 1~100 범위의 정수다. 만점은 항상 100이므로 별도 max 필드를 저장하거나 응답하지 않으며, 항목별 점수도 제공하지 않는다.
+
+### API-022~023, API-025~029 오류 처리
+
+COMMON의 인증·CSRF·서버 오류 처리를 기본으로 적용한다. 질문·피드백 생성 실패는 시작 요청의 HTTP 오류가 아니라 API-016 `job.failed`, API-025 또는 API-029의 조건부 `jobId`와 상태로 처리한다.
+
+| API | HTTP 상태 | 오류 코드 | 발생 조건 | 프론트엔드 처리 |
+|---|---:|---|---|---|
+| API-022 | 404 | `NOT_FOUND` | 자기소개서 없음·비소유·삭제 | 대상 없음 안내 후 목록으로 이동한다. |
+| API-022 | 409 | `CONFLICT` | 자기소개서가 `REVIEWED`가 아니거나 성공한 첨삭 버전이 없음 | API-012를 재조회해 현재 상태 화면으로 전환한다. |
+| API-022 | 409 | `LLM_JOB_ALREADY_RUNNING` | 초기 질문 생성 외 다른 AI Job이 진행 중 | 다른 AI 작업이 진행 중임을 안내하고 자동 재시도하지 않는다. |
+| API-023 | 400 | `VALIDATION_ERROR` | `content` 누락, trim 후 빈 값 또는 2000자 초과 | `details[field=content].reason`을 답변 입력란에 표시한다. |
+| API-023 | 404 | `NOT_FOUND` | thread 없음·비소유 또는 삭제된 자기소개서에 연결됨 | 대화 화면을 종료하고 API-025를 재조회한다. |
+| API-023 | 409 | `LLM_JOB_ALREADY_RUNNING` | 같은 자기소개서에 다른 AI Job이 진행 중 | USER 메시지가 저장되지 않았음을 유지하고 기존 작업 완료 후 사용자가 다시 전송하도록 안내한다. |
+| API-025 | 404 | `NOT_FOUND` | 자기소개서 없음·비소유·삭제 | 대상 없음 안내 후 목록으로 이동한다. 세션 없음과 `FAILED`는 `200` 정상 상태다. |
+| API-026 | 404 | `NOT_FOUND` | 세션 없음·비소유 또는 삭제된 자기소개서의 세션 | 면접 화면을 종료하고 API-025를 재조회한다. 질문 생성 중 빈 `items`는 정상이다. |
+| API-027 | 404 | `NOT_FOUND` | 세션 없음·비소유 또는 삭제된 자기소개서의 세션 | API-025를 재조회한다. |
+| API-027 | 409 | `CONFLICT` | 세션이 `ACTIVE`가 아니거나 자기소개서가 `REVIEWED`가 아님 | API-025를 재조회하고 가능한 동작만 활성화한다. |
+| API-027 | 409 | `LLM_JOB_ALREADY_RUNNING` | 추가 질문 생성 외 다른 AI Job이 진행 중 | 다른 AI 작업이 진행 중임을 안내하고 자동 재시도하지 않는다. |
+| API-028 | - | `API별 오류 없음` | Deprecated되어 호출하지 않는 API | API-026의 `threadId`를 사용한다. `DEPRECATED`는 실제 HTTP 오류 코드가 아니다. |
+| API-029 | 404 | `NOT_FOUND` | thread 없음·비소유 또는 삭제된 자기소개서에 연결됨 | 대화 화면을 종료하고 API-025를 재조회한다. 피드백 진행·실패는 `200`과 `jobId`로 복구한다. |
+
+초기 질문 생성 실패는 API-025의 `FAILED` 상태에서 API-022 수동 재시도를 제공하고, 추가 질문 생성 실패는 기존 질문과 대화를 유지한 채 API-027 수동 재시도를 제공한다. 답변 피드백 실패에서는 임시 delta를 제거하고 저장된 USER 메시지는 유지하며, 존재하지 않는 자동 재처리 API를 가정하지 않는다.
