@@ -123,8 +123,16 @@ coverLetter.status는 REVIEWED여야 한다.
 ### 면접 질문 목록 조회
 
 ```http
-GET /interviews/{interviewSessionId}/questions
+GET /interviews/{interviewSessionId}/questions?size=10
+GET /interviews/{interviewSessionId}/questions?size=10&cursor=Mg
 ```
+
+Query:
+
+| Field | Type | Required | Nullable | Description |
+|---|---|---:|---:|---|
+| `cursor` | string | 아니요 | 예 | 다음 질문 묶음을 조회할 때 직전 응답의 `nextCursor`를 그대로 전달한다. 최초 요청에서는 생략한다. |
+| `size` | integer | 아니요 | 아니요 | 조회할 질문 수. 기본값 `10`, 최솟값 `1`, 최댓값 `20`이다. |
 
 Response:
 
@@ -132,45 +140,30 @@ Response:
 {
   "items": [
     {
-      "id": "iq_01HZ...",
-      "order": 1,
-      "question": "프로젝트에서 맡은 역할을 더 구체적으로 설명해 주세요.",
-      "threadId": "it_01HZ..."
-    },
-    {
-      "id": "iq_01HY...",
-      "order": 2,
-      "question": "지원 동기에서 언급한 회사 선택 기준을 실제 경험과 연결해 설명해 주세요.",
-      "threadId": "it_01HY..."
-    },
-    {
-      "id": "iq_01HX...",
-      "order": 3,
-      "question": "자기소개서에 작성한 협업 경험에서 갈등을 어떻게 해결했는지 설명해 주세요.",
-      "threadId": "it_01HX..."
+      "id": "iq_01HV...",
+      "order": 5,
+      "question": "문제 해결 과정에서 가장 중요하게 내린 의사결정을 설명해 주세요.",
+      "threadId": "it_01HV..."
     },
     {
       "id": "iq_01HW...",
       "order": 4,
       "question": "프로젝트 성과를 만들기 위해 본인이 직접 수행한 행동을 설명해 주세요.",
       "threadId": "it_01HW..."
-    },
-    {
-      "id": "iq_01HV...",
-      "order": 5,
-      "question": "문제 해결 과정에서 가장 중요하게 내린 의사결정을 설명해 주세요.",
-      "threadId": "it_01HV..."
     }
-  ]
+  ],
+  "nextCursor": "NA"
 }
 ```
 
-질문은 `order` 오름차순으로 반환한다. 모든 질문은 생성 시 thread가 함께 저장되므로 `threadId`는 필수값이다. 질문은 존재하지만 thread가 없으면 데이터 불변식 위반으로 처리한다.
+질문은 최신 질문이 먼저 보이도록 `order` 내림차순으로 반환한다. 모든 질문은 생성 시 thread가 함께 저장되므로 `threadId`는 필수값이다. 질문은 존재하지만 thread가 없으면 데이터 불변식 위반으로 처리한다.
+
+최초 조회에서는 `cursor`를 생략한다. 다음 질문이 있으면 `nextCursor`에 불투명 문자열을 반환하며, 프론트엔드는 이 값을 다음 요청의 `cursor`로 그대로 전달해 응답 `items`를 기존 목록 뒤에 추가한다. 더 조회할 질문이 없으면 `nextCursor`는 `null`이다. 새 질문 생성 완료 후에는 cursor 없는 첫 요청을 다시 호출하고 `id` 기준으로 새 질문을 목록 앞에 병합한다.
 
 면접 세션 ID는 path와 중복되므로 응답하지 않는다. 질문의 생성 기준 첨삭 버전은 화면에서 사용하지 않는 내부 추적 정보이므로 `sourceReviewVersionId`도 응답하지 않는다.
 
-질문 생성 중이거나 생성 결과가 없는 세션은 정상 상태이므로 `200 OK`와 빈 `items`를 반환한다.
-면접 세션이 존재하지 않거나 현재 사용자 소유가 아니거나 soft delete된 자기소개서의 세션이면 `NOT_FOUND`를 반환한다.
+질문 생성 중이거나 생성 결과가 없는 세션은 정상 상태이므로 `200 OK`, 빈 `items`, `nextCursor: null`을 반환한다.
+`cursor` 형식이 올바르지 않거나 `size`가 허용 범위를 벗어나면 `VALIDATION_ERROR`를 반환한다. 면접 세션이 존재하지 않거나 현재 사용자 소유가 아니거나 soft delete된 자기소개서의 세션이면 `NOT_FOUND`를 반환한다.
 
 ### 면접 질문 추가 생성
 
@@ -330,6 +323,7 @@ COMMON의 인증·CSRF·서버 오류 처리를 기본으로 적용한다. 질�
 | API-023 | 404 | `NOT_FOUND` | thread 없음·비소유 또는 삭제된 자기소개서에 연결됨 | 대화 화면을 종료하고 API-025를 재조회한다. |
 | API-023 | 409 | `LLM_JOB_ALREADY_RUNNING` | 같은 자기소개서에 다른 AI Job이 진행 중 | USER 메시지가 저장되지 않았음을 유지하고 기존 작업 완료 후 사용자가 다시 전송하도록 안내한다. |
 | API-025 | 404 | `NOT_FOUND` | 자기소개서 없음·비소유·삭제 | 대상 없음 안내 후 목록으로 이동한다. 세션 없음과 `FAILED`는 `200` 정상 상태다. |
+| API-026 | 400 | `VALIDATION_ERROR` | `cursor` 형식 오류 또는 `size`가 1~20 범위를 벗어남 | 목록 추가를 중단한다. 최초 조회는 cursor를 생략하고, 이후에는 서버가 반환한 `nextCursor`만 사용한다. |
 | API-026 | 404 | `NOT_FOUND` | 세션 없음·비소유 또는 삭제된 자기소개서의 세션 | 면접 화면을 종료하고 API-025를 재조회한다. `items=[]`는 데이터 없음만 의미하며 진행·실패는 API-025와 API-015로 판단한다. |
 | API-027 | 404 | `NOT_FOUND` | 세션 없음·비소유 또는 삭제된 자기소개서의 세션 | API-025를 재조회한다. |
 | API-027 | 409 | `CONFLICT` | 세션이 `ACTIVE`가 아니거나 자기소개서가 `REVIEWED`가 아님 | API-025를 재조회하고 가능한 동작만 활성화한다. |

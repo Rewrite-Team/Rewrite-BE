@@ -410,7 +410,7 @@ class InterviewServiceTest {
     }
 
     @Test
-    void findMyInterviewQuestionsReturnsOrderedQuestionsWithRequiredThreadIds() {
+    void findMyInterviewQuestionsReturnsLatestQuestionsWithCursor() {
         Instant now = Instant.parse("2026-07-11T01:00:00Z");
         CoverLetter coverLetter = coverLetterRepository.save(CoverLetter.draft("cl_1", "user_1", now));
         InterviewSession interviewSession = interviewSessionRepository.save(InterviewSession.questionGenerating(
@@ -435,7 +435,15 @@ class InterviewServiceTest {
                 InterviewQuestionType.COVER_LETTER_BASED,
                 "프로젝트에서 맡은 역할을 설명해 주세요."
         );
-        interviewQuestionRepository.saveAll(List.of(secondQuestion, firstQuestion));
+        InterviewQuestion thirdQuestion = InterviewQuestion.create(
+                "iq_3",
+                interviewSession,
+                "rv_2",
+                3,
+                InterviewQuestionType.COVER_LETTER_BASED,
+                "성과를 만들기 위해 어떤 행동을 했는지 설명해 주세요."
+        );
+        interviewQuestionRepository.saveAll(List.of(secondQuestion, firstQuestion, thirdQuestion));
         interviewThreadRepository.save(InterviewThread.active(
                 "it_1",
                 interviewSession,
@@ -448,34 +456,73 @@ class InterviewServiceTest {
                 secondQuestion,
                 now.plusSeconds(120)
         ));
+        interviewThreadRepository.save(InterviewThread.active(
+                "it_3",
+                interviewSession,
+                thirdQuestion,
+                now.plusSeconds(120)
+        ));
         given(currentUserProvider.currentUser()).willReturn(new CurrentUser("user_1", "테스트", null));
 
-        InterviewQuestionListResult result = service.findMyInterviewQuestions("is_1");
+        InterviewQuestionListResult firstPage = service.findMyInterviewQuestions("is_1", null, 2);
 
-        assertThat(result.interviewSessionId()).isEqualTo("is_1");
-        assertThat(result.items())
+        assertThat(firstPage.items())
                 .extracting(
                         InterviewQuestionItemResult::id,
-                        InterviewQuestionItemResult::sourceReviewVersionId,
                         InterviewQuestionItemResult::order,
                         InterviewQuestionItemResult::question,
                         InterviewQuestionItemResult::threadId
                 )
                 .containsExactly(
                         org.assertj.core.groups.Tuple.tuple(
-                                "iq_1",
-                                "rv_1",
-                                1,
-                                "프로젝트에서 맡은 역할을 설명해 주세요.",
-                                "it_1"
+                                "iq_3",
+                                3,
+                                "성과를 만들기 위해 어떤 행동을 했는지 설명해 주세요.",
+                                "it_3"
                         ),
                         org.assertj.core.groups.Tuple.tuple(
                                 "iq_2",
-                                "rv_2",
                                 2,
                                 "트랜잭션 격리 수준을 설명해 주세요.",
                                 "it_2"
                         )
+                );
+        assertThat(firstPage.nextCursor()).isEqualTo("Mg");
+
+        InterviewQuestion latestQuestion = InterviewQuestion.create(
+                "iq_4",
+                interviewSession,
+                "rv_2",
+                4,
+                InterviewQuestionType.COVER_LETTER_BASED,
+                "새로 추가된 최신 질문입니다."
+        );
+        interviewQuestionRepository.save(latestQuestion);
+        interviewThreadRepository.save(InterviewThread.active(
+                "it_4",
+                interviewSession,
+                latestQuestion,
+                now.plusSeconds(180)
+        ));
+
+        InterviewQuestionListResult secondPage = service.findMyInterviewQuestions(
+                "is_1",
+                firstPage.nextCursor(),
+                2
+        );
+
+        assertThat(secondPage.items())
+                .extracting(InterviewQuestionItemResult::id, InterviewQuestionItemResult::order)
+                .containsExactly(org.assertj.core.groups.Tuple.tuple("iq_1", 1));
+        assertThat(secondPage.nextCursor()).isNull();
+
+        InterviewQuestionListResult refreshedFirstPage = service.findMyInterviewQuestions("is_1", null, 2);
+
+        assertThat(refreshedFirstPage.items())
+                .extracting(InterviewQuestionItemResult::id, InterviewQuestionItemResult::order)
+                .containsExactly(
+                        org.assertj.core.groups.Tuple.tuple("iq_4", 4),
+                        org.assertj.core.groups.Tuple.tuple("iq_3", 3)
                 );
     }
 
@@ -499,7 +546,7 @@ class InterviewServiceTest {
         ));
         given(currentUserProvider.currentUser()).willReturn(new CurrentUser("user_1", "테스트", null));
 
-        assertThatThrownBy(() -> service.findMyInterviewQuestions("is_1"))
+        assertThatThrownBy(() -> service.findMyInterviewQuestions("is_1", null, 10))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.INTERNAL_ERROR);
@@ -517,9 +564,26 @@ class InterviewServiceTest {
         ));
         given(currentUserProvider.currentUser()).willReturn(new CurrentUser("user_1", "테스트", null));
 
-        InterviewQuestionListResult result = service.findMyInterviewQuestions("is_1");
+        InterviewQuestionListResult result = service.findMyInterviewQuestions("is_1", null, 10);
 
         assertThat(result.items()).isEmpty();
+        assertThat(result.nextCursor()).isNull();
+    }
+
+    @Test
+    void findMyInterviewQuestionsRejectsInvalidCursorOrSize() {
+        assertThatThrownBy(() -> service.findMyInterviewQuestions("is_1", "invalid", 10))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.VALIDATION_ERROR);
+        assertThatThrownBy(() -> service.findMyInterviewQuestions("is_1", null, 0))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.VALIDATION_ERROR);
+        assertThatThrownBy(() -> service.findMyInterviewQuestions("is_1", null, 21))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.VALIDATION_ERROR);
     }
 
     @Test
@@ -563,7 +627,7 @@ class InterviewServiceTest {
     }
 
     private void assertInterviewQuestionsNotFound(String interviewSessionId) {
-        assertThatThrownBy(() -> service.findMyInterviewQuestions(interviewSessionId))
+        assertThatThrownBy(() -> service.findMyInterviewQuestions(interviewSessionId, null, 10))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.NOT_FOUND);

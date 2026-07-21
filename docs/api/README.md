@@ -89,7 +89,7 @@ API 설계 결정과 트레이드오프는 `../decisions/README.md`를 함께 �
 | API-023 | POST | `/interview-threads/{threadId}/messages` | In Progress | REQ-010 | `userMessageId`·`jobId` 응답과 API-016 실시간 피드백 delta 연결 계약 확정, 구현 변경 필요 |
 | API-024 | POST | `/cover-letters/{coverLetterId}/review-versions` | In Progress | REQ-006 | 응답을 `displayStatus`, `jobId`로 단순화하고 동일 재첨삭 중복 요청 시 기존 Job 반환 계약 확정, 구현 변경 필요 |
 | API-025 | GET | `/cover-letters/{coverLetterId}/interview` | In Progress | REQ-010 | 자기소개서 요약, 현재 세션과 초기·추가 질문 생성용 조건부 `jobId`, SSE 복구 계약 확정, 구현 변경 필요 |
-| API-026 | GET | `/interviews/{interviewSessionId}/questions` | In Progress | REQ-010 | 단일 `items` 구조와 화면에 필요한 질문 필드만 반환하도록 구현 변경 필요 |
+| API-026 | GET | `/interviews/{interviewSessionId}/questions` | Implemented | REQ-010 | 최신 질문 우선 cursor 무한 스크롤과 화면에 필요한 질문 필드만 반환 |
 | API-027 | POST | `/interviews/{interviewSessionId}/questions` | In Progress | REQ-010 | `jobId` 단일 응답, 동일 Job 멱등 반환과 공통 Job SSE 계약 확정, 구현 변경 필요 |
 | API-028 | POST | `/interviews/{interviewSessionId}/threads` | Deprecated | REQ-010 | 질문 생성 시 thread를 함께 저장하므로 사용하지 않음 |
 | API-029 | GET | `/interview-threads/{threadId}/messages` | In Progress | REQ-010 | 표시 문장·점수 중심 메시지와 조건부 `jobId` 응답 계약 확정, 구현 변경 필요 |

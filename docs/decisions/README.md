@@ -121,3 +121,4 @@ API 계약: `../api/README.md`
 | Decision 096 | 등록 단계 API는 미완성 DRAFT를 임시저장하고 제출 시 필수값을 검증한다 | `cover-letters.md` | REQ-004, REQ-005 | API-009 - API-012, API-014 | Active |
 | Decision 097 | 프론트엔드 오류 계약은 공통 복구와 화면별 최소 도메인 오류로 구분한다 | `common.md` | REQ-001, REQ-003 - REQ-010 | COMMON, API-001 - API-030 | Active |
 | Decision 098 | 면접 피드백은 검증된 전체 문장을 분할해 점진 전송한다 | `interviews.md` | REQ-010 | API-016, API-023, API-029 | Active |
+| Decision 099 | 면접 질문 목록은 최신 질문 우선 cursor 무한 스크롤로 조회한다 | `interviews.md` | REQ-010 | API-026 | Active |

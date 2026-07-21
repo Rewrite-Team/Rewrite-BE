@@ -226,61 +226,79 @@ class InterviewControllerTest {
     }
 
     @Test
-    void getInterviewQuestionsReturnsOrderedItemsWithRequiredThreadIds() throws Exception {
-        given(interviewService.findMyInterviewQuestions("is_1"))
+    void getInterviewQuestionsReturnsLatestItemsAndNextCursor() throws Exception {
+        given(interviewService.findMyInterviewQuestions("is_1", null, 10))
                 .willReturn(new InterviewQuestionListResult(
-                        "is_1",
                         List.of(
                                 new InterviewQuestionItemResult(
-                                        "iq_1",
-                                        "rv_1",
-                                        1,
-                                        "프로젝트에서 맡은 역할을 설명해 주세요.",
-                                        "it_1"
-                                ),
-                                new InterviewQuestionItemResult(
                                         "iq_2",
-                                        "rv_2",
                                         2,
                                         "성과를 만들기 위해 어떤 행동을 했는지 설명해 주세요.",
                                         "it_2"
+                                ),
+                                new InterviewQuestionItemResult(
+                                        "iq_1",
+                                        1,
+                                        "프로젝트에서 맡은 역할을 설명해 주세요.",
+                                        "it_1"
                                 )
-                        )
+                        ),
+                        "MQ"
                 ));
 
         mockMvc.perform(get("/interviews/{interviewSessionId}/questions", "is_1"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.interviewSessionId").value("is_1"))
+                .andExpect(jsonPath("$.interviewSessionId").doesNotExist())
                 .andExpect(jsonPath("$.items.length()").value(2))
-                .andExpect(jsonPath("$.items[0].id").value("iq_1"))
-                .andExpect(jsonPath("$.items[0].sourceReviewVersionId").value("rv_1"))
-                .andExpect(jsonPath("$.items[0].order").value(1))
+                .andExpect(jsonPath("$.items[0].id").value("iq_2"))
+                .andExpect(jsonPath("$.items[0].sourceReviewVersionId").doesNotExist())
+                .andExpect(jsonPath("$.items[0].order").value(2))
                 .andExpect(jsonPath("$.items[0].type").doesNotExist())
-                .andExpect(jsonPath("$.items[0].question").value("프로젝트에서 맡은 역할을 설명해 주세요."))
-                .andExpect(jsonPath("$.items[0].threadId").value("it_1"))
-                .andExpect(jsonPath("$.items[1].id").value("iq_2"))
-                .andExpect(jsonPath("$.items[1].threadId").value("it_2"));
+                .andExpect(jsonPath("$.items[0].question").value("성과를 만들기 위해 어떤 행동을 했는지 설명해 주세요."))
+                .andExpect(jsonPath("$.items[0].threadId").value("it_2"))
+                .andExpect(jsonPath("$.items[1].id").value("iq_1"))
+                .andExpect(jsonPath("$.items[1].threadId").value("it_1"))
+                .andExpect(jsonPath("$.nextCursor").value("MQ"));
     }
 
     @Test
     void getInterviewQuestionsReturnsEmptyItems() throws Exception {
-        given(interviewService.findMyInterviewQuestions("is_1"))
-                .willReturn(new InterviewQuestionListResult("is_1", List.of()));
+        given(interviewService.findMyInterviewQuestions("is_1", "NQ", 5))
+                .willReturn(new InterviewQuestionListResult(List.of(), null));
 
-        mockMvc.perform(get("/interviews/{interviewSessionId}/questions", "is_1"))
+        mockMvc.perform(get("/interviews/{interviewSessionId}/questions", "is_1")
+                        .queryParam("cursor", "NQ")
+                        .queryParam("size", "5"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.interviewSessionId").value("is_1"))
-                .andExpect(jsonPath("$.items").isEmpty());
+                .andExpect(jsonPath("$.items").isEmpty())
+                .andExpect(jsonPath("$.nextCursor").value(nullValue()));
     }
 
     @Test
     void getInterviewQuestionsReturnsNotFound() throws Exception {
-        given(interviewService.findMyInterviewQuestions("is_missing"))
+        given(interviewService.findMyInterviewQuestions("is_missing", null, 10))
                 .willThrow(new BusinessException(ErrorCode.NOT_FOUND));
 
         mockMvc.perform(get("/interviews/{interviewSessionId}/questions", "is_missing"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error.code").value("NOT_FOUND"));
+    }
+
+    @Test
+    void getInterviewQuestionsReturnsValidationErrorForInvalidCursorOrSize() throws Exception {
+        given(interviewService.findMyInterviewQuestions("is_1", "invalid", 10))
+                .willThrow(new BusinessException(ErrorCode.VALIDATION_ERROR));
+        given(interviewService.findMyInterviewQuestions("is_1", null, 21))
+                .willThrow(new BusinessException(ErrorCode.VALIDATION_ERROR));
+
+        mockMvc.perform(get("/interviews/{interviewSessionId}/questions", "is_1")
+                        .queryParam("cursor", "invalid"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"));
+        mockMvc.perform(get("/interviews/{interviewSessionId}/questions", "is_1")
+                        .queryParam("size", "21"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"));
     }
 
     private InterviewSession sessionWithStatus(

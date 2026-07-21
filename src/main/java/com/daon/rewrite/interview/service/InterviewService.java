@@ -11,6 +11,7 @@ import com.daon.rewrite.global.util.IdGenerator;
 import com.daon.rewrite.interview.entity.InterviewQuestion;
 import com.daon.rewrite.interview.entity.InterviewSession;
 import com.daon.rewrite.interview.entity.InterviewSessionStatus;
+import com.daon.rewrite.interview.entity.InterviewThread;
 import com.daon.rewrite.interview.repository.InterviewQuestionRepository;
 import com.daon.rewrite.interview.repository.InterviewSessionRepository;
 import com.daon.rewrite.interview.repository.InterviewThreadRepository;
@@ -22,11 +23,14 @@ import com.daon.rewrite.llmjob.service.LlmJobCreatedEvent;
 import com.daon.rewrite.reviewversion.repository.ReviewVersionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -37,6 +41,7 @@ public class InterviewService {
 
     private static final String INTERVIEW_SESSION_ID_PREFIX = "is";
     private static final String LLM_JOB_ID_PREFIX = "job";
+    private static final int MAX_INTERVIEW_QUESTION_LIST_SIZE = 20;
     private static final List<LlmJobStatus> RUNNING_JOB_STATUSES = List.of(
             LlmJobStatus.PENDING,
             LlmJobStatus.PROCESSING
@@ -67,7 +72,13 @@ public class InterviewService {
     }
 
     @Transactional(readOnly = true)
-    public InterviewQuestionListResult findMyInterviewQuestions(String interviewSessionId) {
+    public InterviewQuestionListResult findMyInterviewQuestions(
+            String interviewSessionId,
+            String cursor,
+            int size
+    ) {
+        validateInterviewQuestionListSize(size);
+        int cursorOrder = decodeInterviewQuestionCursor(cursor);
         CurrentUser currentUser = currentUserProvider.currentUser();
         InterviewSession interviewSession = interviewSessionRepository
                 .findByIdAndCoverLetterOwnerIdAndCoverLetterDeletedAtIsNull(
@@ -76,20 +87,36 @@ public class InterviewService {
                 )
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
 
-        Map<String, String> threadIdsByQuestionId = interviewThreadRepository
-                .findByInterviewSessionId(interviewSession.getId())
+        List<InterviewQuestion> foundQuestions = interviewQuestionRepository
+                .findByInterviewSessionIdAndQuestionOrderLessThanOrderByQuestionOrderDesc(
+                        interviewSession.getId(),
+                        cursorOrder,
+                        PageRequest.of(0, size + 1)
+                );
+        boolean hasNext = foundQuestions.size() > size;
+        List<InterviewQuestion> questions = foundQuestions.stream()
+                .limit(size)
+                .toList();
+        List<String> questionIds = questions.stream()
+                .map(InterviewQuestion::getId)
+                .toList();
+        Map<String, String> threadIdsByQuestionId = (questionIds.isEmpty()
+                ? List.<InterviewThread>of()
+                : interviewThreadRepository.findByInterviewQuestionIdIn(questionIds))
                 .stream()
                 .collect(Collectors.toMap(
                         thread -> thread.getInterviewQuestion().getId(),
                         thread -> thread.getId()
                 ));
-        List<InterviewQuestionItemResult> items = interviewQuestionRepository
-                .findByInterviewSessionIdOrderByQuestionOrderAsc(interviewSession.getId())
+        List<InterviewQuestionItemResult> items = questions
                 .stream()
                 .map(question -> toQuestionItem(question, threadIdsByQuestionId))
                 .toList();
+        String nextCursor = hasNext
+                ? encodeInterviewQuestionCursor(questions.getLast().getQuestionOrder())
+                : null;
 
-        return new InterviewQuestionListResult(interviewSession.getId(), items);
+        return new InterviewQuestionListResult(items, nextCursor);
     }
 
     @Transactional
@@ -194,11 +221,42 @@ public class InterviewService {
     ) {
         return new InterviewQuestionItemResult(
                 question.getId(),
-                question.getSourceReviewVersionId(),
                 question.getQuestionOrder(),
                 question.getQuestion(),
                 findRequiredThreadId(question.getId(), threadIdsByQuestionId)
         );
+    }
+
+    private void validateInterviewQuestionListSize(int size) {
+        if (size < 1 || size > MAX_INTERVIEW_QUESTION_LIST_SIZE) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR);
+        }
+    }
+
+    private int decodeInterviewQuestionCursor(String cursor) {
+        if (cursor == null) {
+            return Integer.MAX_VALUE;
+        }
+
+        try {
+            String decoded = new String(
+                    Base64.getUrlDecoder().decode(cursor),
+                    StandardCharsets.UTF_8
+            );
+            int questionOrder = Integer.parseInt(decoded);
+            if (questionOrder < 1) {
+                throw new IllegalArgumentException("질문 순서는 1 이상이어야 합니다.");
+            }
+            return questionOrder;
+        } catch (IllegalArgumentException exception) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR);
+        }
+    }
+
+    private String encodeInterviewQuestionCursor(int questionOrder) {
+        return Base64.getUrlEncoder()
+                .withoutPadding()
+                .encodeToString(Integer.toString(questionOrder).getBytes(StandardCharsets.UTF_8));
     }
 
     private String findRequiredThreadId(String questionId, Map<String, String> threadIdsByQuestionId) {

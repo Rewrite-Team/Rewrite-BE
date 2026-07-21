@@ -136,6 +136,8 @@ Content-Type: text/event-stream
 
 단일 리소스는 객체를 직접 반환하고, 목록은 `items` 배열을 포함하는 객체로 반환한다. 페이지네이션 목록은 `items`, `page`, `size`, `totalItems`, `totalPages`를 같은 최상위 객체에 포함한다.
 
+무한 스크롤 목록은 cursor 기반으로 조회한다. 최초 요청에서는 `cursor`를 생략하고, 다음 목록이 있으면 응답의 불투명 문자열 `nextCursor`를 다음 요청의 `cursor`로 그대로 전달한다. 마지막 응답은 `nextCursor: null`을 반환한다. 프론트엔드는 cursor 내부 값을 해석하거나 생성하지 않는다.
+
 nullable 필드는 값이 없을 때 필드를 생략하지 않고 `null`을 반환한다. 배열은 nullable로 사용하지 않고 값이 없으면 빈 배열 `[]`을 반환한다.
 
 새 자기소개서 초안 생성은 `201 Created`를 반환한다. 일반 조회, 저장·수정·삭제와 기존 Job을 반환할 수 있는 LLM Job 시작 요청은 응답 객체와 함께 `200 OK`를 반환한다. SSE 연결은 `200 OK`, OAuth 흐름은 성공·실패 결과에 맞는 redirect 응답을 사용한다.
