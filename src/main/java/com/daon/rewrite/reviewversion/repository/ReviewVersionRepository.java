@@ -8,7 +8,7 @@ import java.util.Optional;
 
 public interface ReviewVersionRepository extends JpaRepository<ReviewVersion, String> {
 
-    List<ReviewVersion> findByCoverLetterIdOrderByCreatedAtDesc(String coverLetterId);
+    List<ReviewVersion> findByCoverLetterIdOrderByCreatedAtAsc(String coverLetterId);
 
     Optional<ReviewVersion> findByIdAndCoverLetterId(String id, String coverLetterId);
 

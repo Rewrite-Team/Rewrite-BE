@@ -3,8 +3,8 @@ package com.daon.rewrite.interview.service;
 import java.util.List;
 
 public record InterviewQuestionListResult(
-        String interviewSessionId,
-        List<InterviewQuestionItemResult> items
+        List<InterviewQuestionItemResult> items,
+        String nextCursor
 ) {
 
     public InterviewQuestionListResult {

@@ -80,6 +80,22 @@ Set-Cookie: refresh_token=...; HttpOnly; Secure; SameSite=Lax; Path=/auth; Max-A
 Location: https://rewrite.example.com
 ```
 
+로그인 시작 또는 callback 처리 실패 시 응답:
+
+```http
+HTTP/1.1 302 Found
+Location: https://rewrite.example.com/login?error=KAKAO_LOGIN_FAILED
+```
+
+사용자가 카카오 로그인 또는 동의를 취소하면 카카오는 `error=access_denied` callback을 호출하고, 백엔드는 다음과 같이 변환한다.
+
+```http
+HTTP/1.1 302 Found
+Location: https://rewrite.example.com/login?error=KAKAO_LOGIN_CANCELED
+```
+
+OAuth 브라우저 이동 흐름에서는 JSON `ErrorResponse` 대신 프론트엔드 로그인 화면으로 리다이렉트하고 `error` query로 실패 코드를 전달한다. 프론트엔드는 `KAKAO_LOGIN_CANCELED`에 취소 안내를, `KAKAO_LOGIN_FAILED`와 알 수 없는 오류 코드에 일반 로그인 실패 안내를 표시한다. 모든 실패에서 로그인 버튼을 다시 활성화하고 자동 재시도하지 않는다. 카카오 `error_description`, state 검증 원인, 내부 오류 메시지와 설정 정보는 노출하지 않는다.
+
 ### PRD 근거
 
 - 로그인은 카카오 로그인으로 진행한다.
@@ -109,7 +125,7 @@ Rewrite는 인증 토큰을 HttpOnly Cookie로 전달하기로 결정했다. 토
 - 단점
   - 백엔드 callback URL과 프론트엔드 redirect URL을 환경별로 정확히 설정해야 한다.
   - SPA 내부 callback route를 활용하는 방식보다 서버 라우팅 설정이 조금 더 필요하다.
-  - 로그인 실패 시 프론트엔드로 전달할 에러 코드와 redirect 정책이 필요하다.
+  - 브라우저 redirect 오류 계약과 일반 JSON `ErrorResponse` 계약을 구분해 관리해야 한다.
 
 
 
@@ -120,6 +136,8 @@ Rewrite는 인증 토큰을 HttpOnly Cookie로 전달하기로 결정했다. 토
 HttpOnly Cookie 기반 인증의 CSRF 방어는 `SameSite=Lax`와 CSRF 토큰을 함께 사용한다.
 
 서버는 CSRF 토큰 조회 API를 제공하고, 프론트엔드는 상태 변경 요청에 `X-CSRF-Token` 헤더를 포함한다.
+
+CSRF 토큰 조회 API는 access token 인증과 CSRF 헤더 없이 호출할 수 있다. access token이 만료되고 프론트엔드 메모리의 CSRF 토큰이 사라진 경우에도 새 토큰을 받아 refresh 요청을 보낼 수 있어야 하기 때문이다.
 
 상태 변경 요청 범위:
 
@@ -141,6 +159,8 @@ GET /auth/csrf-token
 ```http
 X-CSRF-Token: csrf-token-value
 ```
+
+상태 변경 요청의 CSRF 토큰이 누락·만료·불일치하면 `403 CSRF_TOKEN_INVALID`를 반환한다. 프론트엔드는 API-003으로 토큰을 재발급한 뒤 원래 요청을 한 번만 재시도하고, 같은 오류가 반복되면 중단한다. API-003 자체가 `500 INTERNAL_ERROR`로 실패하면 한 번만 재요청하고 다시 실패할 때 상태 변경 기능을 막고 새로고침을 안내한다.
 
 ### PRD 근거
 
@@ -176,6 +196,7 @@ Rewrite는 HttpOnly Cookie 기반 인증을 사용한다. Cookie는 브라우저
 - 단점
   - CSRF 토큰 조회 API와 프론트엔드 헤더 첨부 로직이 필요하다.
   - 토큰 만료나 갱신 실패에 대한 클라이언트 처리가 필요하다.
+  - 상태 변경 요청의 단일 재시도와 반복 실패 방지 로직이 필요하다.
   - API 테스트 시 `X-CSRF-Token` 헤더를 함께 준비해야 한다.
 
 
@@ -241,5 +262,3 @@ Rewrite는 브라우저 기반 웹 서비스이고 HttpOnly Cookie 인증을 사
   - 서버가 refresh token 저장소와 폐기 상태를 관리해야 한다.
   - 동시 refresh 요청이 발생하면 race condition 처리가 필요하다.
   - API 테스트와 클라이언트 구현에서 refresh 실패 처리를 고려해야 한다.
-
-

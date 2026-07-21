@@ -45,6 +45,7 @@
 
 ## API documentation rules
 
+- API와 관련된 설계, 구현, 수정, 리뷰 또는 문서화 작업을 시작할 때마다 코드나 저장소 문서를 변경하기 전에 관련 `API ID`의 Notion `Rewrite API (자동 동기화)` 페이지를 먼저 조회한다. 새 API는 사용할 `API ID`로 기존 페이지 존재 여부를 먼저 확인한다. Notion 페이지를 조회할 수 없으면 작업을 진행하지 않고 사용자에게 알린다.
 - API를 추가하거나 변경하면 `docs/api/README.md`와 `docs/api/` 하위 관련 도메인 문서를 갱신한다.
 - Git 저장소의 Markdown 문서와 실제 코드는 API 계약과 구현 상태의 기준 원본이다.
 - API를 추가, 삭제하거나 path, request, response, error, validation, 상태 또는 구현 여부를 변경하면 같은 작업에서 Notion `Rewrite API (자동 동기화)` 데이터베이스도 갱신한다.

@@ -28,7 +28,7 @@ public class ReviewVersionQueryService {
     @Transactional(readOnly = true)
     public List<ReviewVersionSummary> findMyReviewVersions(String coverLetterId) {
         CoverLetter coverLetter = findMyActiveCoverLetter(coverLetterId);
-        return reviewVersionRepository.findByCoverLetterIdOrderByCreatedAtDesc(coverLetter.getId())
+        return reviewVersionRepository.findByCoverLetterIdOrderByCreatedAtAsc(coverLetter.getId())
                 .stream()
                 .map(reviewVersion -> new ReviewVersionSummary(
                         reviewVersion,

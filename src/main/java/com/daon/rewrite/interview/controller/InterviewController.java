@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -25,9 +26,13 @@ public class InterviewController {
     }
 
     @GetMapping("/interviews/{interviewSessionId}/questions")
-    public InterviewQuestionListResponse getInterviewQuestions(@PathVariable String interviewSessionId) {
+    public InterviewQuestionListResponse getInterviewQuestions(
+            @PathVariable String interviewSessionId,
+            @RequestParam(required = false) String cursor,
+            @RequestParam(defaultValue = "10") int size
+    ) {
         return InterviewQuestionListResponse.from(
-                interviewService.findMyInterviewQuestions(interviewSessionId)
+                interviewService.findMyInterviewQuestions(interviewSessionId, cursor, size)
         );
     }
 

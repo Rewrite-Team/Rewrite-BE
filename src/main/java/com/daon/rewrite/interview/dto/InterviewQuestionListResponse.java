@@ -6,22 +6,21 @@ import com.daon.rewrite.interview.service.InterviewQuestionListResult;
 import java.util.List;
 
 public record InterviewQuestionListResponse(
-        String interviewSessionId,
-        List<InterviewQuestionResponse> items
+        List<InterviewQuestionResponse> items,
+        String nextCursor
 ) {
 
     public static InterviewQuestionListResponse from(InterviewQuestionListResult result) {
         return new InterviewQuestionListResponse(
-                result.interviewSessionId(),
                 result.items().stream()
                         .map(InterviewQuestionResponse::from)
-                        .toList()
+                        .toList(),
+                result.nextCursor()
         );
     }
 
     public record InterviewQuestionResponse(
             String id,
-            String sourceReviewVersionId,
             int order,
             String question,
             String threadId
@@ -30,7 +29,6 @@ public record InterviewQuestionListResponse(
         private static InterviewQuestionResponse from(InterviewQuestionItemResult item) {
             return new InterviewQuestionResponse(
                     item.id(),
-                    item.sourceReviewVersionId(),
                     item.order(),
                     item.question(),
                     item.threadId()

@@ -58,7 +58,7 @@ class ReviewVersionQueryServiceTest {
     }
 
     @Test
-    void findMyReviewVersionsReturnsCurrentUserVersionsWithLatestFlag() {
+    void findMyReviewVersionsReturnsCurrentUserVersionsByCreatedAtAscWithLatestFlag() {
         Instant now = Instant.parse("2026-06-21T01:00:00Z");
         CoverLetter coverLetter = coverLetterRepository.save(CoverLetter.draft("cl_1", "user_1", now));
         ReviewVersion oldVersion = reviewVersionRepository.save(ReviewVersion.first(
@@ -76,9 +76,9 @@ class ReviewVersionQueryServiceTest {
         List<ReviewVersionSummary> result = service.findMyReviewVersions("cl_1");
 
         assertThat(result).extracting(summary -> summary.reviewVersion().getId())
-                .containsExactly("rv_new", oldVersion.getId());
+                .containsExactly(oldVersion.getId(), "rv_new");
         assertThat(result).extracting(ReviewVersionSummary::isLatest)
-                .containsExactly(true, false);
+                .containsExactly(false, true);
     }
 
     @Test

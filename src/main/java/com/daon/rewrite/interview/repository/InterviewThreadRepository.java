@@ -14,6 +14,9 @@ public interface InterviewThreadRepository extends JpaRepository<InterviewThread
     @EntityGraph(attributePaths = "interviewQuestion")
     List<InterviewThread> findByInterviewSessionId(String interviewSessionId);
 
+    @EntityGraph(attributePaths = "interviewQuestion")
+    List<InterviewThread> findByInterviewQuestionIdIn(List<String> interviewQuestionIds);
+
     @Query("""
             select thread
             from InterviewThread thread

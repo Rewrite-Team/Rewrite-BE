@@ -8,21 +8,11 @@
 POST /cover-letters/{coverLetterId}/keyword-analysis
 ```
 
-Request:
-
-```json
-{
-  "sourceReviewVersionId": "rv_01HZ..."
-}
-```
-
-`sourceReviewVersionId`를 생략하면 최신 첨삭 버전을 기준으로 분석한다.
+Request body는 없다. 서버는 호출 시점의 최신 성공 첨삭 버전과 해당 버전의 문항별 `finalAnswer`를 분석 입력으로 사용한다.
 
 키워드 분석 결과가 없으면 새 `KeywordAnalysis`를 생성하고 LLM Job을 시작한다.
 
 키워드 분석 결과가 이미 있으면 같은 `keywordAnalysisId`를 재사용해 `PROCESSING`으로 전환하고 새 LLM Job을 시작한다. 이 흐름은 결과 화면의 `AI 키워드 재분석` 버튼에서 사용한다.
-
-재분석 요청에서는 `sourceReviewVersionId`를 보내지 않는다. 서버는 항상 `CoverLetter.latestReviewVersionId`를 기준으로 다시 분석한다.
 
 `KEYWORD_ANALYSIS` LLM Job은 커밋 이후 비동기 worker에서 실행된다. worker는 분석 기준 첨삭 버전의 문항별 최종 작성본을 입력으로 사용하고, 완료 시 최신 키워드 결과를 저장한다.
 
@@ -30,10 +20,8 @@ Response:
 
 ```json
 {
-  "jobId": "job_01HZ...",
-  "keywordAnalysisId": "ka_01HZ...",
-  "coverLetterId": "cl_01HZ...",
-  "status": "PROCESSING"
+  "status": "PROCESSING",
+  "jobId": "job_01HZ..."
 }
 ```
 
@@ -41,12 +29,13 @@ Validation:
 
 ```text
 coverLetter.status는 REVIEWED여야 한다.
-sourceReviewVersionId가 있으면 해당 자기소개서의 첨삭 버전이어야 한다.
+최신 성공 ReviewVersion이 존재해야 한다.
 분석 결과 keywords는 최대 20개다.
 keywords[].importance는 1~100 범위의 정수다.
-같은 자기소개서에 PENDING 또는 PROCESSING 상태의 LLM Job이 없어야 한다.
 기존 KeywordAnalysis가 있으면 같은 리소스를 재사용한다.
 ```
+
+동일한 키워드 분석 Job이 이미 `PENDING` 또는 `PROCESSING`이면 새 Job을 만들지 않고 기존 Job의 같은 성공 응답을 반환한다. 키워드 분석 외 다른 종류의 LLM Job이 진행 중이면 `LLM_JOB_ALREADY_RUNNING`을 반환한다.
 
 Conflict Response:
 
@@ -63,12 +52,12 @@ Conflict Response:
 
 ```json
 {
-  "jobId": "job_01HZ...",
-  "keywordAnalysisId": "ka_01HZ...",
-  "coverLetterId": "cl_01HZ...",
-  "status": "PROCESSING"
+  "status": "PROCESSING",
+  "jobId": "job_01HZ..."
 }
 ```
+
+클라이언트는 응답의 `jobId`로 API-016 공통 Job SSE에 연결한다. `job.state.status=COMPLETED`이면 API-021을 다시 조회하고, `job.state.status=FAILED`이면 실패 화면을 표시한다. SSE 연결 또는 재연결에 실패한 경우에는 API-021을 polling해 최종 상태를 복구한다.
 
 ### 최신 키워드 분석 조회
 
@@ -79,6 +68,10 @@ GET /cover-letters/{coverLetterId}/keyword-analysis/latest
 `status`는 `NOT_STARTED`, `PROCESSING`, `COMPLETED`, `FAILED` 중 하나다.
 `keywords`는 완료 상태에서만 분석 결과를 담고, 그 외 상태에서는 빈 배열이다.
 `coverLetter`는 모든 상태에서 반환한다. `sourceReviewVersion`은 분석 기준이 확정된 `PROCESSING`, `COMPLETED`, `FAILED`에서 반환하고, 분석 전 `NOT_STARTED`에서는 `null`이다. 화면에 필요하지 않은 첨삭 버전 생성 시각은 반환하지 않는다.
+
+`jobId`는 `PROCESSING`에서 현재 실행 중인 Job ID, `FAILED`에서 가장 최근 실패한 Job ID를 반환한다. `NOT_STARTED`, `COMPLETED`에서는 `null`이다.
+
+새로고침 후 `status=PROCESSING`이면 응답의 `jobId`로 API-016에 다시 연결한다. SSE 연결에 실패한 동안에는 이 API를 polling하고, `COMPLETED` 또는 `FAILED`가 되면 중단한다.
 
 키워드 분석 결과가 없는 경우:
 
@@ -92,6 +85,7 @@ GET /cover-letters/{coverLetterId}/keyword-analysis/latest
   },
   "sourceReviewVersion": null,
   "status": "NOT_STARTED",
+  "jobId": null,
   "keywords": []
 }
 ```
@@ -111,6 +105,7 @@ GET /cover-letters/{coverLetterId}/keyword-analysis/latest
     "version": "v0.2"
   },
   "status": "PROCESSING",
+  "jobId": "job_01HZ...",
   "keywords": []
 }
 ```
@@ -130,6 +125,7 @@ Response:
     "version": "v0.2"
   },
   "status": "COMPLETED",
+  "jobId": null,
   "keywords": [
     {
       "keyword": "백엔드",
@@ -158,6 +154,20 @@ Response:
     "version": "v0.2"
   },
   "status": "FAILED",
+  "jobId": "job_01HZ...",
   "keywords": []
 }
 ```
+
+### API-020~021 오류 처리
+
+COMMON의 인증·CSRF·서버 오류 처리를 기본으로 적용하고, AI 분석 실패는 HTTP 오류가 아니라 API-016 `job.state.status=FAILED`와 API-021의 `status=FAILED`로 처리한다.
+
+| API | HTTP 상태 | 오류 코드 | 발생 조건 | 프론트엔드 처리 |
+|---|---:|---|---|---|
+| API-020 | 404 | `NOT_FOUND` | 자기소개서 없음·비소유·삭제 | 대상 없음 안내 후 목록으로 이동한다. |
+| API-020 | 409 | `CONFLICT` | 자기소개서가 `REVIEWED`가 아니거나 성공한 첨삭 버전이 없음 | API-012를 재조회해 현재 상태 화면으로 전환한다. |
+| API-020 | 409 | `LLM_JOB_ALREADY_RUNNING` | 키워드 분석 외 다른 AI Job이 진행 중 | 다른 AI 작업이 진행 중임을 안내하고 자동 재시도하지 않는다. 오류 응답에 기존 `jobId`가 없으므로 복구를 가정하지 않는다. |
+| API-021 | 404 | `NOT_FOUND` | 자기소개서 없음·비소유·삭제 | 대상 없음 안내 후 목록으로 이동한다. |
+
+동일한 키워드 분석 Job 중복 요청은 기존 `jobId`를 담은 `200 OK`다. 분석 실패 시 기존 결과와 실패 결과를 섞어 표시하지 않고 실패 안내와 API-020 수동 재시도를 제공한다.

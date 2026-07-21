@@ -31,6 +31,7 @@ Codex는 모든 문서를 매번 읽지 않는다. 먼저 이 문서를 보고 �
 - 기능 구현 전에는 `status.md`, 관련 `requirements.md`의 `REQ-*` 섹션과 `api/` 도메인 문서, `conventions.md`와 `testing.md`의 관련 섹션을 읽는다.
 - API를 추가하거나 변경할 때는 `api/README.md`의 상태표와 관련 `api/` 도메인 문서를 갱신한다.
 - API 계약 또는 구현 상태를 바꾸면 Markdown 계약과 Notion `Rewrite API (자동 동기화)` 데이터베이스를 `API ID`로 함께 갱신한다. 저장소가 기준 원본이며 Notion 직접 수정은 역동기화하지 않는다.
+- API 관련 설계, 구현, 수정, 리뷰 또는 문서화는 코드나 저장소 문서를 변경하기 전에 관련 `API ID`의 Notion 페이지를 먼저 조회한다. 조회할 수 없으면 작업을 진행하지 않고 사용자에게 알린다.
 - DB/JPA entity, repository, schema, migration, persistence 전략을 변경할 때는 `erd.md`를 함께 확인한다.
 - 설계 결정의 배경이 필요할 때만 `decisions/README.md`와 관련 `decisions/` 도메인 또는 persistence 문서를 읽는다.
 - 다음 이슈를 만들 때는 `status.md`, 관련 `requirements.md`, 관련 `api/` 도메인 문서, 실제 코드/테스트 상태, `.github/ISSUE_TEMPLATE/`를 함께 확인한다.

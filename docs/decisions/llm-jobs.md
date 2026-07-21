@@ -650,7 +650,7 @@ partial result는 진행 중 화면 복구를 위한 임시 데이터다. 서버
 
 ## Decision 064: 실패한 첨삭 Job의 partialResult는 실패 화면에 표시하지 않는다
 
-> Superseded by Decision 075. 실패한 첨삭 Job의 임시 문항 결과는 사용자-facing API에서 숨긴다.
+> Superseded by Decision 082. 실패한 첨삭 Job에서도 성공한 임시 문항 결과를 API-012에 포함한다.
 
 ### 결정
 
@@ -709,11 +709,28 @@ latestFirstReviewJob.completedAt
   - 사용자는 실패 전까지 어느 정도 생성됐는지 볼 수 없다.
   - 디버깅용 partial 내용 확인은 운영 로그나 내부 도구에 의존해야 한다.
 
+## Decision 085: Job 상태 조회는 복구에 필요한 필드만 반환한다
+
+### 결정
+
+API-015 Job 상태 조회는 `status`, `progress`, `resultRef`, `error`만 반환한다. Job ID는 path와 중복되므로 제외하고 type, target, 내부 재시도 횟수, partial result와 생성·완료 시각도 공개 응답에서 제외한다.
+
+API-015는 실시간 진행의 주 경로가 아니라 API-016 연결·재연결 실패, 이벤트 유실과 새로고침 시 모든 Job의 최종 상태를 확인하는 공통 polling fallback으로 유지한다.
+
+### 선택 이유
+
+최초·재첨삭은 API-012와 API-016으로 진행 화면을 구성하지만, 면접 추가 질문과 답변 피드백 등은 Job의 최종 실패 상태를 확인할 공통 fallback이 필요하다. 복구에 사용하지 않는 내부 필드를 제거하면 Job 구현과 프론트엔드 계약의 결합을 줄일 수 있다.
+
+### 트레이드오프
+
+- 장점: 모든 LLM Job에 공통 복구 경로를 유지하면서 응답을 최소화한다.
+- 단점: 운영용 Job 메타데이터가 필요하면 별도 내부 조회가 필요하다.
+
 
 
 ## Decision 065: 실패 화면의 사용자 메시지는 LLM Job error.code 기준으로 매핑한다
 
-> Superseded by Decision 074. 이번 공통 상세 계약에서는 실패 화면 전용 error 응답을 다루지 않는다.
+> Superseded by Decision 097. 아래 내용은 과거 계약이며 현재 공개 LLM Job 오류 코드는 `LLM_PROVIDER_ERROR`, `LLM_CONTEXT_LENGTH_EXCEEDED`, `LLM_CONTENT_FILTERED`만 사용한다.
 
 ### 결정
 
@@ -732,32 +749,26 @@ REVIEW_FAILED: AI 첨삭 실패 화면
 ```json
 {
   "error": {
-    "code": "LLM_PROVIDER_TIMEOUT",
-    "message": "LLM provider request timed out."
+    "code": "LLM_PROVIDER_ERROR",
+    "message": "AI 처리에 실패했습니다."
   }
 }
 ```
 
-대표 LLM Job error code:
+현재 공개 LLM Job error code:
 
 ```text
-LLM_PROVIDER_TIMEOUT
-LLM_PROVIDER_UNAVAILABLE
-LLM_PROVIDER_RATE_LIMITED
+LLM_PROVIDER_ERROR
 LLM_CONTEXT_LENGTH_EXCEEDED
 LLM_CONTENT_FILTERED
-LLM_PROVIDER_ERROR
 ```
 
 권장 사용자 메시지:
 
 ```text
-LLM_PROVIDER_TIMEOUT: AI 응답 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.
-LLM_PROVIDER_UNAVAILABLE: AI 서비스가 일시적으로 불안정합니다. 잠시 후 다시 시도해주세요.
-LLM_PROVIDER_RATE_LIMITED: 요청이 일시적으로 많아 처리하지 못했습니다. 잠시 후 다시 시도해주세요.
+LLM_PROVIDER_ERROR: AI 처리에 실패했습니다. 잠시 후 다시 시도해주세요.
 LLM_CONTEXT_LENGTH_EXCEEDED: 입력 내용이 너무 길어 AI가 처리하지 못했습니다.
-LLM_CONTENT_FILTERED: 입력 내용 또는 생성 결과가 처리 정책에 맞지 않아 첨삭에 실패했습니다.
-LLM_PROVIDER_ERROR: AI 첨삭에 실패했습니다. 잠시 후 다시 시도해주세요.
+LLM_CONTENT_FILTERED: 입력 내용 또는 생성 결과를 처리할 수 없습니다. 내용을 수정한 뒤 다시 시도해주세요.
 ```
 
 ### PRD 근거
@@ -884,7 +895,8 @@ JSON 파싱 실패
 -> 서버 자동 재시도 1회
 -> 재시도 결과도 구조 검증 실패
 -> LlmJob.status=FAILED
--> error.code=LLM_OUTPUT_VALIDATION_FAILED
+-> 공개 error.code=LLM_PROVIDER_ERROR
+-> 내부 로그에는 LLM 출력 구조 검증 실패 원인 기록
 ```
 
 적용 Job type:
@@ -939,15 +951,38 @@ LLM 출력은 사용자에게 직접 보이는 결과 데이터다. 구조가 �
 
 ### 결정
 
-API-016은 최초 첨삭과 재첨삭에 공통으로 문항의 `aiReport`와 `rewrittenAnswer`가 모두 완성된 시점에 `review.question.completed` 이벤트 하나를 전송한다. 필드별 또는 토큰별 delta 이벤트는 제공하지 않는다.
+API-016은 최초 첨삭과 재첨삭에 공통으로 연결 직후 `job.state`와 `review.questions`를 순서대로 전송한다. `job.state`는 항상 `jobType`, `status`, `progress`, `resultRef`, `error`의 같은 구조를 사용하고, `review.questions`는 완료 문항 `items`를 포함한다.
 
-연결 직후 해당 Job에 임시 영속 저장된 완료 문항 결과를 같은 이벤트 형식으로 먼저 전송한 뒤 실시간 이벤트를 전송한다. 이벤트는 중복될 수 있으며 클라이언트는 `questionId`로 upsert하고 `order`로 정렬한다. `Last-Event-ID` 기반 영속 replay는 제공하지 않는다.
+문항의 `aiReport`와 `rewrittenAnswer`가 모두 완성된 시점에는 해당 문항 하나를 `items`에 담은 `review.questions`를 전송하고, 갱신된 진행률은 이어지는 `job.state`로 전달한다. 연결 직후 스냅샷과 실시간 문항 완료가 같은 배열 payload를 사용하므로 프론트엔드는 모두 `questionId` 기준 upsert로 처리한다. Job 완료·실패·취소도 별도 이벤트를 만들지 않고 최종 `job.state.status`로 전달한다.
+
+서버는 연결을 먼저 등록하고 스냅샷 전송 중 발생한 변경 이벤트를 버퍼링한 뒤 이어서 전송한다. 이벤트는 중복될 수 있으며 클라이언트는 `questionId`로 upsert하고 `order`로 정렬한다. `Last-Event-ID` 기반 영속 replay는 제공하지 않고 재연결할 때 최신 스냅샷을 다시 전송한다. 연결 유지는 SSE comment heartbeat를 사용한다.
+
+Job ID는 path에 있으므로 이벤트 데이터에 포함하지 않는다. 공통 스트림의 Job 종류는 `job.state.jobType`으로 식별한다. 연결·진행·종료 상태는 단계별 이벤트로 나누지 않고 모두 같은 `job.state`로 전달한다.
 
 ### 선택 이유
 
-AI 리포트와 수정본은 한 문항의 완결된 결과로 함께 사용한다. 문항 단위 전송은 불완전한 필드 조합을 피하고, 연결 직후 스냅샷은 상세 조회와 SSE 연결 사이의 이벤트 누락을 방지한다.
+AI 리포트와 수정본은 한 문항의 완결된 결과로 함께 사용한다. 문항 단위 전송은 불완전한 필드 조합을 피하고, 상태와 완료 문항을 함께 담은 연결 직후 스냅샷은 상세 조회와 SSE 연결 사이의 이벤트 누락과 종료 이벤트 유실을 복구한다.
 
 ### 트레이드오프
 
 - 장점: 프론트엔드 상태 병합이 단순하고 새로고침·재연결 복구가 안정적이다.
 - 단점: 토큰 스트리밍처럼 글자가 생성되는 즉시 보이는 효과는 제공하지 않는다.
+
+## Decision 090: API-016은 첨삭·키워드 분석·면접 Job의 공통 SSE다
+
+### 결정
+
+API-016은 최초 첨삭·재첨삭, 키워드 분석, 초기·추가 면접 질문 생성, 면접 답변 피드백에 공통으로 사용한다. 모든 Job은 연결 직후와 상태·진행률 변경 시 `jobType`, `status`, `progress`, `resultRef`, `error`를 담은 같은 `job.state`를 전송한다. 첨삭 Job은 연결 직후 완료 문항 전체와 이후 완료 문항 하나를 모두 `review.questions.items` 배열로 전달한다. 면접 답변 피드백 Job의 `interview.feedback.delta`는 기존대로 1부터 증가하는 `sequence`와 `contentDelta`를 전송한다. 키워드 분석과 초기·추가 면접 질문 생성은 중간 도메인 이벤트 없이 `job.state`만 사용한다.
+
+완료 `resultRef.type`은 Job에 따라 `REVIEW_VERSION`, `KEYWORD_ANALYSIS`, `INTERVIEW_SESSION`, `INTERVIEW_QUESTION`, `INTERVIEW_MESSAGE`를 사용한다. 키워드 분석 완료 후 API-021을, 초기 면접 질문 생성 완료 후 API-025와 API-026을, 추가 면접 질문 생성 완료 후 API-026을, 면접 피드백 완료 후 API-029를 다시 조회한다. 도메인 조회 응답은 진행 중이거나 최근 실패한 Job ID를 제공해 새로고침 후 SSE에 다시 연결할 수 있게 하며, SSE 연결 실패 시 polling fallback으로 사용한다.
+
+면접 피드백 delta는 검증이 끝난 전체 `content`를 화면 표시용 조각으로 나눈 결과다. `PROCESSING` 동안 서버 메모리에 delta를 보관하고 재연결 시 1번부터 replay한 뒤 새 delta를 이어서 전송한다. `Last-Event-ID` 기반 영속 replay는 제공하지 않으며 메모리 버퍼를 복구할 수 없으면 진행 상태만 표시한다. 완료된 전체 assistant 메시지는 API-029로 조회한다. 생성·검증·저장 순서는 Decision 098을 따른다.
+
+### 선택 이유
+
+중간 결과가 없는 작업도 시작 직후 완료 시점을 실시간으로 알릴 필요가 있다. 하나의 Job SSE 계약을 재사용하면 도메인별 스트림 API를 추가하지 않고도 시작, 새로고침 복구, 완료 후 결과 재조회를 같은 흐름으로 통일할 수 있다.
+
+### 트레이드오프
+
+- 장점: 비동기 시작 API와 프론트엔드의 Job 추적 흐름이 일관된다.
+- 단점: 공통 이벤트와 도메인 전용 이벤트를 구분해 처리해야 하며, 연결 실패와 메모리 replay 버퍼 유실에 대비한 polling fallback도 유지해야 한다.
