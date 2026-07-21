@@ -91,7 +91,7 @@ class ReviewVersionRepositoryTest {
     }
 
     @Test
-    void findByCoverLetterIdOrdersByCreatedAtDesc() {
+    void findByCoverLetterIdOrdersByCreatedAtAsc() {
         Instant now = Instant.parse("2026-06-21T01:00:00Z");
         CoverLetter coverLetter = coverLetterRepository.save(CoverLetter.draft("cl_1", "user_1", now));
         ReviewVersion oldVersion = reviewVersionRepository.save(ReviewVersion.first(
@@ -107,10 +107,10 @@ class ReviewVersionRepositoryTest {
         ReflectionTestUtils.setField(newVersion, "version", "v0.2");
         reviewVersionRepository.save(newVersion);
 
-        List<ReviewVersion> result = reviewVersionRepository.findByCoverLetterIdOrderByCreatedAtDesc("cl_1");
+        List<ReviewVersion> result = reviewVersionRepository.findByCoverLetterIdOrderByCreatedAtAsc("cl_1");
 
         assertThat(result).extracting(ReviewVersion::getId)
-                .containsExactly("rv_new", "rv_old");
+                .containsExactly("rv_old", "rv_new");
     }
 
     @Test
