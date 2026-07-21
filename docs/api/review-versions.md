@@ -12,7 +12,7 @@ GET /cover-letters/{coverLetterId}/review-versions
 
 응답의 `isLatest`는 저장 필드가 아니라 `ReviewVersion.id == CoverLetter.latestReviewVersionId` 여부로 계산한 파생 필드다.
 
-목록은 `createdAt` 내림차순으로 반환한다. 성공한 첨삭 버전이 없으면 `items`는 빈 배열 `[]`이다. 페이지네이션은 제공하지 않는다.
+목록은 프론트엔드가 버전 히스토리를 과거부터 최신 순서로 바로 표시할 수 있도록 `createdAt` 오름차순으로 반환한다. 성공한 첨삭 버전이 없으면 `items`는 빈 배열 `[]`이다. 페이지네이션은 제공하지 않는다.
 
 Response:
 
@@ -20,16 +20,16 @@ Response:
 {
   "items": [
     {
-      "id": "rv_01HZ...",
-      "version": "v0.2",
-      "isLatest": true,
-      "createdAt": "2026-06-20T14:31:00"
-    },
-    {
       "id": "rv_01HY...",
       "version": "v0.1",
       "isLatest": false,
       "createdAt": "2026-06-20T14:11:00"
+    },
+    {
+      "id": "rv_01HZ...",
+      "version": "v0.2",
+      "isLatest": true,
+      "createdAt": "2026-06-20T14:31:00"
     }
   ]
 }
@@ -124,7 +124,7 @@ Response:
 
 재첨삭 Job은 요청 transaction에서 요청 시점의 최신 `ReviewVersion`을 `requestRef`로 고정하고, 그 버전의 문항별 `finalAnswer`를 임시 문항 입력 스냅샷으로 함께 저장한다. 진행 상세의 `originalAnswer`에도 실제 입력으로 고정된 `finalAnswer`를 반환한다. 새 버전의 `requestInstruction`에는 Job 생성 시 저장한 재첨삭 요구사항을 기록한다.
 
-worker는 전체 자기소개서 문맥과 대상 문항을 입력으로 문항별 OpenAI 호출을 병렬 실행한다. provider 오류나 출력 검증 실패가 발생한 문항만 1회 재시도한다. 새 Job 시작 시 이전 버전의 AI 필드는 새 진행 결과로 복사하지 않는다. 각 문항의 `aiReport`와 `rewrittenAnswer`가 모두 완성되면 임시 결과를 저장하고 하나의 `review.question.completed` 이벤트로 전달한다. `finalAnswer` 초깃값은 새 `rewrittenAnswer`와 같다.
+worker는 전체 자기소개서 문맥과 대상 문항을 입력으로 문항별 OpenAI 호출을 병렬 실행한다. provider 오류나 출력 검증 실패가 발생한 문항만 1회 재시도한다. 새 Job 시작 시 이전 버전의 AI 필드는 새 진행 결과로 복사하지 않는다. 각 문항의 `aiReport`와 `rewrittenAnswer`가 모두 완성되면 임시 결과를 저장하고 해당 문항 하나를 담은 `review.questions` 이벤트로 전달한 뒤 갱신된 진행률의 `job.state`를 전송한다. `finalAnswer` 초깃값은 새 `rewrittenAnswer`와 같다.
 
 재첨삭 Job이 완료되어 새 `ReviewVersion`이 생성되어도 기존 키워드 분석 결과는 삭제하지 않는다. 최신 첨삭 버전 기준 키워드 분석이 필요하면 사용자가 `AI 키워드 재분석`을 실행해 기존 `KeywordAnalysis`를 갱신한다.
 

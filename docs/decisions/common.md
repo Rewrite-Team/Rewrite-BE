@@ -193,7 +193,7 @@ completedAt
 
 `401 UNAUTHORIZED`는 API-004 single-flight 갱신 후 원 요청을 한 번만 재시도하고, `403 CSRF_TOKEN_INVALID`는 API-003 재발급 후 원 요청을 한 번만 재시도한다. 반복 실패에서는 재시도를 중단한다. API별로 별도 허용하지 않은 상태 변경 요청은 네트워크 또는 `5xx`에서 자동 재전송하지 않는다.
 
-비동기 Job의 `FAILED`와 `job.failed`는 HTTP 오류가 아니라 정상 조회·스트림에서 받은 작업 결과로 분리한다. 공개 Job 오류 코드는 프론트 동작이 다른 `LLM_PROVIDER_ERROR`, `LLM_CONTEXT_LENGTH_EXCEEDED`, `LLM_CONTENT_FILTERED`만 사용한다. timeout, provider 장애·요청 제한과 출력 형식 검증 실패는 내부 로그에서는 구분하되 공개 응답에서는 `LLM_PROVIDER_ERROR`로 정규화한다.
+비동기 Job의 `FAILED`와 API-016 `job.state.status=FAILED`는 HTTP 오류가 아니라 정상 조회·스트림에서 받은 작업 결과로 분리한다. 공개 Job 오류 코드는 프론트 동작이 다른 `LLM_PROVIDER_ERROR`, `LLM_CONTEXT_LENGTH_EXCEEDED`, `LLM_CONTENT_FILTERED`만 사용한다. timeout, provider 장애·요청 제한과 출력 형식 검증 실패는 내부 로그에서는 구분하되 공개 응답에서는 `LLM_PROVIDER_ERROR`로 정규화한다.
 
 ### 선택 이유
 

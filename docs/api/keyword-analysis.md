@@ -57,7 +57,7 @@ Conflict Response:
 }
 ```
 
-클라이언트는 응답의 `jobId`로 API-016 공통 Job SSE에 연결한다. `job.completed`를 받으면 API-021을 다시 조회하고, `job.failed`를 받으면 실패 화면을 표시한다. SSE 연결 또는 재연결에 실패한 경우에는 API-021을 polling해 최종 상태를 복구한다.
+클라이언트는 응답의 `jobId`로 API-016 공통 Job SSE에 연결한다. `job.state.status=COMPLETED`이면 API-021을 다시 조회하고, `job.state.status=FAILED`이면 실패 화면을 표시한다. SSE 연결 또는 재연결에 실패한 경우에는 API-021을 polling해 최종 상태를 복구한다.
 
 ### 최신 키워드 분석 조회
 
@@ -161,7 +161,7 @@ Response:
 
 ### API-020~021 오류 처리
 
-COMMON의 인증·CSRF·서버 오류 처리를 기본으로 적용하고, AI 분석 실패는 HTTP 오류가 아니라 API-016 `job.failed`와 API-021의 `status=FAILED`로 처리한다.
+COMMON의 인증·CSRF·서버 오류 처리를 기본으로 적용하고, AI 분석 실패는 HTTP 오류가 아니라 API-016 `job.state.status=FAILED`와 API-021의 `status=FAILED`로 처리한다.
 
 | API | HTTP 상태 | 오류 코드 | 발생 조건 | 프론트엔드 처리 |
 |---|---:|---|---|---|

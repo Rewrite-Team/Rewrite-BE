@@ -79,8 +79,8 @@ API 설계 결정과 트레이드오프는 `../decisions/README.md`를 함께 �
 | API-013 | DELETE | `/cover-letters/{coverLetterId}` | In Progress | REQ-003 | 삭제 응답을 `success` 단일 필드로 확정, 구현 변경 필요 |
 | API-014 | POST | `/cover-letters/{coverLetterId}/submit` | In Progress | REQ-004, REQ-005 | DRAFT 필수값 최종 검증과 `displayStatus`, `jobId` 응답 계약 확정, 구현 변경 필요 |
 | API-015 | GET | `/llm-jobs/{jobId}` | In Progress | REQ-005, REQ-009, REQ-010 | 복구용 경량 Job 상태 응답으로 확정, 구현 변경 필요 |
-| API-016 | GET | `/llm-jobs/{jobId}/stream` | In Progress | REQ-005, REQ-006, REQ-009, REQ-010 | `jobType` 공통 Job 스냅샷·종료, 첨삭 문항, 면접 피드백 delta 이벤트 계약 확정, 구현 필요 |
-| API-017 | GET | `/cover-letters/{coverLetterId}/review-versions` | Implemented | REQ-006 | 첨삭 버전 목록 |
+| API-016 | GET | `/llm-jobs/{jobId}/stream` | In Progress | REQ-005, REQ-006, REQ-009, REQ-010 | 동일 구조의 Job 상태, 첨삭 문항, 검증된 면접 피드백의 점진 전송·재연결 replay 계약 확정, 구현 필요 |
+| API-017 | GET | `/cover-letters/{coverLetterId}/review-versions` | Implemented | REQ-006 | 성공한 첨삭 버전을 `createdAt` 오름차순으로 반환 |
 | API-018 | GET | `/cover-letters/{coverLetterId}/review-versions/{versionId}` | In Progress | REQ-006 | 조회 구현됨, API-012와 공통 상세 응답 계약 전환 필요 |
 | API-019 | PUT | `/cover-letters/{coverLetterId}/review-versions/{versionId}/final-answers` | In Progress | REQ-006 | `versionId` 동시성 검증을 유지하고 저장 응답을 `success` 단일 필드로 확정, 구현 변경 필요 |
 | API-020 | POST | `/cover-letters/{coverLetterId}/keyword-analysis` | In Progress | REQ-009 | 요청 body 제거, `status`·`jobId` 응답과 동일 분석 중복 요청의 기존 Job 반환 계약 확정, 구현 변경 필요 |

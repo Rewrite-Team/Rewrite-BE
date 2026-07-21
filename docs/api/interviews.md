@@ -63,7 +63,7 @@ GET /cover-letters/{coverLetterId}/interview
 재첨삭 후에도 기존 면접 세션을 유지하므로 자기소개서의 현재 상태와 관계없이 세션을 조회한다.
 `interviewSession.jobId`는 아직 화면에서 처리해야 하는 질문 생성 Job이 있을 때 반환한다. `QUESTION_GENERATING`에서는 실행 중이거나 실패한 초기 질문 생성 Job ID를 반환한다. `ACTIVE`에서는 추가 질문 생성 Job이 `PENDING`, `PROCESSING`, `FAILED`이면 해당 Job ID를 반환하고, 처리할 질문 생성 Job이 없으면 `null`이다. 면접 답변 피드백 Job은 질문별 thread에 속하므로 API-025에 포함하지 않는다.
 
-새로고침 후 `jobId`가 있으면 API-016에 연결해 `job.snapshot`으로 진행 또는 실패 상태를 복구한다. 추가 질문 생성이 완료되면 API-026을 다시 조회한다. SSE 연결에 실패한 동안에는 API-025를 polling한다.
+새로고침 후 `jobId`가 있으면 API-016에 연결해 `job.state`로 진행 또는 실패 상태를 복구한다. SSE 연결에 실패하면 해당 `jobId`로 API-015를 polling한다. 완료되면 초기 질문은 API-025와 API-026, 추가 질문은 API-026을 다시 조회하고, 실패하면 각각 API-022 또는 API-027 수동 재시도를 제공한다. API-025 polling은 현재 세션과 복구할 `jobId`를 다시 찾는 용도로 사용한다.
 
 ### 모의면접 시작
 
@@ -88,7 +88,7 @@ Response:
 `LlmJob(type=INTERVIEW_INITIAL_QUESTION_GENERATION)`은 `requestRef.type=REVIEW_VERSION`, `requestRef.id=생성 기준 첨삭 버전 id`를 저장하고 after-commit 비동기 worker에서 실행한다.
 생성에 성공하면 질문 5개와 질문별 thread 5개를 저장하고 `InterviewSession.status`를 `ACTIVE`로 전환한다.
 완료 Job의 `resultRef`는 해당 면접 세션을 가리킨다.
-클라이언트는 응답의 `jobId`로 API-016 공통 Job SSE에 연결한다. `job.completed`를 받으면 API-025와 API-026을 다시 조회한다.
+클라이언트는 응답의 `jobId`로 API-016 공통 Job SSE에 연결한다. `job.state.status=COMPLETED`이면 API-025와 API-026을 다시 조회한다.
 
 질문 생성 실패 시 `InterviewSession.status`는 `FAILED`로 저장된다. 실패한 세션은 현재 면접 세션 조회 API에서 그대로 반환한다.
 
@@ -205,9 +205,9 @@ Response:
 
 응답은 `200 OK`다. Job은 transaction commit 이후 기존 면접 질문 생성 worker에서 비동기로 실행한다.
 
-질문과 thread는 같은 transaction에서 저장한다. 클라이언트는 응답의 `jobId`로 API-016에 연결한다. 추가 질문 생성은 중간 도메인 이벤트를 제공하지 않으며 Job이 완료되면 `progress.current=1`, `resultRef.type=INTERVIEW_QUESTION`, `resultRef.id=생성된 질문 id`가 된다. `job.completed`를 받으면 API-026을 다시 조회해 추가된 질문과 `threadId`를 확인한다.
+질문과 thread는 같은 transaction에서 저장한다. 클라이언트는 응답의 `jobId`로 API-016에 연결한다. 추가 질문 생성은 중간 도메인 이벤트를 제공하지 않으며 Job이 완료되면 `job.state`의 `progress.current=1`, `resultRef.type=INTERVIEW_QUESTION`, `resultRef.id=생성된 질문 id`가 된다. `job.state.status=COMPLETED`이면 API-026을 다시 조회해 추가된 질문과 `threadId`를 확인한다.
 
-질문 추가 생성 중에도 기존 면접 세션과 기존 질문별 대화방은 유지된다. 추가 질문 생성 Job이 실패해도 `InterviewSession.status`는 `ACTIVE`를 유지하고, 새 질문과 thread는 저장하지 않는다. 실패 상태는 API-016의 `job.failed` 또는 API-025가 반환한 Job ID의 `job.snapshot`으로 복구한다.
+질문 추가 생성 중에도 기존 면접 세션과 기존 질문별 대화방은 유지된다. 추가 질문 생성 Job이 실패해도 `InterviewSession.status`는 `ACTIVE`를 유지하고, 새 질문과 thread는 저장하지 않는다. 실패 상태는 API-016의 `job.state.status=FAILED` 또는 API-025가 반환한 Job ID로 다시 연결한 `job.state`에서 복구한다.
 
 동일한 추가 질문 생성 Job이 이미 `PENDING` 또는 `PROCESSING`이면 새 Job을 만들지 않고 기존 Job의 같은 성공 응답을 반환한다. 다른 종류의 LLM Job이 진행 중이면 `LLM_JOB_ALREADY_RUNNING`을 반환한다.
 
@@ -295,7 +295,7 @@ Response:
 }
 ```
 
-`userMessageId`는 저장된 USER 메시지 ID이고, `jobId`는 API-016에 연결할 피드백 Job ID다. 생성 직후 항상 같은 값인 Job 상태는 응답하지 않으며, 실제 상태는 API-016의 `job.snapshot`으로 확인한다.
+`userMessageId`는 저장된 USER 메시지 ID이고, `jobId`는 API-016에 연결할 피드백 Job ID다. 생성 직후 항상 같은 값인 Job 상태는 응답하지 않으며, 실제 상태는 API-016의 `job.state`로 확인한다.
 
 요청이 성공하면 trim된 USER 메시지와 `INTERVIEW_MESSAGE_FEEDBACK` Job을 같은 transaction에서 저장한다. 생성 직후 Job 상태는 `PENDING`이며, Job이 실제 실행을 시작하면 `PROCESSING`으로 전환된다.
 
@@ -307,9 +307,9 @@ LLM 작업이 완료되면 assistant 메시지와 Job 완료 상태를 같은 tr
 
 provider 호출 또는 출력 검증에 실패하면 Job은 `FAILED`로 종료하고 assistant 메시지는 저장하지 않는다. 이미 완료되거나 실패한 Job event가 다시 전달되어도 메시지를 중복 생성하지 않는다.
 
-면접 답변 피드백 Job(`INTERVIEW_MESSAGE_FEEDBACK`)은 진행 중 assistant 메시지를 미리 생성하지 않는다. 클라이언트는 API-023 응답의 `jobId`로 API-016에 연결하고 `interview.feedback.delta`의 `contentDelta`를 `sequence` 순서대로 이어 붙여 실시간 피드백 문장을 표시한다. 서버는 면접 피드백용 delta 또는 partial result를 저장하지 않는다.
+면접 답변 피드백 Job(`INTERVIEW_MESSAGE_FEEDBACK`)은 진행 중 assistant 메시지를 미리 생성하지 않는다. 서버는 OpenAI 전체 응답을 받은 뒤 구조와 필수 값을 검증하고, 검증된 `content`를 화면 표시용 문자열 조각으로 나눠 API-016 `interview.feedback.delta`로 점진 전송한다. 이는 실제 OpenAI 토큰 스트리밍이 아니라 검증이 끝난 전체 문장을 순차적으로 보여주는 방식이다. 프론트엔드는 `contentDelta`를 `sequence` 순서대로 이어 붙인다.
 
-사용자가 면접 피드백 생성 중 화면을 이탈했다가 다시 진입하면 API-029의 `jobId`로 API-016에 다시 연결한다. 이전 delta는 replay하지 않으므로 불완전한 뒷부분만 표시하지 않고 완료 전까지 진행 상태만 복구한다. `job.completed`를 받으면 API-029를 다시 조회해 저장된 assistant 메시지의 `content`와 `score`를 확정한다. `job.failed`를 받으면 임시 피드백 문장을 제거하고 실패 상태를 표시한다.
+서버는 `PROCESSING` 동안 이미 전송한 delta를 Job별 메모리에 보관한다. 사용자가 생성 중 화면을 이탈했다가 다시 진입하면 API-029의 `jobId`로 API-016에 다시 연결하고, 서버는 이전 delta를 `sequence=1`부터 replay한 뒤 새 delta를 이어서 전송한다. 프론트엔드는 이미 반영한 sequence를 무시한다. 서버 재시작 등으로 replay 버퍼가 없으면 불완전한 뒷부분을 표시하지 않고 완료 전까지 진행 상태만 복구한다. SSE 연결에 실패하면 해당 `jobId`로 API-015를 polling한다. `job.state.status=COMPLETED`이면 API-029를 다시 조회해 임시 문장을 저장된 assistant 메시지의 `content`와 `score`로 교체한다. `job.state.status=FAILED`이면 임시 문장을 제거하고 실패 상태를 표시한다.
 
 사용자 답변 1개에 대해 assistant 메시지 1개를 저장한다. 꼬리질문은 내부 `followUpQuestion` 필드에 포함하며 별도 assistant 메시지로 분리하지 않는다. 공개 응답에서는 피드백과 꼬리질문을 합친 표시 문장을 `content`로 제공한다.
 
@@ -319,7 +319,7 @@ provider 호출 또는 출력 검증에 실패하면 Job은 `FAILED`로 종료�
 
 ### API-022~023, API-025~029 오류 처리
 
-COMMON의 인증·CSRF·서버 오류 처리를 기본으로 적용한다. 질문·피드백 생성 실패는 시작 요청의 HTTP 오류가 아니라 API-016 `job.failed`, API-025 또는 API-029의 조건부 `jobId`와 상태로 처리한다.
+COMMON의 인증·CSRF·서버 오류 처리를 기본으로 적용한다. 질문·피드백 생성 실패는 시작 요청의 HTTP 오류가 아니라 API-016 `job.state.status=FAILED`, API-025 또는 API-029의 조건부 `jobId`와 상태로 처리한다.
 
 | API | HTTP 상태 | 오류 코드 | 발생 조건 | 프론트엔드 처리 |
 |---|---:|---|---|---|
@@ -330,11 +330,11 @@ COMMON의 인증·CSRF·서버 오류 처리를 기본으로 적용한다. 질�
 | API-023 | 404 | `NOT_FOUND` | thread 없음·비소유 또는 삭제된 자기소개서에 연결됨 | 대화 화면을 종료하고 API-025를 재조회한다. |
 | API-023 | 409 | `LLM_JOB_ALREADY_RUNNING` | 같은 자기소개서에 다른 AI Job이 진행 중 | USER 메시지가 저장되지 않았음을 유지하고 기존 작업 완료 후 사용자가 다시 전송하도록 안내한다. |
 | API-025 | 404 | `NOT_FOUND` | 자기소개서 없음·비소유·삭제 | 대상 없음 안내 후 목록으로 이동한다. 세션 없음과 `FAILED`는 `200` 정상 상태다. |
-| API-026 | 404 | `NOT_FOUND` | 세션 없음·비소유 또는 삭제된 자기소개서의 세션 | 면접 화면을 종료하고 API-025를 재조회한다. 질문 생성 중 빈 `items`는 정상이다. |
+| API-026 | 404 | `NOT_FOUND` | 세션 없음·비소유 또는 삭제된 자기소개서의 세션 | 면접 화면을 종료하고 API-025를 재조회한다. `items=[]`는 데이터 없음만 의미하며 진행·실패는 API-025와 API-015로 판단한다. |
 | API-027 | 404 | `NOT_FOUND` | 세션 없음·비소유 또는 삭제된 자기소개서의 세션 | API-025를 재조회한다. |
 | API-027 | 409 | `CONFLICT` | 세션이 `ACTIVE`가 아니거나 자기소개서가 `REVIEWED`가 아님 | API-025를 재조회하고 가능한 동작만 활성화한다. |
 | API-027 | 409 | `LLM_JOB_ALREADY_RUNNING` | 추가 질문 생성 외 다른 AI Job이 진행 중 | 다른 AI 작업이 진행 중임을 안내하고 자동 재시도하지 않는다. |
 | API-028 | - | `API별 오류 없음` | Deprecated되어 호출하지 않는 API | API-026의 `threadId`를 사용한다. `DEPRECATED`는 실제 HTTP 오류 코드가 아니다. |
-| API-029 | 404 | `NOT_FOUND` | thread 없음·비소유 또는 삭제된 자기소개서에 연결됨 | 대화 화면을 종료하고 API-025를 재조회한다. 피드백 진행·실패는 `200`과 `jobId`로 복구한다. |
+| API-029 | 404 | `NOT_FOUND` | thread 없음·비소유 또는 삭제된 자기소개서에 연결됨 | 대화 화면을 종료하고 API-025를 재조회한다. `jobId`가 있으면 API-016에 연결하고, 연결 실패 시 API-015를 polling한다. |
 
 초기 질문 생성 실패는 API-025의 `FAILED` 상태에서 API-022 수동 재시도를 제공하고, 추가 질문 생성 실패는 기존 질문과 대화를 유지한 채 API-027 수동 재시도를 제공한다. 답변 피드백 실패에서는 임시 delta를 제거하고 저장된 USER 메시지는 유지하며, 존재하지 않는 자동 재처리 API를 가정하지 않는다.

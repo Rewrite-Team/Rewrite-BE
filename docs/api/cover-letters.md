@@ -100,6 +100,8 @@ data: {"coverLetterId":"cl_01HZ...","displayStatus":"REVIEW_FAILED","latestRevie
 
 서버는 사용자 연결을 이벤트 라우터에 먼저 등록한 뒤 스냅샷을 조회·전송하고, 그 사이 발생한 변경 이벤트는 스냅샷 전송이 끝날 때까지 연결별로 버퍼링했다가 발생 순서대로 전송한다. 이 스트림은 `Last-Event-ID` 영속 replay를 제공하지 않는다. 재연결하면 전체 현재 상태 스냅샷을 다시 받은 뒤 실시간 이벤트를 수신한다. 연결 유지를 위한 heartbeat가 필요하면 프론트엔드 데이터 계약에 포함되지 않는 SSE comment를 사용한다.
 
+`EventSource.onerror`가 발생하면 기존 연결을 닫고 API-007 같은 일반 인증 요청에서 COMMON의 API-004 single-flight 갱신을 수행한 뒤 스트림을 다시 생성한다. 갱신에 실패하면 로그인 화면으로 이동하고, 스트림 복구가 계속 실패하면 API-007을 재조회해 목록 상태를 복구한다.
+
 ### 자기소개서 생성
 
 자기소개서 작성 플로우를 시작할 때 빈 초안을 생성한다.
@@ -218,7 +220,6 @@ Error Codes:
 
 ```text
 400 VALIDATION_ERROR: 입력된 필드의 최대 길이 또는 URL 형식 validation 실패
-401 UNAUTHORIZED: 인증되지 않은 요청
 404 NOT_FOUND: 자기소개서가 없거나 현재 사용자가 소유하지 않은 경우
 409 COVER_LETTER_NOT_DRAFT: 대상 자기소개서가 DRAFT가 아닌 경우
 ```
@@ -274,7 +275,6 @@ Error Codes:
 
 ```text
 400 VALIDATION_ERROR: 입력된 preferences의 최대 길이 validation 실패
-401 UNAUTHORIZED: 인증되지 않은 요청
 404 NOT_FOUND: 자기소개서가 없거나 현재 사용자가 소유하지 않은 경우
 409 COVER_LETTER_NOT_DRAFT: 대상 자기소개서가 DRAFT가 아닌 경우
 ```
@@ -334,7 +334,6 @@ Error Codes:
 
 ```text
 400 VALIDATION_ERROR: 문항 객체가 null이거나 입력된 문항 필드의 최대 길이·범위 validation 실패
-401 UNAUTHORIZED: 인증되지 않은 요청
 404 NOT_FOUND: 자기소개서가 없거나 현재 사용자가 소유하지 않은 경우
 409 COVER_LETTER_NOT_DRAFT: 대상 자기소개서가 DRAFT가 아닌 경우
 ```
@@ -470,7 +469,6 @@ REVIEWED: 최신 성공 reviewVersion과 해당 버전 questions를 반환하고
 Error Codes:
 
 ```text
-401 UNAUTHORIZED: 인증되지 않은 요청
 404 NOT_FOUND: 자기소개서가 없거나 현재 사용자가 소유하지 않은 경우
 ```
 
@@ -520,7 +518,7 @@ questions는 1개 이상이어야 한다.
 
 `REVIEW_FAILED` 상태의 사용자 수동 재시도에는 제품 도메인상 횟수 제한을 두지 않는다. 단, LLM 비용과 남용 방지를 위한 rate limit, 사용자 quota, 운영 정책은 별도로 적용할 수 있다.
 
-새 Job이 생성되면 submit transaction commit 이후 최초 첨삭 worker가 비동기로 실행된다. worker는 전체 자기소개서 문맥과 대상 문항을 입력으로 각 문항 호출을 병렬 실행하고, provider 오류나 출력 검증 실패가 발생한 문항만 1회 재시도한다. 문항의 `aiReport`와 `rewrittenAnswer`가 모두 완성되면 임시 문항 결과를 영속 저장하고 `review.question.completed` 이벤트를 전송한다.
+새 Job이 생성되면 submit transaction commit 이후 최초 첨삭 worker가 비동기로 실행된다. worker는 전체 자기소개서 문맥과 대상 문항을 입력으로 각 문항 호출을 병렬 실행하고, provider 오류나 출력 검증 실패가 발생한 문항만 1회 재시도한다. 문항의 `aiReport`와 `rewrittenAnswer`가 모두 완성되면 임시 문항 결과를 영속 저장하고 해당 문항 하나를 담은 `review.questions` 이벤트를 전송한 뒤 갱신된 진행률의 `job.state`를 전송한다.
 
 모든 문항 task가 종료된 뒤 모든 임시 결과가 성공하면 최종 `ReviewVersion`과 문항별 결과로 한 transaction에서 확정하고 `CoverLetter.status`를 `REVIEWED`로 변경한다. 최종 실패하면 `LlmJob.status`는 `FAILED`, 최초 첨삭의 `CoverLetter.status`는 `REVIEW_FAILED`가 된다. 실패 Job에서 성공한 임시 문항 결과는 API-012에서 읽기 전용 부분 결과로 반환한다.
 
@@ -637,3 +635,5 @@ COMMON의 `UNAUTHORIZED`, `CSRF_TOKEN_INVALID`, 예상하지 못한 `5xx` 처리
 | API-014 | 404 | `NOT_FOUND` | 자기소개서 없음·비소유·삭제 | 대상 없음 안내 후 목록으로 이동한다. |
 | API-014 | 409 | `LLM_JOB_ALREADY_RUNNING` | 최초 첨삭 외 다른 AI Job이 진행 중 | 다른 AI 작업이 진행 중임을 안내하고 제출 화면을 유지하며 자동 재시도하지 않는다. 동일 최초 첨삭 중복 요청은 오류가 아니라 기존 `jobId`를 담은 성공이다. |
 | API-030 | - | `API별 오류 없음` | 네트워크 또는 SSE 연결 종료 | 재연결하고 실패가 지속되면 API-007을 재조회해 상태를 복구한다. Job 실패는 `displayStatus=REVIEW_FAILED`로 처리한다. |
+
+API-014가 `200 OK`를 반환한 뒤 발생한 AI 처리 실패는 API-014의 HTTP 오류가 아니다. API-016 `job.state.status=FAILED` 또는 API-012 `displayStatus=REVIEW_FAILED`로 처리하고, `job.state.status=COMPLETED` 후에는 API-012를 재조회한다.

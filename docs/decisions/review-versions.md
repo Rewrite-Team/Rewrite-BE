@@ -345,6 +345,8 @@ AI 첨삭 버전 라벨은 최초 첨삭 결과를 `v0.1`로 표시하고, 재�
 
 이 라벨은 semantic versioning이 아니라 화면 표시용 revision label이다. `major`, `minor`, `patch`에 제품 호환성 의미를 부여하지 않는다.
 
+API-017은 버전 히스토리를 프론트엔드에서 그대로 표시할 수 있도록 성공한 버전을 `createdAt` 오름차순으로 반환한다.
+
 예상 흐름:
 
 ```text

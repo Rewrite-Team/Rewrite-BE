@@ -6,7 +6,7 @@
 
 첨삭, 재첨삭, 키워드 분석, 면접 질문 생성, 면접 답변 피드백은 비동기 Job으로 처리한다.
 
-LLM 작업 요청 API는 즉시 `jobId`를 반환한다. 클라이언트는 Job 상태 조회 API 또는 스트리밍 API를 통해 진행 상태와 결과를 확인한다.
+LLM 작업 요청 API는 즉시 `jobId`를 반환한다. API-016을 지원하는 화면은 SSE를 우선 사용하고, API-015 Job 상태 조회 또는 도메인 조회 polling은 연결 복구와 fallback에 사용한다. Job 완료 후에는 해당 도메인 결과 조회 API를 다시 호출한다.
 
 ### 버전 관리
 
@@ -184,19 +184,19 @@ API 응답 DTO로 변환할 때는 `ZoneId.of("Asia/Seoul")` 기준으로 변환
 - 개별 API 문서에는 해당 화면에서 별도 분기가 필요한 validation, 리소스 없음, 상태 충돌 오류만 기록한다. 공통 `401`, `403`, `5xx`를 기계적으로 반복하지 않는다.
 - 프론트엔드는 서버 `error.message`를 그대로 노출하지 않고 알려진 `error.code`를 사용자 문구에 매핑한다. 알 수 없는 코드는 공통 오류 문구를 사용한다.
 
-대표 에러 코드:
+공통 오류 코드와 HTTP 상태:
 
-```text
-UNAUTHORIZED
-CSRF_TOKEN_INVALID
-NOT_FOUND
-VALIDATION_ERROR
-CONFLICT
-LLM_JOB_ALREADY_RUNNING
-COVER_LETTER_NOT_DRAFT
-REVIEW_VERSION_NOT_LATEST
-INTERNAL_ERROR
-```
+| HTTP 상태 | 오류 코드 | 발생 조건 | 프론트엔드 처리 |
+|---:|---|---|---|
+| 400 Bad Request | `VALIDATION_ERROR` | 요청 필드의 형식·길이·범위 위반 | `details[].field`에 해당하는 입력 항목에 `reason`을 표시한다. |
+| 401 Unauthorized | `UNAUTHORIZED` | 인증 필요 API에서 access token이 없거나 만료됨 | API-004를 single-flight로 한 번 호출하고 원 요청을 한 번만 재시도한다. 실패하면 로그인 화면으로 이동한다. |
+| 403 Forbidden | `CSRF_TOKEN_INVALID` | 상태 변경 요청의 CSRF 토큰 누락·만료·불일치 | API-003으로 토큰을 재발급하고 원래 상태 변경 요청을 한 번만 재시도한다. |
+| 404 Not Found | `NOT_FOUND` | 리소스 없음·비소유·삭제 | 대상이 없거나 접근할 수 없음을 안내하고 해당 도메인의 이전 화면으로 이동한다. |
+| 409 Conflict | `CONFLICT` | 요청 시점의 리소스 상태가 작업 조건과 맞지 않음 | API별로 명시된 현재 상태 조회를 수행하고 가능한 화면으로 전환한다. |
+| 409 Conflict | `LLM_JOB_ALREADY_RUNNING` | 같은 자기소개서에서 다른 종류의 AI Job이 진행 중 | 다른 AI 작업이 진행 중임을 안내하고 새 요청을 중단한다. 오류 응답에 `jobId`가 없으면 기존 Job 복구를 가정하지 않는다. |
+| 409 Conflict | `COVER_LETTER_NOT_DRAFT` | DRAFT가 아닌 자기소개서에 임시저장을 요청함 | 자동저장을 중단하고 상세를 재조회해 읽기 전용 또는 현재 상태 화면으로 전환한다. |
+| 409 Conflict | `REVIEW_VERSION_NOT_LATEST` | 최신 버전이 아닌 첨삭 버전에 최종 답변 저장을 요청함 | 자동 재전송하지 않고 최신 버전과 상세를 다시 조회한다. |
+| 500 Internal Server Error | `INTERNAL_ERROR` | 예상하지 못한 서버 오류 | 공통 일시 오류를 표시하며 상태 변경 요청을 자동 재전송하지 않는다. |
 
 `CSRF_TOKEN_INVALID`는 모든 `POST`, `PUT`, `PATCH`, `DELETE`에 적용되는 공통 오류다. 프론트엔드는 서버의 `error.message`를 그대로 표시하지 않고 CSRF 토큰 재발급과 단일 재시도 흐름을 사용한다.
 
@@ -422,7 +422,7 @@ LLM 출력 파싱 실패, 필수 필드 누락, 타입 불일치, 범위 위반�
 
 최초 면접 질문 생성 Job은 `type=INTERVIEW_INITIAL_QUESTION_GENERATION`, 추가 면접 질문 생성 Job은 `type=INTERVIEW_ADDITIONAL_QUESTION_GENERATION`으로 구분한다. 두 Job 모두 `requestRef.type=REVIEW_VERSION`, `requestRef.id=생성 기준 첨삭 버전 id`를 저장한다. 추가 생성 Job의 `progress.total`은 1이며 완료 결과는 생성된 `INTERVIEW_QUESTION`을 가리킨다.
 
-첨삭 Job(`COVER_LETTER_REVIEW`, `COVER_LETTER_RE_REVIEW`)은 문항별 호출을 병렬 실행하고, 문항의 `aiReport`와 `rewrittenAnswer`가 모두 완성된 결과만 Job과 연결된 임시 문항 결과로 영속 저장한다. API-012는 이 완료 문항을 진행 상세에 포함하고 API-016은 같은 결과를 `review.question.completed` 이벤트로 전송한다.
+첨삭 Job(`COVER_LETTER_REVIEW`, `COVER_LETTER_RE_REVIEW`)은 문항별 호출을 병렬 실행하고, 문항의 `aiReport`와 `rewrittenAnswer`가 모두 완성된 결과만 Job과 연결된 임시 문항 결과로 영속 저장한다. API-012는 이 완료 문항을 진행 상세에 포함하고 API-016은 같은 결과를 `review.questions.items`로 전송한다.
 
 Job 상태 조회는 복구에 필요한 상태, 진행률, 결과 참조와 오류만 반환한다. 필드별 partial text와 토큰별 첨삭 delta는 저장하거나 전송하지 않는다.
 
