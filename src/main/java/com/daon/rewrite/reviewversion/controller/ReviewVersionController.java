@@ -59,12 +59,11 @@ public class ReviewVersionController {
             @PathVariable String versionId,
             @RequestBody SaveFinalAnswersRequest request
     ) {
-        return SaveFinalAnswersResponse.from(
-                reviewVersionCommandService.saveMyFinalAnswers(
-                        coverLetterId,
-                        versionId,
-                        request == null ? null : request.toInputs()
-                )
+        reviewVersionCommandService.saveMyFinalAnswers(
+                coverLetterId,
+                versionId,
+                request == null ? null : request.toInputs()
         );
+        return SaveFinalAnswersResponse.completed();
     }
 }

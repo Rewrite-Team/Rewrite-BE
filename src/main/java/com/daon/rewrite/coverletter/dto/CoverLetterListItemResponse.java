@@ -1,7 +1,7 @@
 package com.daon.rewrite.coverletter.dto;
 
-import com.daon.rewrite.coverletter.entity.CoverLetter;
 import com.daon.rewrite.coverletter.entity.CoverLetterStatus;
+import com.daon.rewrite.coverletter.entity.CoverLetter;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -11,9 +11,9 @@ public record CoverLetterListItemResponse(
         String title,
         String companyName,
         String positionTitle,
-        CoverLetterStatus status,
+        CoverLetterStatus displayStatus,
         LocalDateTime createdAt,
-        String latestReviewVersionId
+        String latestReviewedVersionId
 ) {
     private static final ZoneId API_ZONE = ZoneId.of("Asia/Seoul");
 
@@ -25,7 +25,7 @@ public record CoverLetterListItemResponse(
                 coverLetter.getPositionTitle(),
                 coverLetter.getStatus(),
                 LocalDateTime.ofInstant(coverLetter.getCreatedAt(), API_ZONE),
-                coverLetter.getLatestReviewVersionId()
+                coverLetter.getLatestReviewedVersionId()
         );
     }
 }

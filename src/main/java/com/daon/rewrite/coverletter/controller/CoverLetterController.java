@@ -11,9 +11,7 @@ import com.daon.rewrite.coverletter.dto.SaveQuestionsRequest;
 import com.daon.rewrite.coverletter.dto.SaveQuestionsResponse;
 import com.daon.rewrite.coverletter.dto.SubmitCoverLetterResponse;
 import com.daon.rewrite.coverletter.entity.CoverLetter;
-import com.daon.rewrite.coverletter.entity.CoverLetterStatus;
 import com.daon.rewrite.coverletter.service.CoverLetterService;
-import com.daon.rewrite.coverletter.service.SaveQuestionsResult;
 import com.daon.rewrite.coverletter.service.SubmitCoverLetterResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -36,23 +34,30 @@ public class CoverLetterController {
 
     @PostMapping("/cover-letters")
     @ResponseStatus(HttpStatus.CREATED)
-    public CreateCoverLetterResponse createDraft() {
-        return CreateCoverLetterResponse.from(coverLetterService.createDraft());
+    public CreateCoverLetterResponse create() {
+        return CreateCoverLetterResponse.from(coverLetterService.create());
     }
 
+    /**
+     * 현재 사용자의 자기소개서 목록을 조회
+     *
+     * @param page 1부터 시작하는 페이지 번호. 생략하면 1
+     * @param size 페이지당 항목 수. 생략하면 9
+     * @return 자기소개서 목록과 페이지 정보
+     */
     @GetMapping("/cover-letters")
     public CoverLetterListResponse findMyCoverLetters(
             @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "9") int size,
-            @RequestParam(required = false) CoverLetterStatus status
+            @RequestParam(defaultValue = "9") int size
     ) {
-        Page<CoverLetter> result = coverLetterService.findMyCoverLetters(page, size, status);
+        Page<CoverLetter> result = coverLetterService.findMyCoverLetters(page, size);
         return CoverLetterListResponse.from(result, page, size);
     }
 
     @DeleteMapping("/cover-letters/{coverLetterId}")
     public DeleteCoverLetterResponse deleteMyCoverLetter(@PathVariable String coverLetterId) {
-        return DeleteCoverLetterResponse.from(coverLetterService.deleteMyCoverLetter(coverLetterId));
+        coverLetterService.deleteMyCoverLetter(coverLetterId);
+        return DeleteCoverLetterResponse.completed();
     }
 
     @PutMapping("/cover-letters/{coverLetterId}/basic-info")
@@ -60,14 +65,14 @@ public class CoverLetterController {
             @PathVariable String coverLetterId,
             @RequestBody SaveBasicInfoRequest request
     ) {
-        CoverLetter result = coverLetterService.saveBasicInfo(
+        coverLetterService.saveBasicInfo(
                 coverLetterId,
                 request.title(),
                 request.companyName(),
                 request.positionTitle(),
                 request.jobPostingUrl()
         );
-        return SaveBasicInfoResponse.from(result);
+        return SaveBasicInfoResponse.completed();
     }
 
     @PutMapping("/cover-letters/{coverLetterId}/preferences")
@@ -75,11 +80,11 @@ public class CoverLetterController {
             @PathVariable String coverLetterId,
             @RequestBody SavePreferencesRequest request
     ) {
-        CoverLetter result = coverLetterService.savePreferences(
+        coverLetterService.savePreferences(
                 coverLetterId,
                 request.preferences()
         );
-        return SavePreferencesResponse.from(result);
+        return SavePreferencesResponse.completed();
     }
 
     @PutMapping("/cover-letters/{coverLetterId}/questions")
@@ -87,11 +92,11 @@ public class CoverLetterController {
             @PathVariable String coverLetterId,
             @RequestBody SaveQuestionsRequest request
     ) {
-        SaveQuestionsResult result = coverLetterService.saveQuestions(
+        coverLetterService.saveQuestions(
                 coverLetterId,
                 request.toInputs()
         );
-        return SaveQuestionsResponse.from(result);
+        return SaveQuestionsResponse.completed();
     }
 
     @PostMapping("/cover-letters/{coverLetterId}/submit")

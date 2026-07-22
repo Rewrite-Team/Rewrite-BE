@@ -2,7 +2,6 @@ package com.daon.rewrite.reviewversion.service;
 
 import com.daon.rewrite.coverletter.entity.CoverLetter;
 import com.daon.rewrite.coverletter.entity.CoverLetterStatus;
-import com.daon.rewrite.coverletter.repository.CoverLetterRepository;
 import com.daon.rewrite.global.exception.BusinessException;
 import com.daon.rewrite.global.exception.ErrorCode;
 import com.daon.rewrite.global.util.IdGenerator;
@@ -12,7 +11,7 @@ import com.daon.rewrite.llmjob.entity.LlmJobRequestRefType;
 import com.daon.rewrite.llmjob.entity.LlmJobStatus;
 import com.daon.rewrite.llmjob.entity.LlmJobTargetType;
 import com.daon.rewrite.llmjob.entity.LlmJobType;
-import com.daon.rewrite.llmjob.repository.LlmJobRepository;
+import com.daon.rewrite.llmjob.service.CoverLetterJobLockService;
 import com.daon.rewrite.reviewversion.entity.ReviewVersion;
 import com.daon.rewrite.reviewversion.entity.ReviewJobQuestionResult;
 import com.daon.rewrite.reviewversion.entity.ReviewJobQuestionResultStatus;
@@ -36,8 +35,7 @@ public class ReviewVersionService {
     private static final String QUESTION_RESULT_ID_PREFIX = "rvqr";
     private static final String COMPLETED_MESSAGE = "첨삭이 완료되었습니다.";
 
-    private final LlmJobRepository llmJobRepository;
-    private final CoverLetterRepository coverLetterRepository;
+    private final CoverLetterJobLockService coverLetterJobLockService;
     private final ReviewVersionRepository reviewVersionRepository;
     private final ReviewVersionQuestionResultRepository questionResultRepository;
     private final ReviewJobQuestionResultRepository jobQuestionResultRepository;
@@ -46,8 +44,8 @@ public class ReviewVersionService {
 
     @Transactional
     public CompleteReviewResult completeFirstReview(String jobId) {
-        LlmJob job = llmJobRepository.findByIdForUpdate(jobId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.INTERNAL_ERROR));
+        CoverLetterJobLockService.LockedCoverLetterJob locked = coverLetterJobLockService.lock(jobId);
+        LlmJob job = locked.job();
         validateFirstReviewJob(job);
 
         if (job.getStatus() == LlmJobStatus.COMPLETED) {
@@ -57,8 +55,7 @@ public class ReviewVersionService {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR);
         }
 
-        CoverLetter coverLetter = coverLetterRepository.findActiveByIdForUpdate(job.getTargetId())
-                .orElseThrow(() -> new BusinessException(ErrorCode.INTERNAL_ERROR));
+        CoverLetter coverLetter = locked.coverLetter();
         if (coverLetter.getStatus() != CoverLetterStatus.REVIEWING) {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR);
         }
@@ -99,8 +96,8 @@ public class ReviewVersionService {
     @Transactional
     public CompleteReviewResult completeReReview(String jobId) {
         // 재첨삭 Job 완료 처리는 동일 Job의 중복 완료 요청을 막기 위해 row lock을 잡고 진행한다.
-        LlmJob job = llmJobRepository.findByIdForUpdate(jobId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.INTERNAL_ERROR));
+        CoverLetterJobLockService.LockedCoverLetterJob locked = coverLetterJobLockService.lock(jobId);
+        LlmJob job = locked.job();
         validateReReviewJob(job);
 
         if (job.getStatus() == LlmJobStatus.COMPLETED) {
@@ -111,10 +108,9 @@ public class ReviewVersionService {
         }
 
         // 재첨삭은 이미 최초 첨삭이 완료된 자기소개서에서만 가능하다.
-        CoverLetter coverLetter = coverLetterRepository.findActiveByIdForUpdate(job.getTargetId())
-                .orElseThrow(() -> new BusinessException(ErrorCode.INTERNAL_ERROR));
-        if (coverLetter.getStatus() != CoverLetterStatus.REVIEWED
-                || coverLetter.getLatestReviewVersionId() == null) {
+        CoverLetter coverLetter = locked.coverLetter();
+        if (coverLetter.getStatus() != CoverLetterStatus.REVIEWING
+                || coverLetter.getLatestReviewedVersionId() == null) {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR);
         }
 

@@ -61,6 +61,6 @@ public class ReviewVersionQueryService {
     }
 
     private boolean isLatest(CoverLetter coverLetter, ReviewVersion reviewVersion) {
-        return reviewVersion.getId().equals(coverLetter.getLatestReviewVersionId());
+        return reviewVersion.getId().equals(coverLetter.getLatestReviewedVersionId());
     }
 }

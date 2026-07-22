@@ -3,7 +3,6 @@ package com.daon.rewrite.interview.service;
 import com.daon.rewrite.auth.CurrentUser;
 import com.daon.rewrite.auth.CurrentUserProvider;
 import com.daon.rewrite.coverletter.entity.CoverLetter;
-import com.daon.rewrite.coverletter.entity.CoverLetterStatus;
 import com.daon.rewrite.coverletter.repository.CoverLetterRepository;
 import com.daon.rewrite.global.exception.BusinessException;
 import com.daon.rewrite.global.exception.ErrorCode;
@@ -18,6 +17,7 @@ import com.daon.rewrite.interview.repository.InterviewThreadRepository;
 import com.daon.rewrite.llmjob.entity.LlmJob;
 import com.daon.rewrite.llmjob.entity.LlmJobStatus;
 import com.daon.rewrite.llmjob.entity.LlmJobTargetType;
+import com.daon.rewrite.llmjob.entity.LlmJobType;
 import com.daon.rewrite.llmjob.repository.LlmJobRepository;
 import com.daon.rewrite.llmjob.service.LlmJobCreatedEvent;
 import com.daon.rewrite.reviewversion.repository.ReviewVersionRepository;
@@ -120,22 +120,29 @@ public class InterviewService {
     }
 
     @Transactional
-    public StartInterviewResult startMyInterview(String coverLetterId, String sourceReviewVersionId) {
+    public StartInterviewResult startMyInterview(String coverLetterId) {
         CurrentUser currentUser = currentUserProvider.currentUser();
         CoverLetter coverLetter = coverLetterRepository
                 .findActiveByIdAndOwnerIdForUpdate(coverLetterId, currentUser.id())
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
 
         validateReviewedCoverLetter(coverLetter);
-        String selectedSourceReviewVersionId = selectSourceReviewVersionId(coverLetter, sourceReviewVersionId);
+        String selectedSourceReviewVersionId = coverLetter.getLatestReviewedVersionId();
 
         InterviewSession existingSession = interviewSessionRepository
                 .findByCoverLetterId(coverLetter.getId())
                 .orElse(null);
-        if (isReusableSession(existingSession)) {
+        if (existingSession != null && existingSession.getStatus() == InterviewSessionStatus.ACTIVE) {
             return new StartInterviewResult(existingSession, null);
         }
-        if (hasRunningJob(coverLetter.getId())) {
+        LlmJob runningJob = findRunningJob(coverLetter.getId());
+        if (existingSession != null
+                && existingSession.getStatus() == InterviewSessionStatus.QUESTION_GENERATING
+                && runningJob != null
+                && runningJob.getType() == LlmJobType.INTERVIEW_INITIAL_QUESTION_GENERATION) {
+            return new StartInterviewResult(existingSession, runningJob);
+        }
+        if (runningJob != null) {
             throw new BusinessException(ErrorCode.LLM_JOB_ALREADY_RUNNING);
         }
 
@@ -174,7 +181,11 @@ public class InterviewService {
         }
         validateReviewedCoverLetter(coverLetter);
         String sourceReviewVersionId = selectSourceReviewVersionId(coverLetter, null);
-        if (hasRunningJob(coverLetter.getId())) {
+        LlmJob runningJob = findRunningJob(coverLetter.getId());
+        if (runningJob != null && runningJob.getType() == LlmJobType.INTERVIEW_ADDITIONAL_QUESTION_GENERATION) {
+            return new AddInterviewQuestionResult(interviewSession, runningJob);
+        }
+        if (runningJob != null) {
             throw new BusinessException(ErrorCode.LLM_JOB_ALREADY_RUNNING);
         }
 
@@ -191,28 +202,19 @@ public class InterviewService {
     }
 
     private void validateReviewedCoverLetter(CoverLetter coverLetter) {
-        if (coverLetter.getStatus() != CoverLetterStatus.REVIEWED
-                || coverLetter.getLatestReviewVersionId() == null) {
+        if (coverLetter.getLatestReviewedVersionId() == null) {
             throw new BusinessException(ErrorCode.CONFLICT);
         }
     }
 
-    private boolean isReusableSession(InterviewSession interviewSession) {
-        if (interviewSession == null) {
-            return false;
-        }
-        return interviewSession.getStatus() == InterviewSessionStatus.ACTIVE
-                || interviewSession.getStatus() == InterviewSessionStatus.QUESTION_GENERATING;
-    }
-
-    private boolean hasRunningJob(String coverLetterId) {
+    private LlmJob findRunningJob(String coverLetterId) {
         return llmJobRepository
                 .findFirstByTargetTypeAndTargetIdAndStatusInOrderByCreatedAtDesc(
                         LlmJobTargetType.COVER_LETTER,
                         coverLetterId,
                         RUNNING_JOB_STATUSES
                 )
-                .isPresent();
+                .orElse(null);
     }
 
     private InterviewQuestionItemResult toQuestionItem(
@@ -270,7 +272,7 @@ public class InterviewService {
     private String selectSourceReviewVersionId(CoverLetter coverLetter, String sourceReviewVersionId) {
         String normalizedSourceReviewVersionId = normalize(sourceReviewVersionId);
         String selectedSourceReviewVersionId = normalizedSourceReviewVersionId == null
-                ? coverLetter.getLatestReviewVersionId()
+                ? coverLetter.getLatestReviewedVersionId()
                 : normalizedSourceReviewVersionId;
         reviewVersionRepository
                 .findByIdAndCoverLetterId(selectedSourceReviewVersionId, coverLetter.getId())

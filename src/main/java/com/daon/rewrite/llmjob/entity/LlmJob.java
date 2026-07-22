@@ -277,4 +277,12 @@ public class LlmJob {
         this.errorMessage = errorMessage;
         this.completedAt = completedAt;
     }
+
+    public void cancel(Instant completedAt) {
+        if (status != LlmJobStatus.PENDING && status != LlmJobStatus.PROCESSING) {
+            return;
+        }
+        this.status = LlmJobStatus.CANCELED;
+        this.completedAt = completedAt;
+    }
 }

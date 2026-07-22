@@ -1,8 +1,6 @@
 package com.daon.rewrite.interview.service;
 
 import com.daon.rewrite.coverletter.entity.CoverLetter;
-import com.daon.rewrite.coverletter.entity.CoverLetterStatus;
-import com.daon.rewrite.coverletter.repository.CoverLetterRepository;
 import com.daon.rewrite.global.exception.BusinessException;
 import com.daon.rewrite.global.exception.ErrorCode;
 import com.daon.rewrite.global.util.IdGenerator;
@@ -25,6 +23,7 @@ import com.daon.rewrite.llmjob.entity.LlmJobStatus;
 import com.daon.rewrite.llmjob.entity.LlmJobTargetType;
 import com.daon.rewrite.llmjob.entity.LlmJobType;
 import com.daon.rewrite.llmjob.repository.LlmJobRepository;
+import com.daon.rewrite.llmjob.service.CoverLetterJobLockService;
 import com.daon.rewrite.reviewversion.entity.ReviewVersion;
 import com.daon.rewrite.reviewversion.entity.ReviewVersionQuestionResult;
 import com.daon.rewrite.reviewversion.repository.ReviewVersionQuestionResultRepository;
@@ -57,7 +56,7 @@ class InterviewQuestionGenerationJobTransactionService {
     private static final String UNEXPECTED_ERROR_MESSAGE = "면접 질문 생성 처리 중 오류가 발생했습니다.";
 
     private final LlmJobRepository llmJobRepository;
-    private final CoverLetterRepository coverLetterRepository;
+    private final CoverLetterJobLockService coverLetterJobLockService;
     private final ReviewVersionRepository reviewVersionRepository;
     private final ReviewVersionQuestionResultRepository questionResultRepository;
     private final InterviewSessionRepository interviewSessionRepository;
@@ -68,14 +67,14 @@ class InterviewQuestionGenerationJobTransactionService {
 
     @Transactional
     public InterviewQuestionGenerationWork start(String jobId) {
-        LlmJob job = findInterviewQuestionGenerationJobForUpdate(jobId);
+        CoverLetterJobLockService.LockedCoverLetterJob locked = coverLetterJobLockService.lock(jobId);
+        LlmJob job = validateInterviewQuestionGenerationJob(locked.job());
         if (job.getStatus() != LlmJobStatus.PENDING) {
             return null;
         }
 
-        CoverLetter coverLetter = coverLetterRepository.findActiveByIdForUpdate(job.getTargetId())
-                .orElseThrow(() -> new BusinessException(ErrorCode.INTERNAL_ERROR));
-        if (coverLetter.getStatus() != CoverLetterStatus.REVIEWED) {
+        CoverLetter coverLetter = locked.coverLetter();
+        if (coverLetter.getLatestReviewedVersionId() == null) {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR);
         }
 
@@ -222,6 +221,16 @@ class InterviewQuestionGenerationJobTransactionService {
     private LlmJob findInterviewQuestionGenerationJobForUpdate(String jobId) {
         LlmJob job = llmJobRepository.findByIdForUpdate(jobId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.INTERNAL_ERROR));
+        if (!job.getType().isInterviewQuestionGeneration()
+                || job.getTargetType() != LlmJobTargetType.COVER_LETTER
+                || job.getRequestRefType() != LlmJobRequestRefType.REVIEW_VERSION
+                || job.getRequestRefId() == null) {
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR);
+        }
+        return job;
+    }
+
+    private LlmJob validateInterviewQuestionGenerationJob(LlmJob job) {
         if (!job.getType().isInterviewQuestionGeneration()
                 || job.getTargetType() != LlmJobTargetType.COVER_LETTER
                 || job.getRequestRefType() != LlmJobRequestRefType.REVIEW_VERSION

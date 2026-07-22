@@ -28,13 +28,13 @@ public class CoverLetterQuestion {
     @Column(name = "question_order", nullable = false)
     private int questionOrder;
 
-    @Column(name = "question", nullable = false, length = 300)
+    @Column(name = "question", length = 300)
     private String question;
 
-    @Column(name = "max_answer_length", nullable = false)
-    private int maxAnswerLength;
+    @Column(name = "max_answer_length")
+    private Integer maxAnswerLength;
 
-    @Column(name = "original_answer", nullable = false, columnDefinition = "text")
+    @Column(name = "original_answer", columnDefinition = "text")
     private String originalAnswer;
 
     private CoverLetterQuestion(
@@ -42,7 +42,7 @@ public class CoverLetterQuestion {
             CoverLetter coverLetter,
             int questionOrder,
             String question,
-            int maxAnswerLength,
+            Integer maxAnswerLength,
             String originalAnswer
     ) {
         this.id = id;
@@ -58,7 +58,7 @@ public class CoverLetterQuestion {
             CoverLetter coverLetter,
             int questionOrder,
             String question,
-            int maxAnswerLength,
+            Integer maxAnswerLength,
             String originalAnswer
     ) {
         return new CoverLetterQuestion(

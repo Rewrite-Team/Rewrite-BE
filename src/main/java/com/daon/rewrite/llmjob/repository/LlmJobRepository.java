@@ -15,6 +15,16 @@ import java.util.Optional;
 
 public interface LlmJobRepository extends JpaRepository<LlmJob, String> {
 
+    interface JobTarget {
+        String getTargetId();
+
+        LlmJobTargetType getTargetType();
+    }
+
+    @Query("select job.targetId as targetId, job.targetType as targetType from LlmJob job where job.id = :id")
+    Optional<JobTarget> findTargetById(@Param("id") String id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<LlmJob> findFirstByTargetTypeAndTargetIdAndStatusInOrderByCreatedAtDesc(
             LlmJobTargetType targetType,
             String targetId,

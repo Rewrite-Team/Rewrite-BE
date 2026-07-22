@@ -1,7 +1,6 @@
 package com.daon.rewrite.interview.service;
 
 import com.daon.rewrite.coverletter.entity.CoverLetter;
-import com.daon.rewrite.coverletter.repository.CoverLetterRepository;
 import com.daon.rewrite.global.exception.BusinessException;
 import com.daon.rewrite.global.exception.ErrorCode;
 import com.daon.rewrite.global.util.IdGenerator;
@@ -21,6 +20,7 @@ import com.daon.rewrite.llmjob.entity.LlmJobStatus;
 import com.daon.rewrite.llmjob.entity.LlmJobTargetType;
 import com.daon.rewrite.llmjob.entity.LlmJobType;
 import com.daon.rewrite.llmjob.repository.LlmJobRepository;
+import com.daon.rewrite.llmjob.service.CoverLetterJobLockService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,20 +45,20 @@ class InterviewMessageFeedbackJobTransactionService {
     private static final String UNEXPECTED_ERROR_MESSAGE = "면접 답변 피드백 처리 중 오류가 발생했습니다.";
 
     private final LlmJobRepository llmJobRepository;
-    private final CoverLetterRepository coverLetterRepository;
+    private final CoverLetterJobLockService coverLetterJobLockService;
     private final InterviewMessageRepository interviewMessageRepository;
     private final IdGenerator idGenerator;
     private final Clock clock;
 
     @Transactional
     public InterviewMessageFeedbackWork start(String jobId) {
-        LlmJob job = findInterviewMessageFeedbackJobForUpdate(jobId);
+        CoverLetterJobLockService.LockedCoverLetterJob locked = coverLetterJobLockService.lock(jobId);
+        LlmJob job = validateInterviewMessageFeedbackJob(locked.job());
         if (job.getStatus() != LlmJobStatus.PENDING) {
             return null;
         }
 
-        CoverLetter coverLetter = coverLetterRepository.findActiveByIdForUpdate(job.getTargetId())
-                .orElseThrow(() -> new BusinessException(ErrorCode.INTERNAL_ERROR));
+        CoverLetter coverLetter = locked.coverLetter();
         InterviewMessage userMessage = findRequestUserMessage(job);
         if (!userMessage.getThread().getInterviewSession().getCoverLetter().getId().equals(coverLetter.getId())
                 || userMessage.getThread().getInterviewSession().getStatus() != InterviewSessionStatus.ACTIVE
@@ -148,6 +148,14 @@ class InterviewMessageFeedbackJobTransactionService {
     private LlmJob findInterviewMessageFeedbackJobForUpdate(String jobId) {
         LlmJob job = llmJobRepository.findByIdForUpdate(jobId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.INTERNAL_ERROR));
+        if (job.getType() != LlmJobType.INTERVIEW_MESSAGE_FEEDBACK
+                || job.getTargetType() != LlmJobTargetType.COVER_LETTER) {
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR);
+        }
+        return job;
+    }
+
+    private LlmJob validateInterviewMessageFeedbackJob(LlmJob job) {
         if (job.getType() != LlmJobType.INTERVIEW_MESSAGE_FEEDBACK
                 || job.getTargetType() != LlmJobTargetType.COVER_LETTER) {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR);
