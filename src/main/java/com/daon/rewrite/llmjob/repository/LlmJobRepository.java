@@ -3,6 +3,8 @@ package com.daon.rewrite.llmjob.repository;
 import com.daon.rewrite.llmjob.entity.LlmJob;
 import com.daon.rewrite.llmjob.entity.LlmJobStatus;
 import com.daon.rewrite.llmjob.entity.LlmJobTargetType;
+import com.daon.rewrite.llmjob.entity.LlmJobType;
+import com.daon.rewrite.llmjob.entity.LlmJobRequestRefType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -29,6 +31,31 @@ public interface LlmJobRepository extends JpaRepository<LlmJob, String> {
             LlmJobTargetType targetType,
             String targetId,
             Collection<LlmJobStatus> statuses
+    );
+
+    Optional<LlmJob> findFirstByTargetTypeAndTargetIdAndTypeInAndStatusInOrderByCreatedAtDesc(
+            LlmJobTargetType targetType,
+            String targetId,
+            Collection<LlmJobType> types,
+            Collection<LlmJobStatus> statuses
+    );
+
+    Optional<LlmJob> findFirstByTargetTypeAndTargetIdAndTypeOrderByCreatedAtDesc(
+            LlmJobTargetType targetType,
+            String targetId,
+            LlmJobType type
+    );
+
+    Optional<LlmJob> findFirstByTargetTypeAndTargetIdAndTypeInOrderByCreatedAtDesc(
+            LlmJobTargetType targetType,
+            String targetId,
+            Collection<LlmJobType> types
+    );
+
+    Optional<LlmJob> findFirstByTypeAndRequestRefTypeAndRequestRefIdOrderByCreatedAtDesc(
+            LlmJobType type,
+            LlmJobRequestRefType requestRefType,
+            String requestRefId
     );
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

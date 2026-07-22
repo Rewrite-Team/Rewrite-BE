@@ -1,6 +1,6 @@
 package com.daon.rewrite.llmjob.controller;
 
-import com.daon.rewrite.llmjob.dto.LlmJobResponse;
+import com.daon.rewrite.llmjob.dto.LlmJobStateResponse;
 import com.daon.rewrite.llmjob.service.LlmJobService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -14,7 +14,7 @@ public class LlmJobController {
     private final LlmJobService llmJobService;
 
     @GetMapping("/llm-jobs/{jobId}")
-    public LlmJobResponse findJob(@PathVariable String jobId) {
-        return LlmJobResponse.from(llmJobService.findMyJob(jobId));
+    public LlmJobStateResponse findJob(@PathVariable String jobId) {
+        return LlmJobStateResponse.from(llmJobService.findMyJob(jobId));
     }
 }

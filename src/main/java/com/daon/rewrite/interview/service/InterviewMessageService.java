@@ -9,12 +9,15 @@ import com.daon.rewrite.global.exception.ErrorCode;
 import com.daon.rewrite.global.response.ErrorResponse;
 import com.daon.rewrite.global.util.IdGenerator;
 import com.daon.rewrite.interview.entity.InterviewMessage;
+import com.daon.rewrite.interview.entity.InterviewMessageRole;
 import com.daon.rewrite.interview.entity.InterviewThread;
 import com.daon.rewrite.interview.repository.InterviewMessageRepository;
 import com.daon.rewrite.interview.repository.InterviewThreadRepository;
 import com.daon.rewrite.llmjob.entity.LlmJob;
 import com.daon.rewrite.llmjob.entity.LlmJobStatus;
+import com.daon.rewrite.llmjob.entity.LlmJobRequestRefType;
 import com.daon.rewrite.llmjob.entity.LlmJobTargetType;
+import com.daon.rewrite.llmjob.entity.LlmJobType;
 import com.daon.rewrite.llmjob.repository.LlmJobRepository;
 import com.daon.rewrite.llmjob.service.LlmJobCreatedEvent;
 import lombok.RequiredArgsConstructor;
@@ -61,8 +64,16 @@ public class InterviewMessageService {
                 .stream()
                 .map(this::toItemResult)
                 .toList();
+        String latestUserMessageId = interviewMessageRepository
+                .findFirstByThreadIdAndRoleOrderByCreatedAtDescIdDesc(
+                        thread.getId(),
+                        InterviewMessageRole.USER
+                )
+                .map(InterviewMessage::getId)
+                .orElse(null);
+        LlmJob job = findLatestFeedbackJob(latestUserMessageId);
 
-        return new InterviewMessageListResult(thread.getId(), items);
+        return new InterviewMessageListResult(job == null ? null : job.getId(), items);
     }
 
     @Transactional
@@ -121,6 +132,24 @@ public class InterviewMessageService {
                         RUNNING_JOB_STATUSES
                 )
                 .isPresent();
+    }
+
+    private LlmJob findLatestFeedbackJob(String userMessageId) {
+        if (userMessageId == null) {
+            return null;
+        }
+        LlmJob job = llmJobRepository
+                .findFirstByTypeAndRequestRefTypeAndRequestRefIdOrderByCreatedAtDesc(
+                        LlmJobType.INTERVIEW_MESSAGE_FEEDBACK,
+                        LlmJobRequestRefType.INTERVIEW_MESSAGE,
+                        userMessageId
+                )
+                .orElse(null);
+        if (job == null || job.getStatus() == LlmJobStatus.COMPLETED
+                || job.getStatus() == LlmJobStatus.CANCELED) {
+            return null;
+        }
+        return job;
     }
 
     private String validateAndNormalizeContent(String content) {

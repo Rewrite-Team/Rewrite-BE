@@ -46,6 +46,10 @@ public class InterviewService {
             LlmJobStatus.PENDING,
             LlmJobStatus.PROCESSING
     );
+    private static final List<LlmJobType> INTERVIEW_QUESTION_JOB_TYPES = List.of(
+            LlmJobType.INTERVIEW_INITIAL_QUESTION_GENERATION,
+            LlmJobType.INTERVIEW_ADDITIONAL_QUESTION_GENERATION
+    );
 
     private final CurrentUserProvider currentUserProvider;
     private final CoverLetterRepository coverLetterRepository;
@@ -68,7 +72,10 @@ public class InterviewService {
                 .findByCoverLetterId(coverLetter.getId())
                 .orElse(null);
 
-        return new CurrentInterviewResult(coverLetter.getId(), interviewSession);
+        LlmJob job = interviewSession == null
+                ? null
+                : findLatestInterviewQuestionJob(coverLetter.getId());
+        return new CurrentInterviewResult(coverLetter, interviewSession, job);
     }
 
     @Transactional(readOnly = true)
@@ -215,6 +222,21 @@ public class InterviewService {
                         RUNNING_JOB_STATUSES
                 )
                 .orElse(null);
+    }
+
+    private LlmJob findLatestInterviewQuestionJob(String coverLetterId) {
+        LlmJob job = llmJobRepository
+                .findFirstByTargetTypeAndTargetIdAndTypeInOrderByCreatedAtDesc(
+                        LlmJobTargetType.COVER_LETTER,
+                        coverLetterId,
+                        INTERVIEW_QUESTION_JOB_TYPES
+                )
+                .orElse(null);
+        if (job == null || job.getStatus() == LlmJobStatus.COMPLETED
+                || job.getStatus() == LlmJobStatus.CANCELED) {
+            return null;
+        }
+        return job;
     }
 
     private InterviewQuestionItemResult toQuestionItem(

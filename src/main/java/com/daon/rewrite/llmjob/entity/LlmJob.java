@@ -20,6 +20,8 @@ public class LlmJob {
 
     private static final int DEFAULT_ATTEMPT = 1;
     private static final int DEFAULT_MAX_ATTEMPTS = 2;
+    private static final String PENDING_MESSAGE = "처리를 기다리고 있습니다.";
+    private static final String CANCELED_MESSAGE = "작업이 취소되었습니다.";
 
     @Id
     @Column(name = "id", nullable = false, length = 64)
@@ -106,6 +108,7 @@ public class LlmJob {
         this.requestRefId = requestRefId;
         this.progressCurrent = 0;
         this.progressTotal = progressTotal;
+        this.progressMessage = PENDING_MESSAGE;
         this.attempt = DEFAULT_ATTEMPT;
         this.maxAttempts = DEFAULT_MAX_ATTEMPTS;
         this.createdAt = createdAt;
@@ -283,6 +286,7 @@ public class LlmJob {
             return;
         }
         this.status = LlmJobStatus.CANCELED;
+        this.progressMessage = CANCELED_MESSAGE;
         this.completedAt = completedAt;
     }
 }

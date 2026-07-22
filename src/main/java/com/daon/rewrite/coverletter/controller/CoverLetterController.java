@@ -1,6 +1,7 @@
 package com.daon.rewrite.coverletter.controller;
 
 import com.daon.rewrite.coverletter.dto.CoverLetterListResponse;
+import com.daon.rewrite.coverletter.dto.CoverLetterDetailResponse;
 import com.daon.rewrite.coverletter.dto.CreateCoverLetterResponse;
 import com.daon.rewrite.coverletter.dto.DeleteCoverLetterResponse;
 import com.daon.rewrite.coverletter.dto.SaveBasicInfoRequest;
@@ -12,6 +13,7 @@ import com.daon.rewrite.coverletter.dto.SaveQuestionsResponse;
 import com.daon.rewrite.coverletter.dto.SubmitCoverLetterResponse;
 import com.daon.rewrite.coverletter.entity.CoverLetter;
 import com.daon.rewrite.coverletter.service.CoverLetterService;
+import com.daon.rewrite.coverletter.service.CoverLetterDetailQueryService;
 import com.daon.rewrite.coverletter.service.SubmitCoverLetterResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -31,6 +33,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class CoverLetterController {
 
     private final CoverLetterService coverLetterService;
+    private final CoverLetterDetailQueryService coverLetterDetailQueryService;
 
     @PostMapping("/cover-letters")
     @ResponseStatus(HttpStatus.CREATED)
@@ -52,6 +55,11 @@ public class CoverLetterController {
     ) {
         Page<CoverLetter> result = coverLetterService.findMyCoverLetters(page, size);
         return CoverLetterListResponse.from(result, page, size);
+    }
+
+    @GetMapping("/cover-letters/{coverLetterId}")
+    public CoverLetterDetailResponse findMyCoverLetter(@PathVariable String coverLetterId) {
+        return CoverLetterDetailResponse.from(coverLetterDetailQueryService.findCurrent(coverLetterId));
     }
 
     @DeleteMapping("/cover-letters/{coverLetterId}")

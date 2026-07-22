@@ -18,6 +18,7 @@ import com.daon.rewrite.llmjob.entity.LlmJobTargetType;
 import com.daon.rewrite.llmjob.entity.LlmJobType;
 import com.daon.rewrite.llmjob.repository.LlmJobRepository;
 import com.daon.rewrite.llmjob.service.LlmJobCreatedEvent;
+import com.daon.rewrite.reviewversion.repository.ReviewVersionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -42,6 +43,7 @@ public class KeywordAnalysisService {
     private final CoverLetterRepository coverLetterRepository;
     private final KeywordAnalysisRepository keywordAnalysisRepository;
     private final KeywordAnalysisKeywordRepository keywordAnalysisKeywordRepository;
+    private final ReviewVersionRepository reviewVersionRepository;
     private final LlmJobRepository llmJobRepository;
     private final IdGenerator idGenerator;
     private final Clock clock;
@@ -100,10 +102,23 @@ public class KeywordAnalysisService {
 
         return keywordAnalysisRepository.findByCoverLetterId(coverLetter.getId())
                 .map(keywordAnalysis -> {
+                    var sourceReviewVersion = reviewVersionRepository
+                            .findByIdAndCoverLetterId(
+                                    keywordAnalysis.getSourceReviewVersionId(),
+                                    coverLetter.getId()
+                            )
+                            .orElseThrow(() -> new BusinessException(ErrorCode.INTERNAL_ERROR));
+                    LlmJob job = findLatestKeywordAnalysisJob(coverLetter.getId());
                     List<KeywordAnalysisKeyword> keywords = findCompletedKeywords(keywordAnalysis);
-                    return LatestKeywordAnalysisResult.of(coverLetter.getId(), keywordAnalysis, keywords);
+                    return LatestKeywordAnalysisResult.of(
+                            coverLetter,
+                            sourceReviewVersion,
+                            keywordAnalysis,
+                            job,
+                            keywords
+                    );
                 })
-                .orElseGet(() -> LatestKeywordAnalysisResult.empty(coverLetter.getId()));
+                .orElseGet(() -> LatestKeywordAnalysisResult.empty(coverLetter));
     }
 
     private List<KeywordAnalysisKeyword> findCompletedKeywords(KeywordAnalysis keywordAnalysis) {
@@ -122,6 +137,21 @@ public class KeywordAnalysisService {
                         RUNNING_JOB_STATUSES
                 )
                 .orElse(null);
+    }
+
+    private LlmJob findLatestKeywordAnalysisJob(String coverLetterId) {
+        LlmJob job = llmJobRepository
+                .findFirstByTargetTypeAndTargetIdAndTypeOrderByCreatedAtDesc(
+                        LlmJobTargetType.COVER_LETTER,
+                        coverLetterId,
+                        LlmJobType.KEYWORD_ANALYSIS
+                )
+                .orElse(null);
+        if (job == null || job.getStatus() == LlmJobStatus.COMPLETED
+                || job.getStatus() == LlmJobStatus.CANCELED) {
+            return null;
+        }
+        return job;
     }
 
 }

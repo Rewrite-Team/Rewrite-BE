@@ -3,7 +3,7 @@ package com.daon.rewrite.interview.service;
 import java.util.List;
 
 public record InterviewMessageListResult(
-        String threadId,
+        String jobId,
         List<InterviewMessageItemResult> items
 ) {
 
