@@ -11,7 +11,7 @@
 상태:
 
 ```text
-DRAFT
+WRITING
 REVIEWING
 REVIEWED
 REVIEW_FAILED
@@ -20,7 +20,7 @@ REVIEW_FAILED
 API 형태:
 
 ```http
-GET  /cover-letters?page=1&size=9&status=DRAFT
+GET  /cover-letters?page=1&size=9
 POST /cover-letters
 PUT  /cover-letters/{coverLetterId}/basic-info
 PUT  /cover-letters/{coverLetterId}/preferences
@@ -57,7 +57,7 @@ POST /cover-letters/{coverLetterId}/submit
 
 - 단점
   - 목록 카드 상태가 PRD의 `첨삭 중`, `첨삭 완료`보다 확장된다.
-  - 목록에서 `DRAFT` 항목 클릭 시 등록 step으로 이동하고, `REVIEWING` 또는 `REVIEWED` 항목 클릭 시 AI 첨삭 페이지로 이동하는 라우팅 규칙이 필요하다.
+  - 목록에서 `WRITING` 항목 클릭 시 등록 step으로 이동하고, `REVIEWING` 또는 `REVIEWED` 항목 클릭 시 AI 첨삭 페이지로 이동하는 라우팅 규칙이 필요하다.
 
 
 
@@ -141,7 +141,7 @@ originalAnswer
 finalAnswer
 ```
 
-즉, `DRAFT` 상태에서만 등록 step1~step3 저장 API를 사용할 수 있다. `REVIEWING`, `REVIEWED`, `REVIEW_FAILED` 상태에서는 원본 수정 API를 호출하면 `CONFLICT`를 반환한다.
+즉, `WRITING` 상태에서만 등록 step1~step3 저장 API를 사용할 수 있다. `REVIEWING`, `REVIEWED`, `REVIEW_FAILED` 상태에서는 원본 수정 API를 호출하면 `CONFLICT`를 반환한다.
 
 ### PRD 근거
 
@@ -228,6 +228,8 @@ MVP 범위에서는 삭제 복구가 핵심 사용자 흐름이 아니다. Soft 
 
 
 ## Decision 032: 최초 첨삭 실패만 CoverLetter.status를 REVIEW_FAILED로 변경한다
+
+> Superseded by Decision 077. 최초·재첨삭 실패 모두 `CoverLetter.status=REVIEW_FAILED`로 저장하고, 이전 성공 결과의 존재 여부는 `latestReviewedVersionId`로 판단한다.
 
 ### 결정
 
@@ -335,7 +337,7 @@ jobPostingUrl: 선택, trim 후 최대 500자, URL 형식
 
 ## Decision 042: 원본 답변도 앞뒤 공백을 trim한 뒤 검증하고 저장한다
 
-> Superseded by Decision 096. 비어 있지 않은 값의 trim·최대 길이 정책은 유지하지만, DRAFT의 빈 값은 오류 대신 `null`로 임시저장하고 제출 시 필수 검증한다.
+> Superseded by Decision 096. 비어 있지 않은 값의 trim·최대 길이 정책은 유지하지만, WRITING의 빈 값은 오류 대신 `null`로 임시저장하고 제출 시 필수 검증한다.
 
 ### 결정
 
@@ -399,7 +401,7 @@ PUT /cover-letters/{coverLetterId}/questions
 
 ## Decision 043: 질문 문구도 앞뒤 공백을 trim한 뒤 검증하고 저장한다
 
-> Superseded by Decision 096. 비어 있지 않은 값의 trim·최대 길이 정책은 유지하지만, DRAFT의 빈 값은 오류 대신 `null`로 임시저장하고 제출 시 필수 검증한다.
+> Superseded by Decision 096. 비어 있지 않은 값의 trim·최대 길이 정책은 유지하지만, WRITING의 빈 값은 오류 대신 `null`로 임시저장하고 제출 시 필수 검증한다.
 
 ### 결정
 
@@ -465,7 +467,7 @@ PUT /cover-letters/{coverLetterId}/questions
 
 ### 결정
 
-등록 step3의 DRAFT 임시저장에서는 문항이 없어도 되며, 제품 정책상 최대 개수 제한은 두지 않는다. API-014 제출 시에는 최소 1개 이상이어야 한다.
+등록 step3의 WRITING 임시저장에서는 문항이 없어도 되며, 제품 정책상 최대 개수 제한은 두지 않는다. API-014 제출 시에는 최소 1개 이상이어야 한다.
 
 적용 API:
 
@@ -476,7 +478,7 @@ PUT /cover-letters/{coverLetterId}/questions
 Validation:
 
 ```text
-DRAFT 저장 questions: 0개 이상, 제품 정책상 최대 개수 제한 없음
+WRITING 저장 questions: 0개 이상, 제품 정책상 최대 개수 제한 없음
 API-014 제출 questions: 1개 이상
 ```
 
@@ -694,7 +696,7 @@ Request:
 Validation:
 
 ```text
-coverLetter.status는 DRAFT여야 한다.
+coverLetter.status는 WRITING여야 한다.
 title: 필수, trim 후 Unicode code point 기준 1~50자
 companyName: 필수, trim 후 Unicode code point 기준 1~30자
 positionTitle: 필수, trim 후 Unicode code point 기준 1~30자
@@ -759,7 +761,7 @@ Request:
 Validation:
 
 ```text
-coverLetter.status는 DRAFT여야 한다.
+coverLetter.status는 WRITING여야 한다.
 preferences: 필수, trim 후 Unicode code point 기준 1~3000자
 ```
 
@@ -798,7 +800,7 @@ step2는 우대사항 텍스트 전체를 작성하고 임시저장하는 화면
 
 ## Decision 049: 우대사항은 빈 문자열로 저장할 수 없다
 
-> Superseded by Decision 096. DRAFT에서는 빈 값을 `null`로 임시저장하고 API-014 제출 시 우대사항을 필수 검증한다.
+> Superseded by Decision 096. WRITING에서는 빈 값을 `null`로 임시저장하고 API-014 제출 시 우대사항을 필수 검증한다.
 
 ### 결정
 
@@ -855,7 +857,7 @@ Rewrite의 AI 첨삭은 자기소개서를 공고/직무 맥락에 맞게 개선
 
 ## Decision 050: step1 기본 정보 문자열은 앞뒤 공백을 trim한 뒤 검증하고 저장한다
 
-> Superseded by Decision 096. 비어 있지 않은 값의 trim·최대 길이 정책은 유지하지만, DRAFT의 빈 값은 오류 대신 `null`로 임시저장하고 제출 시 필수 검증한다.
+> Superseded by Decision 096. 비어 있지 않은 값의 trim·최대 길이 정책은 유지하지만, WRITING의 빈 값은 오류 대신 `null`로 임시저장하고 제출 시 필수 검증한다.
 
 ### 결정
 
@@ -1170,7 +1172,7 @@ Response:
 
 ### 결정
 
-최초 첨삭 Job이 실패해 `CoverLetter.status=REVIEW_FAILED`가 된 경우, 사용자는 submit API를 다시 호출해 최초 첨삭을 재시도할 수 있다.
+최초 첨삭 Job이 실패해 `CoverLetter.status=REVIEW_FAILED`, `latestReviewedVersionId=null`이 된 경우, 사용자는 submit API를 다시 호출해 최초 첨삭을 재시도할 수 있다.
 
 재시도 시 새 최초 첨삭 Job을 생성하고 `CoverLetter.status`를 `REVIEWING`으로 전환한다.
 
@@ -1245,7 +1247,7 @@ Response:
   "coverLetterId": "cl_01HZ...",
   "status": "REVIEWED",
   "jobId": null,
-  "latestReviewVersionId": "rv_01HZ..."
+  "latestReviewedVersionId": "rv_01HZ..."
 }
 ```
 
@@ -1284,7 +1286,7 @@ submit API는 최초 첨삭 시작 요청이지만, 네트워크 재시도나 �
   - 중복 LLM 비용과 불필요한 ReviewVersion 생성을 막을 수 있다.
 
 - 단점
-  - `REVIEWED` 상태인데 `latestReviewVersionId`가 없는 데이터 불일치 상황을 서버가 별도로 감지해야 한다.
+  - `REVIEWED` 상태인데 `latestReviewedVersionId`가 없는 데이터 불일치 상황을 서버가 별도로 감지해야 한다.
   - 사용자가 의도적으로 다시 첨삭받고 싶은 경우에는 submit이 아니라 재첨삭 API를 사용해야 한다.
 
 
@@ -1295,7 +1297,7 @@ submit API는 최초 첨삭 시작 요청이지만, 네트워크 재시도나 �
 
 `CoverLetter.status=REVIEW_FAILED` 상태에서도 등록 step1~step3의 원본 수정 API는 사용할 수 없다.
 
-즉, `basic-info`, `preferences`, `questions` 저장 API는 계속 `DRAFT` 상태에서만 허용한다.
+즉, `basic-info`, `preferences`, `questions` 저장 API는 계속 `WRITING` 상태에서만 허용한다.
 
 적용 API:
 
@@ -1330,14 +1332,14 @@ POST /cover-letters/{coverLetterId}/submit
 
 ### 선택 이유
 
-`REVIEW_FAILED`는 최초 첨삭 Job의 실패 상태이지, 작성 플로우가 다시 `DRAFT`로 돌아간 상태가 아니다. 따라서 재시도는 허용하되 원본 편집은 계속 막아 제출 후 원본 잠금 정책을 유지한다.
+`REVIEW_FAILED`는 최초 첨삭 Job의 실패 상태이지, 작성 플로우가 다시 `WRITING`로 돌아간 상태가 아니다. 따라서 재시도는 허용하되 원본 편집은 계속 막아 제출 후 원본 잠금 정책을 유지한다.
 
-원본을 수정하고 다시 첨삭받는 흐름이 필요해지면, 기존 자기소개서를 복제해 새 `DRAFT`로 편집하는 별도 기능으로 다루는 편이 상태 모델이 명확하다.
+원본을 수정하고 다시 첨삭받는 흐름이 필요해지면, 기존 자기소개서를 복제해 새 `WRITING`로 편집하는 별도 기능으로 다루는 편이 상태 모델이 명확하다.
 
 ### 트레이드오프
 
 - 장점
-  - `DRAFT`에서만 원본 수정 가능하다는 규칙이 유지된다.
+  - `WRITING`에서만 원본 수정 가능하다는 규칙이 유지된다.
   - 실패 재시도와 원본 편집 재개를 분리할 수 있다.
   - 기존 첨삭/버전/최종 작성본 모델과 충돌하지 않는다.
 
@@ -1408,7 +1410,7 @@ POST /cover-letters/{coverLetterId}/submit
 목록 카드 클릭 라우팅:
 
 ```text
-DRAFT: 등록 step 화면
+WRITING: 등록 step 화면
 REVIEWING: AI 첨삭 진행 화면
 REVIEWED: AI 첨삭 결과 화면
 REVIEW_FAILED: AI 첨삭 실패 화면
@@ -1495,10 +1497,10 @@ GET /cover-letters/{coverLetterId}
 상태별 의미:
 
 ```text
-DRAFT: null
+WRITING: null
 REVIEWING: 진행 중인 최초 첨삭 Job 요약
 REVIEW_FAILED: 실패한 최근 최초 첨삭 Job 요약
-REVIEWED: latestReviewVersionId를 기준으로 결과를 조회하므로 null 허용
+REVIEWED: latestReviewedVersionId를 기준으로 결과를 조회하므로 null 허용
 ```
 
 ### PRD 근거
@@ -1545,7 +1547,7 @@ REVIEWED: latestReviewVersionId를 기준으로 결과를 조회하므로 null �
 - 단점
   - 자기소개서 상세 조회가 최근 최초 첨삭 Job을 함께 조회해야 한다.
   - 상세 응답이 순수 자기소개서 데이터뿐 아니라 화면 복구용 Job 요약도 포함하게 된다.
-  - `REVIEWED` 상태에서는 `latestReviewVersionId`와 `latestFirstReviewJob` 중 어떤 필드를 우선할지 프론트 규칙이 필요하다.
+  - `REVIEWED` 상태에서는 `latestReviewedVersionId`와 `latestFirstReviewJob` 중 어떤 필드를 우선할지 프론트 규칙이 필요하다.
 
 
 
@@ -1641,26 +1643,26 @@ API-012는 `WRITING`, `REVIEWING`, `REVIEW_FAILED`, `REVIEWED` 모든 표시 상
 
 ### 결정
 
-API-007 목록 항목과 query filter는 내부 자기소개서·Job 상태 대신 메인 화면 표시용 `displayStatus=WRITING|REVIEWING|REVIEWED|REVIEW_FAILED`를 사용한다. 현재 최초 첨삭 또는 재첨삭 Job이 `PENDING`이나 `PROCESSING`이면 `displayStatus=REVIEWING`으로 계산한다. 최초·재첨삭의 최신 시도가 실패하면 `displayStatus=REVIEW_FAILED`로 계산한다. 메인 화면은 카드마다 연결하지 않고 API-030 `GET /cover-letters/stream` 연결 하나로 현재 사용자의 첨삭 상태 변경을 수신한다.
+API-007 목록 항목은 저장된 `CoverLetter.status`를 메인 화면의 `displayStatus=WRITING|REVIEWING|REVIEWED|REVIEW_FAILED`로 그대로 반환한다. 프론트엔드는 상태별 서버 필터를 사용하지 않고 현재 페이지의 모든 상태 항목을 함께 조회한다. 최초·재첨삭 시작·성공·실패 transaction이 `CoverLetter.status`를 직접 갱신한다. 메인 화면은 카드마다 연결하지 않고 API-030 `GET /cover-letters/stream` 연결 하나로 현재 사용자의 첨삭 상태 변경을 수신한다.
 
 연결 직후 soft delete되지 않은 모든 자기소개서의 현재 표시 상태를 `cover-letter.review-status.snapshot` 이벤트의 `items` 배열로 한 번에 전송한다. 이후 상태가 바뀐 자기소개서는 `cover-letter.review-status.changed` 단건 이벤트로 전송한다. 이벤트 이름으로 스냅샷과 변경을 구분하므로 `eventPhase`와 `changeType`은 사용하지 않는다. `PENDING → PROCESSING`은 표시 상태를 바꾸지 않으므로 메인 스트림에 노출하지 않는다.
 
-프론트엔드는 모든 이벤트에서 `displayStatus`와 `latestReviewVersionId`를 목록 항목에 그대로 함께 반영하고 내부 상태를 조합하지 않는다. 최초·재첨삭 실패는 모두 `displayStatus=REVIEW_FAILED`다. 최초 첨삭 실패는 `latestReviewVersionId=null`, 재첨삭 실패는 기존 성공 버전 ID를 유지한다. 서버는 연결을 이벤트 라우터에 등록한 뒤 스냅샷을 조회·전송하며, 그 사이 발생한 변경 이벤트를 연결별로 버퍼링해 스냅샷 다음에 발생 순서대로 전송한다.
+프론트엔드는 모든 이벤트에서 `displayStatus`와 `latestReviewedVersionId`를 목록 항목에 그대로 함께 반영하고 내부 상태를 조합하지 않는다. 최초·재첨삭 실패는 모두 `displayStatus=REVIEW_FAILED`다. 최초 첨삭 실패는 `latestReviewedVersionId=null`, 재첨삭 실패는 기존 성공 버전 ID를 유지한다. 서버는 연결을 이벤트 라우터에 등록한 뒤 스냅샷을 조회·전송하며, 그 사이 발생한 변경 이벤트를 연결별로 버퍼링해 스냅샷 다음에 발생 순서대로 전송한다.
 
 ### 선택 이유
 
-목록 카드 수에 비례해 SSE 연결을 만들 필요가 없고, 서버가 메인 화면 상태를 계산하므로 프론트엔드가 서로 다른 두 상태 모델을 조합하지 않아도 된다. 전체 현재 상태 스냅샷은 목록 조회와 스트림 연결 사이에 종료된 Job으로 인한 stale 상태를 해소한다. 이벤트 이름과 `displayStatus`만으로 처리 경로를 결정하며, `latestReviewVersionId`로 실패 화면에서 이전 성공 결과 접근 가능 여부를 구분한다.
+목록 카드 수에 비례해 SSE 연결을 만들 필요가 없고, 저장 상태를 그대로 전달하므로 프론트엔드가 서로 다른 두 상태 모델을 조합하지 않아도 된다. 전체 현재 상태 스냅샷은 목록 조회와 스트림 연결 사이의 stale 상태를 해소한다. 이벤트 이름과 `displayStatus`만으로 처리 경로를 결정하며, `latestReviewedVersionId`로 실패 화면에서 이전 성공 결과 접근 가능 여부를 구분한다.
 
 ### 트레이드오프
 
 - 장점: 연결 수가 사용자당 하나로 고정되고 목록 상태가 실시간으로 갱신된다. 프론트엔드는 이벤트 이름과 표시 상태를 그대로 사용하며, 연결 시점의 상태 변경 누락도 복구한다.
-- 단점: 서버가 화면 표시 상태 계산, 사용자별 이벤트 라우팅, 전체 현재 상태 스냅샷 조회와 스냅샷 전송 중 변경 이벤트 버퍼링을 지원해야 한다. 스냅샷 크기는 자기소개서 수에 비례해 증가한다.
+- 단점: 서버가 사용자별 이벤트 라우팅, 전체 현재 상태 스냅샷 조회와 스냅샷 전송 중 변경 이벤트 버퍼링을 지원해야 한다. 스냅샷 크기는 자기소개서 수에 비례해 증가한다.
 
 ## Decision 080: 자기소개서 생성 응답은 id만 반환한다
 
 ### 결정
 
-API-008 자기소개서 생성 성공 응답은 생성된 자기소개서의 `id`만 반환한다. 생성 직후 항상 같은 내부 `status=DRAFT`와 등록 화면에서 사용하지 않는 `createdAt`은 공개 응답에서 제외한다.
+API-008 자기소개서 생성 성공 응답은 생성된 자기소개서의 `id`만 반환한다. 생성 직후 항상 같은 내부 `status=WRITING`와 등록 화면에서 사용하지 않는 `createdAt`은 공개 응답에서 제외한다.
 
 ### 선택 이유
 
@@ -1705,7 +1707,7 @@ API-013 자기소개서 삭제 성공 응답은 `success=true`만 반환한다. 
 
 ### 결정
 
-API-014 최초 첨삭 제출 성공 응답은 `displayStatus`와 nullable `jobId`만 반환한다. 새 Job을 생성하거나 기존 진행 중 Job을 반환하면 `displayStatus=REVIEWING`과 Job ID를 반환하고, 이미 첨삭이 완료되었으면 `displayStatus=REVIEWED`, `jobId=null`을 반환한다. 요청 본문은 사용하지 않는다.
+API-014 최초 첨삭 제출 성공 응답은 `displayStatus`와 nullable `jobId`만 반환한다. 새 Job을 생성하거나 기존 진행 중 최초 첨삭 Job을 반환하면 `displayStatus=REVIEWING`과 Job ID를 반환하고, 이미 첨삭이 완료되었으면 `displayStatus=REVIEWED`, `jobId=null`을 반환한다. 재첨삭 실패로 `status=REVIEW_FAILED`이면서 기존 성공 버전이 남아 있으면 `CONFLICT`를 반환하고 API-024를 사용한다. 요청 본문은 사용하지 않는다.
 
 ### 선택 이유
 
@@ -1716,19 +1718,19 @@ API-014 최초 첨삭 제출 성공 응답은 `displayStatus`와 nullable `jobId
 - 장점: 응답이 화면 분기와 SSE 연결에 필요한 값만 포함하고 공개 상태 이름을 통일한다.
 - 단점: 이미 완료된 최신 버전 ID가 필요하면 API-012를 조회해야 한다.
 
-## Decision 096: 등록 단계 API는 미완성 DRAFT를 임시저장하고 제출 시 필수값을 검증한다
+## Decision 096: 등록 단계 API는 미완성 WRITING를 임시저장하고 제출 시 필수값을 검증한다
 
 ### 결정
 
-API-009~011은 별도의 임시저장 API를 추가하지 않고 각 등록 step의 현재 폼 전체를 DRAFT 스냅샷으로 저장한다. 요청 필드의 누락·`null`·trim 후 빈 문자열은 미입력값인 `null`로 정규화한다. 값이 있으면 최대 길이, 숫자 범위와 URL 형식을 저장 시 검증하지만 필수값 여부는 강제하지 않는다.
+API-009~011은 별도의 임시저장 API를 추가하지 않고 각 등록 step의 현재 폼 전체를 WRITING 스냅샷으로 저장한다. 요청 필드의 누락·`null`·trim 후 빈 문자열은 미입력값인 `null`로 정규화한다. 값이 있으면 최대 길이, 숫자 범위와 URL 형식을 저장 시 검증하지만 필수값 여부는 강제하지 않는다.
 
-API-011의 `questions`가 누락·`null`·빈 배열이면 문항을 모두 삭제하며, 배열 내부 문항 필드도 DRAFT에서는 nullable이다. 이를 위해 원본 문항 persistence의 `question`, `maxAnswerLength`, `originalAnswer`는 nullable을 허용한다.
+API-011의 `questions`가 누락·`null`·빈 배열이면 문항을 모두 삭제하며, 배열 내부 문항 필드도 WRITING에서는 nullable이다. 이를 위해 원본 문항 persistence의 `question`, `maxAnswerLength`, `originalAnswer`는 nullable을 허용한다.
 
 API-012는 `WRITING` 상태에서 미완성 기본 정보와 nullable 원본 문항을 그대로 반환한다. API-014만 모든 등록 필드와 문항의 필수값 완성 여부를 검증하며, 누락이 있으면 필드별 `VALIDATION_ERROR`를 반환하고 첨삭 Job을 생성하지 않는다.
 
 ### 선택 이유
 
-현재 step 저장 API와 별도의 임시저장 API를 함께 두면 같은 데이터를 저장하는 endpoint, DTO와 service 로직이 중복된다. 단계 완료 여부를 서버가 별도 상태로 관리하지 않는 현재 모델에서는 기존 step API가 DRAFT 스냅샷을 저장하고 제출 API가 최종 완성도를 검증하는 구조가 더 단순하다.
+현재 step 저장 API와 별도의 임시저장 API를 함께 두면 같은 데이터를 저장하는 endpoint, DTO와 service 로직이 중복된다. 단계 완료 여부를 서버가 별도 상태로 관리하지 않는 현재 모델에서는 기존 step API가 WRITING 스냅샷을 저장하고 제출 API가 최종 완성도를 검증하는 구조가 더 단순하다.
 
 ### 트레이드오프
 

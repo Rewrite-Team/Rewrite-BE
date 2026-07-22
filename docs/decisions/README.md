@@ -54,7 +54,7 @@ API 계약: `../api/README.md`
 | Decision 029 | 키워드 분석 결과 화면에서 재분석을 제공한다 | `keyword-analysis.md` | REQ-009 | API-020 - API-021 | Active |
 | Decision 030 | 면접 답변은 최대 2000자로 제한한다 | `interviews.md` | REQ-010 | API-022 - API-023, API-025 - API-029 | Active |
 | Decision 031 | 면접 꼬리질문은 피드백과 같은 assistant 메시지에 저장한다 | `interviews.md` | REQ-010 | API-022 - API-023, API-025 - API-029 | Active |
-| Decision 032 | 최초 첨삭 실패만 CoverLetter.status를 REVIEW_FAILED로 변경한다 | `cover-letters.md` | REQ-003, REQ-004, REQ-005 | API-007 - API-014 | Active |
+| Decision 032 | 최초 첨삭 실패만 CoverLetter.status를 REVIEW_FAILED로 변경한다 | `cover-letters.md` | REQ-003, REQ-004, REQ-005 | API-007 - API-014 | Superseded by Decision 077 |
 | Decision 033 | 키워드 분석과 면접 세션은 Job 실패 시 FAILED 상태로 저장한다 | `llm-jobs.md` | REQ-005, REQ-009, REQ-010 | API-015 - API-016, LLM 시작 API | Active |
 | Decision 034 | FAILED 키워드 분석과 면접 세션은 같은 리소스로 재시도한다 | `llm-jobs.md` | REQ-005, REQ-009, REQ-010 | API-015 - API-016, LLM 시작 API | Active |
 | Decision 035 | 공고 링크는 URL 형식만 검증한다 | `cover-letters.md` | REQ-003, REQ-004, REQ-005 | API-007 - API-014 | Active |

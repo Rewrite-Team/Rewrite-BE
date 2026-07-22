@@ -223,7 +223,7 @@ erDiagram
 | `position_title` | Yes | Step1 저장 전까지 null 가능; 저장 시 1-30 code points |
 | `job_posting_url` | Yes | 선택값; 빈 입력은 null로 정규화 |
 | `preferences` | Yes | Step2 저장 전까지 null 가능; 저장 시 1-3000 code points |
-| `status` | No | `DRAFT`, `REVIEWING`, `REVIEWED`, `REVIEW_FAILED` |
+| `status` | No | `WRITING`, `REVIEWING`, `REVIEWED`, `REVIEW_FAILED` |
 | `created_at` | No | 초안 생성 시각 |
 | `updated_at` | No | 자기소개서 루트 수정 시각 |
 | `submitted_at` | Yes | 최초 제출 전까지 null |
@@ -245,15 +245,15 @@ Policy:
 | `id` | No | PK |
 | `cover_letter_id` | No | FK to `cover_letters.id` |
 | `question_order` | No | 서버가 요청 배열 순서대로 1부터 재부여 |
-| `question` | Yes | DRAFT 임시저장 중 null 가능. 제출 시 1-300 code points 필수 |
-| `max_answer_length` | Yes | DRAFT 임시저장 중 null 가능. 제출 시 100-5000 필수 |
-| `original_answer` | Yes | DRAFT 임시저장 중 null 가능. 제출 시 1-5000 code points 필수 |
+| `question` | Yes | WRITING 임시저장 중 null 가능. 제출 시 1-300 code points 필수 |
+| `max_answer_length` | Yes | WRITING 임시저장 중 null 가능. 제출 시 100-5000 필수 |
+| `original_answer` | Yes | WRITING 임시저장 중 null 가능. 제출 시 1-5000 code points 필수 |
 
 Policy:
 
 - `(cover_letter_id, question_order)`는 한 자기소개서 안에서 유일해야 한다.
 - Step3 저장 API는 전체 replace다. 요청에 없는 기존 문항 row는 삭제될 수 있다.
-- 미완성 DRAFT 문항은 nullable 필드로 저장하고, 제출 transaction에서 모든 필수값을 검증한 뒤에만 첨삭 Job을 생성한다.
+- 미완성 WRITING 문항은 nullable 필드로 저장하고, 제출 transaction에서 모든 필수값을 검증한 뒤에만 첨삭 Job을 생성한다.
 - 제출 후 원본 질문과 답변은 수정하지 않는다.
 
 ### review_versions

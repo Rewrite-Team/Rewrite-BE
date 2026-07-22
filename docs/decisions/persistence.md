@@ -31,7 +31,7 @@ REQ-003의 남은 CRUD는 저장소 구현 세부사항의 영향을 직접 받�
 - 목록 조회는 pagination, status filter, owner filter, createdAt 정렬, deletedAt 제외가 필요하다.
 - 상세 조회는 owner 검증, soft delete 제외, 질문과 최신 Job 요약 조회 정책이 필요하다.
 - 삭제는 hard delete가 아니라 soft delete로 처리한다.
-- 등록 step 저장은 전체 replace, DRAFT 상태 검증, transaction boundary가 필요하다.
+- 등록 step 저장은 전체 replace, WRITING 상태 검증, transaction boundary가 필요하다.
 
 API-008의 공개 계약은 이미 확인됐지만 저장소 구현은 아직 in-memory다. API-008 내부 persistence를 DB/JPA로 먼저 교체하지 않은 채 남은 동작들을 in-memory repository 기준으로 확장하면 DB/JPA 전환 시 repository API, 테스트 fixture, pagination/sort/filter 검증을 다시 작성할 가능성이 높다.
 

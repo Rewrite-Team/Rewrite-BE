@@ -28,7 +28,6 @@ Response:
 Validation:
 
 ```text
-coverLetter.status는 REVIEWED여야 한다.
 최신 성공 ReviewVersion이 존재해야 한다.
 분석 결과 keywords는 최대 20개다.
 keywords[].importance는 1~100 범위의 정수다.
@@ -166,7 +165,7 @@ COMMON의 인증·CSRF·서버 오류 처리를 기본으로 적용하고, AI �
 | API | HTTP 상태 | 오류 코드 | 발생 조건 | 프론트엔드 처리 |
 |---|---:|---|---|---|
 | API-020 | 404 | `NOT_FOUND` | 자기소개서 없음·비소유·삭제 | 대상 없음 안내 후 목록으로 이동한다. |
-| API-020 | 409 | `CONFLICT` | 자기소개서가 `REVIEWED`가 아니거나 성공한 첨삭 버전이 없음 | API-012를 재조회해 현재 상태 화면으로 전환한다. |
+| API-020 | 409 | `CONFLICT` | 성공한 첨삭 버전이 없음 | API-012를 재조회해 현재 상태 화면으로 전환한다. |
 | API-020 | 409 | `LLM_JOB_ALREADY_RUNNING` | 키워드 분석 외 다른 AI Job이 진행 중 | 다른 AI 작업이 진행 중임을 안내하고 자동 재시도하지 않는다. 오류 응답에 기존 `jobId`가 없으므로 복구를 가정하지 않는다. |
 | API-021 | 404 | `NOT_FOUND` | 자기소개서 없음·비소유·삭제 | 대상 없음 안내 후 목록으로 이동한다. |
 

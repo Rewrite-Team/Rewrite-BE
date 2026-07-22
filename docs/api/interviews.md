@@ -115,7 +115,6 @@ Response:
 Validation:
 
 ```text
-coverLetter.status는 REVIEWED여야 한다.
 최신 성공 ReviewVersion이 존재해야 한다.
 같은 자기소개서에 PENDING 또는 PROCESSING 상태의 LLM Job이 없어야 한다.
 ```
@@ -173,9 +172,9 @@ Response:
 POST /interviews/{interviewSessionId}/questions
 ```
 
-Request body는 없다. 서버는 항상 해당 자기소개서의 최신 첨삭 버전인 `CoverLetter.latestReviewVersionId`를 기준으로 질문을 생성한다.
+Request body는 없다. 서버는 항상 해당 자기소개서의 최신 첨삭 버전인 `CoverLetter.latestReviewedVersionId`를 기준으로 질문을 생성한다.
 
-요청 시점의 최신 첨삭 버전은 Job의 `requestRef.type=REVIEW_VERSION`, `requestRef.id=latestReviewVersionId`로 확정한다. 추가 질문 생성 Job은 `type=INTERVIEW_ADDITIONAL_QUESTION_GENERATION`, `progress.total=1`로 생성한다.
+요청 시점의 최신 첨삭 버전은 Job의 `requestRef.type=REVIEW_VERSION`, `requestRef.id=latestReviewedVersionId`로 확정한다. 추가 질문 생성 Job은 `type=INTERVIEW_ADDITIONAL_QUESTION_GENERATION`, `progress.total=1`로 생성한다.
 
 추가 질문은 자기소개서 최종 작성본을 기반으로 총 1개 생성한다. 질문 종류는 구분하지 않는다.
 
@@ -208,7 +207,7 @@ Validation:
 
 ```text
 interviewSession.status는 ACTIVE여야 한다.
-연결된 coverLetter.status는 REVIEWED여야 한다.
+연결된 자기소개서에 최신 성공 ReviewVersion이 존재해야 한다.
 동일한 추가 질문 생성 Job 외에 같은 자기소개서의 PENDING 또는 PROCESSING LLM Job이 없어야 한다.
 ```
 
@@ -317,7 +316,7 @@ COMMON의 인증·CSRF·서버 오류 처리를 기본으로 적용한다. 질�
 | API | HTTP 상태 | 오류 코드 | 발생 조건 | 프론트엔드 처리 |
 |---|---:|---|---|---|
 | API-022 | 404 | `NOT_FOUND` | 자기소개서 없음·비소유·삭제 | 대상 없음 안내 후 목록으로 이동한다. |
-| API-022 | 409 | `CONFLICT` | 자기소개서가 `REVIEWED`가 아니거나 성공한 첨삭 버전이 없음 | API-012를 재조회해 현재 상태 화면으로 전환한다. |
+| API-022 | 409 | `CONFLICT` | 성공한 첨삭 버전이 없음 | API-012를 재조회해 현재 상태 화면으로 전환한다. |
 | API-022 | 409 | `LLM_JOB_ALREADY_RUNNING` | 초기 질문 생성 외 다른 AI Job이 진행 중 | 다른 AI 작업이 진행 중임을 안내하고 자동 재시도하지 않는다. |
 | API-023 | 400 | `VALIDATION_ERROR` | `content` 누락, trim 후 빈 값 또는 2000자 초과 | `details[field=content].reason`을 답변 입력란에 표시한다. |
 | API-023 | 404 | `NOT_FOUND` | thread 없음·비소유 또는 삭제된 자기소개서에 연결됨 | 대화 화면을 종료하고 API-025를 재조회한다. |
