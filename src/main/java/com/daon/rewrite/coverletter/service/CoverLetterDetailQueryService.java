@@ -120,7 +120,7 @@ public class CoverLetterDetailQueryService {
             return null;
         }
         return llmJobRepository
-                .findFirstByTargetTypeAndTargetIdAndTypeInAndStatusInOrderByCreatedAtDesc(
+                .findFirstByTargetTypeAndTargetIdAndTypeInAndStatusInOrderByCreatedAtDescIdDesc(
                         LlmJobTargetType.COVER_LETTER,
                         coverLetter.getId(),
                         REVIEW_JOB_TYPES,

@@ -27,32 +27,32 @@ public interface LlmJobRepository extends JpaRepository<LlmJob, String> {
     Optional<JobTarget> findTargetById(@Param("id") String id);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    Optional<LlmJob> findFirstByTargetTypeAndTargetIdAndStatusInOrderByCreatedAtDesc(
+    Optional<LlmJob> findFirstByTargetTypeAndTargetIdAndStatusInOrderByCreatedAtDescIdDesc(
             LlmJobTargetType targetType,
             String targetId,
             Collection<LlmJobStatus> statuses
     );
 
-    Optional<LlmJob> findFirstByTargetTypeAndTargetIdAndTypeInAndStatusInOrderByCreatedAtDesc(
+    Optional<LlmJob> findFirstByTargetTypeAndTargetIdAndTypeInAndStatusInOrderByCreatedAtDescIdDesc(
             LlmJobTargetType targetType,
             String targetId,
             Collection<LlmJobType> types,
             Collection<LlmJobStatus> statuses
     );
 
-    Optional<LlmJob> findFirstByTargetTypeAndTargetIdAndTypeOrderByCreatedAtDesc(
+    Optional<LlmJob> findFirstByTargetTypeAndTargetIdAndTypeOrderByCreatedAtDescIdDesc(
             LlmJobTargetType targetType,
             String targetId,
             LlmJobType type
     );
 
-    Optional<LlmJob> findFirstByTargetTypeAndTargetIdAndTypeInOrderByCreatedAtDesc(
+    Optional<LlmJob> findFirstByTargetTypeAndTargetIdAndTypeInOrderByCreatedAtDescIdDesc(
             LlmJobTargetType targetType,
             String targetId,
             Collection<LlmJobType> types
     );
 
-    Optional<LlmJob> findFirstByTypeAndRequestRefTypeAndRequestRefIdOrderByCreatedAtDesc(
+    Optional<LlmJob> findFirstByTypeAndRequestRefTypeAndRequestRefIdOrderByCreatedAtDescIdDesc(
             LlmJobType type,
             LlmJobRequestRefType requestRefType,
             String requestRefId

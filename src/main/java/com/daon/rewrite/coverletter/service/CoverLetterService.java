@@ -231,7 +231,7 @@ public class CoverLetterService {
 
     private LlmJob findRunningJob(String coverLetterId) {
         return llmJobRepository
-                .findFirstByTargetTypeAndTargetIdAndStatusInOrderByCreatedAtDesc(
+                .findFirstByTargetTypeAndTargetIdAndStatusInOrderByCreatedAtDescIdDesc(
                         LlmJobTargetType.COVER_LETTER,
                         coverLetterId,
                         RUNNING_JOB_STATUSES

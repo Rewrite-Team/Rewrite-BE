@@ -13,6 +13,7 @@ import com.daon.rewrite.coverletter.dto.SaveQuestionsResponse;
 import com.daon.rewrite.coverletter.dto.SubmitCoverLetterResponse;
 import com.daon.rewrite.coverletter.entity.CoverLetter;
 import com.daon.rewrite.coverletter.service.CoverLetterService;
+import com.daon.rewrite.coverletter.service.CoverLetterReviewStatusStreamService;
 import com.daon.rewrite.coverletter.service.CoverLetterDetailQueryService;
 import com.daon.rewrite.coverletter.service.SubmitCoverLetterResult;
 import lombok.RequiredArgsConstructor;
@@ -27,12 +28,15 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.MediaType;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @RestController
 @RequiredArgsConstructor
 public class CoverLetterController {
 
     private final CoverLetterService coverLetterService;
+    private final CoverLetterReviewStatusStreamService coverLetterReviewStatusStreamService;
     private final CoverLetterDetailQueryService coverLetterDetailQueryService;
 
     @PostMapping("/cover-letters")
@@ -111,5 +115,10 @@ public class CoverLetterController {
     public SubmitCoverLetterResponse submit(@PathVariable String coverLetterId) {
         SubmitCoverLetterResult result = coverLetterService.submit(coverLetterId);
         return SubmitCoverLetterResponse.from(result);
+    }
+
+    @GetMapping(path = "/cover-letters/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter streamCoverLetterReviewStatuses() {
+        return coverLetterReviewStatusStreamService.openMyStream();
     }
 }

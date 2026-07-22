@@ -216,7 +216,7 @@ public class InterviewService {
 
     private LlmJob findRunningJob(String coverLetterId) {
         return llmJobRepository
-                .findFirstByTargetTypeAndTargetIdAndStatusInOrderByCreatedAtDesc(
+                .findFirstByTargetTypeAndTargetIdAndStatusInOrderByCreatedAtDescIdDesc(
                         LlmJobTargetType.COVER_LETTER,
                         coverLetterId,
                         RUNNING_JOB_STATUSES
@@ -226,7 +226,7 @@ public class InterviewService {
 
     private LlmJob findLatestInterviewQuestionJob(String coverLetterId) {
         LlmJob job = llmJobRepository
-                .findFirstByTargetTypeAndTargetIdAndTypeInOrderByCreatedAtDesc(
+                .findFirstByTargetTypeAndTargetIdAndTypeInOrderByCreatedAtDescIdDesc(
                         LlmJobTargetType.COVER_LETTER,
                         coverLetterId,
                         INTERVIEW_QUESTION_JOB_TYPES

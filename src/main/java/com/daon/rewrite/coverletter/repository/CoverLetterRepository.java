@@ -10,10 +10,13 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.Optional;
+import java.util.List;
 
 public interface CoverLetterRepository extends JpaRepository<CoverLetter, String> {
 
     Page<CoverLetter> findByOwnerIdAndDeletedAtIsNull(String ownerId, Pageable pageable);
+
+    List<CoverLetter> findByOwnerIdAndDeletedAtIsNullOrderByCreatedAtDesc(String ownerId);
 
     Optional<CoverLetter> findByIdAndOwnerIdAndDeletedAtIsNull(String id, String ownerId);
 

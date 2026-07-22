@@ -126,7 +126,7 @@ public class InterviewMessageService {
 
     private boolean hasRunningJob(String coverLetterId) {
         return llmJobRepository
-                .findFirstByTargetTypeAndTargetIdAndStatusInOrderByCreatedAtDesc(
+                .findFirstByTargetTypeAndTargetIdAndStatusInOrderByCreatedAtDescIdDesc(
                         LlmJobTargetType.COVER_LETTER,
                         coverLetterId,
                         RUNNING_JOB_STATUSES
@@ -139,7 +139,7 @@ public class InterviewMessageService {
             return null;
         }
         LlmJob job = llmJobRepository
-                .findFirstByTypeAndRequestRefTypeAndRequestRefIdOrderByCreatedAtDesc(
+                .findFirstByTypeAndRequestRefTypeAndRequestRefIdOrderByCreatedAtDescIdDesc(
                         LlmJobType.INTERVIEW_MESSAGE_FEEDBACK,
                         LlmJobRequestRefType.INTERVIEW_MESSAGE,
                         userMessageId

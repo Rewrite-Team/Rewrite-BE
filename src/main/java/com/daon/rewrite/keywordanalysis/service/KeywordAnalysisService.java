@@ -131,7 +131,7 @@ public class KeywordAnalysisService {
 
     private LlmJob findRunningJob(String coverLetterId) {
         return llmJobRepository
-                .findFirstByTargetTypeAndTargetIdAndStatusInOrderByCreatedAtDesc(
+                .findFirstByTargetTypeAndTargetIdAndStatusInOrderByCreatedAtDescIdDesc(
                         LlmJobTargetType.COVER_LETTER,
                         coverLetterId,
                         RUNNING_JOB_STATUSES
@@ -141,7 +141,7 @@ public class KeywordAnalysisService {
 
     private LlmJob findLatestKeywordAnalysisJob(String coverLetterId) {
         LlmJob job = llmJobRepository
-                .findFirstByTargetTypeAndTargetIdAndTypeOrderByCreatedAtDesc(
+                .findFirstByTargetTypeAndTargetIdAndTypeOrderByCreatedAtDescIdDesc(
                         LlmJobTargetType.COVER_LETTER,
                         coverLetterId,
                         LlmJobType.KEYWORD_ANALYSIS

@@ -6,6 +6,7 @@ import com.daon.rewrite.interview.client.InterviewMessageFeedbackResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import com.daon.rewrite.llmjob.service.LlmJobStreamService;
 
 @Slf4j
 @Service
@@ -14,6 +15,7 @@ public class InterviewMessageFeedbackJobWorker {
 
     private final InterviewMessageFeedbackJobTransactionService transactionService;
     private final InterviewMessageFeedbackClient client;
+    private final LlmJobStreamService llmJobStreamService;
 
     public void execute(String jobId) {
         try {
@@ -22,6 +24,7 @@ public class InterviewMessageFeedbackJobWorker {
                 return;
             }
             InterviewMessageFeedbackResult result = client.generate(work.request());
+            llmJobStreamService.publishValidatedFeedback(jobId, result.content());
             transactionService.complete(jobId, result);
         } catch (InterviewMessageFeedbackClientException exception) {
             failByClientException(jobId, exception);
