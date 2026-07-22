@@ -58,7 +58,7 @@ GET /cover-letters/{coverLetterId}/interview
 ```
 
 면접 세션이 없는 것은 정상 상태이므로 `200 OK`와 `interviewSession: null`을 반환한다.
-`coverLetter`는 면접 세션 존재 여부와 관계없이 항상 반환하며, AI 면접 화면의 자기소개서 제목, 회사명, 직무 표시에 사용한다. `id`, `title`, `companyName`, `positionTitle`은 모두 non-null이다.
+`coverLetter`는 면접 세션 존재 여부와 관계없이 항상 반환하며, AI 면접 화면의 자기소개서 제목, 회사명, 직무 표시에 사용한다. `id`는 non-null이고, 등록 중인 자기소개서를 직접 조회하면 `title`, `companyName`, `positionTitle`은 `null`일 수 있다. 면접을 시작할 수 있는 첨삭 완료 상태에서는 모두 non-null이다.
 자기소개서가 존재하지 않거나 현재 사용자 소유가 아니거나 soft delete된 경우에는 `NOT_FOUND`를 반환한다.
 재첨삭 후에도 기존 면접 세션을 유지하므로 자기소개서의 현재 상태와 관계없이 세션을 조회한다.
 `interviewSession.jobId`는 아직 화면에서 처리해야 하는 질문 생성 Job이 있을 때 반환한다. `QUESTION_GENERATING`에서는 실행 중이거나 실패한 초기 질문 생성 Job ID를 반환한다. `ACTIVE`에서는 추가 질문 생성 Job이 `PENDING`, `PROCESSING`, `FAILED`이면 해당 Job ID를 반환하고, 처리할 질문 생성 Job이 없으면 `null`이다. 면접 답변 피드백 Job은 질문별 thread에 속하므로 API-025에 포함하지 않는다.

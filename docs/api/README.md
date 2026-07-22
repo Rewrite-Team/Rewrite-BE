@@ -75,22 +75,22 @@ API 설계 결정과 트레이드오프는 `../decisions/README.md`를 함께 �
 | API-009 | PUT | `/cover-letters/{coverLetterId}/basic-info` | Implemented | REQ-004 | nullable 기본 정보 WRITING 스냅샷과 `success` 응답 구현 |
 | API-010 | PUT | `/cover-letters/{coverLetterId}/preferences` | Implemented | REQ-004 | nullable 우대사항 WRITING 스냅샷과 `success` 응답 구현 |
 | API-011 | PUT | `/cover-letters/{coverLetterId}/questions` | Implemented | REQ-004 | nullable 문항 WRITING 전체 replace와 `success` 응답 구현 |
-| API-012 | GET | `/cover-letters/{coverLetterId}` | In Progress | REQ-003, REQ-004, REQ-005, REQ-006 | 미완성 WRITING 복구, 상태 공통 상세와 실패 Job 부분 성공 문항 계약 확정, 구현 필요 |
+| API-012 | GET | `/cover-letters/{coverLetterId}` | Verified | REQ-003, REQ-004, REQ-005, REQ-006 | WRITING 복구와 상태 공통 상세, 실패 Job의 성공 문항 조회 구현·검증 |
 | API-013 | DELETE | `/cover-letters/{coverLetterId}` | Implemented | REQ-003 | `success` 응답과 진행 중 Job 취소 구현 |
 | API-014 | POST | `/cover-letters/{coverLetterId}/submit` | Implemented | REQ-004, REQ-005 | WRITING 최종 검증과 `displayStatus`, `jobId` 응답 구현 |
-| API-015 | GET | `/llm-jobs/{jobId}` | In Progress | REQ-005, REQ-009, REQ-010 | 복구용 경량 Job 상태 응답으로 확정, 구현 변경 필요 |
-| API-016 | GET | `/llm-jobs/{jobId}/stream` | In Progress | REQ-005, REQ-006, REQ-009, REQ-010 | 동일 구조의 Job 상태, 첨삭 문항, 검증된 면접 피드백의 점진 전송·재연결 replay 계약 확정, 구현 필요 |
+| API-015 | GET | `/llm-jobs/{jobId}` | Verified | REQ-005, REQ-009, REQ-010 | 복구용 경량 Job 상태 응답 구현·검증 |
+| API-016 | GET | `/llm-jobs/{jobId}/stream` | Verified | REQ-005, REQ-006, REQ-009, REQ-010 | Job 상태, 첨삭 문항, 검증된 면접 피드백 delta와 재연결 replay 구현·검증 |
 | API-017 | GET | `/cover-letters/{coverLetterId}/review-versions` | Implemented | REQ-006 | 성공한 첨삭 버전을 `createdAt` 오름차순으로 반환 |
-| API-018 | GET | `/cover-letters/{coverLetterId}/review-versions/{versionId}` | In Progress | REQ-006 | 조회 구현됨, API-012와 공통 상세 응답 계약 전환 필요 |
+| API-018 | GET | `/cover-letters/{coverLetterId}/review-versions/{versionId}` | Verified | REQ-006 | API-012와 같은 공통 상세 응답으로 선택 버전 조회 구현·검증 |
 | API-019 | PUT | `/cover-letters/{coverLetterId}/review-versions/{versionId}/final-answers` | Implemented | REQ-006 | `versionId` 동시성 검증과 `success` 단일 응답 구현 |
 | API-020 | POST | `/cover-letters/{coverLetterId}/keyword-analysis` | Implemented | REQ-009 | 요청 body 없이 최신 성공 버전을 사용하고 동일 분석 Job을 멱등 반환 |
-| API-021 | GET | `/cover-letters/{coverLetterId}/keyword-analysis/latest` | In Progress | REQ-009 | 화면 메타데이터와 조건부 `jobId`, SSE 복구용 polling fallback 계약 확정, 구현 변경 필요 |
+| API-021 | GET | `/cover-letters/{coverLetterId}/keyword-analysis/latest` | Verified | REQ-009 | 화면 메타데이터와 조건부 `jobId`, SSE 복구용 polling fallback 구현·검증 |
 | API-022 | POST | `/cover-letters/{coverLetterId}/interviews` | Implemented | REQ-010 | 최신 성공 버전 자동 선택과 기존 Job 멱등 반환 구현 |
-| API-023 | POST | `/interview-threads/{threadId}/messages` | In Progress | REQ-010 | `userMessageId`·`jobId` 응답과 API-016 실시간 피드백 delta 연결 계약 확정, 구현 변경 필요 |
+| API-023 | POST | `/interview-threads/{threadId}/messages` | Verified | REQ-010 | `userMessageId`·`jobId` 응답과 API-016 피드백 delta 연결 구현·검증 |
 | API-024 | POST | `/cover-letters/{coverLetterId}/review-versions` | Implemented | REQ-006 | `displayStatus`, `jobId` 응답과 동일 재첨삭 Job 멱등 반환 구현 |
-| API-025 | GET | `/cover-letters/{coverLetterId}/interview` | In Progress | REQ-010 | 자기소개서 요약, 현재 세션과 초기·추가 질문 생성용 조건부 `jobId`, SSE 복구 계약 확정, 구현 변경 필요 |
+| API-025 | GET | `/cover-letters/{coverLetterId}/interview` | Verified | REQ-010 | 자기소개서 요약, 현재 세션과 초기·추가 질문 생성용 조건부 `jobId` 구현·검증 |
 | API-026 | GET | `/interviews/{interviewSessionId}/questions` | Implemented | REQ-010 | 최신 질문 우선 cursor 무한 스크롤과 화면에 필요한 질문 필드만 반환 |
 | API-027 | POST | `/interviews/{interviewSessionId}/questions` | Implemented | REQ-010 | `jobId` 단일 응답과 동일 추가 질문 Job 멱등 반환 구현 |
 | API-028 | POST | `/interviews/{interviewSessionId}/threads` | Deprecated | REQ-010 | 질문 생성 시 thread를 함께 저장하므로 사용하지 않음 |
-| API-029 | GET | `/interview-threads/{threadId}/messages` | In Progress | REQ-010 | 표시 문장·점수 중심 메시지와 조건부 `jobId` 응답 계약 확정, 구현 변경 필요 |
-| API-030 | GET | `/cover-letters/stream` | Planned | REQ-003, REQ-005 | 사용자 단일 연결에서 전체 상태 스냅샷 후 단건 표시 상태 변경 SSE 제공 |
+| API-029 | GET | `/interview-threads/{threadId}/messages` | Verified | REQ-010 | 표시 문장·점수 중심 메시지와 조건부 `jobId` 응답 구현·검증 |
+| API-030 | GET | `/cover-letters/stream` | Verified | REQ-003, REQ-005 | 사용자 단일 연결의 전체 상태 스냅샷과 단건 상태 변경 SSE 구현·검증 |

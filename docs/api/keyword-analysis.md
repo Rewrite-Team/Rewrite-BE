@@ -68,6 +68,8 @@ GET /cover-letters/{coverLetterId}/keyword-analysis/latest
 `keywords`는 완료 상태에서만 분석 결과를 담고, 그 외 상태에서는 빈 배열이다.
 `coverLetter`는 모든 상태에서 반환한다. `sourceReviewVersion`은 분석 기준이 확정된 `PROCESSING`, `COMPLETED`, `FAILED`에서 반환하고, 분석 전 `NOT_STARTED`에서는 `null`이다. 화면에 필요하지 않은 첨삭 버전 생성 시각은 반환하지 않는다.
 
+`coverLetter.title`, `companyName`, `positionTitle`은 등록 중인 자기소개서를 직접 조회하면 `null`일 수 있다. 첨삭이 완료되어 키워드 분석을 시작할 수 있는 상태에서는 모두 non-null이다.
+
 `jobId`는 `PROCESSING`에서 현재 실행 중인 Job ID, `FAILED`에서 가장 최근 실패한 Job ID를 반환한다. `NOT_STARTED`, `COMPLETED`에서는 `null`이다.
 
 새로고침 후 `status=PROCESSING`이면 응답의 `jobId`로 API-016에 다시 연결한다. SSE 연결에 실패한 동안에는 이 API를 polling하고, `COMPLETED` 또는 `FAILED`가 되면 중단한다.
