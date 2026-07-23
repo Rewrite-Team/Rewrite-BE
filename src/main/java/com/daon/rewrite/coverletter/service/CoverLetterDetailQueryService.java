@@ -15,7 +15,6 @@ import com.daon.rewrite.llmjob.entity.LlmJobTargetType;
 import com.daon.rewrite.llmjob.entity.LlmJobType;
 import com.daon.rewrite.llmjob.repository.LlmJobRepository;
 import com.daon.rewrite.reviewversion.entity.ReviewJobQuestionResult;
-import com.daon.rewrite.reviewversion.entity.ReviewJobQuestionResultStatus;
 import com.daon.rewrite.reviewversion.entity.ReviewVersion;
 import com.daon.rewrite.reviewversion.entity.ReviewVersionQuestionResult;
 import com.daon.rewrite.reviewversion.repository.ReviewJobQuestionResultRepository;
@@ -162,7 +161,6 @@ public class CoverLetterDetailQueryService {
     }
 
     private CoverLetterDetailResult.QuestionResult fromJobResult(ReviewJobQuestionResult result) {
-        boolean completed = result.getStatus() == ReviewJobQuestionResultStatus.COMPLETED;
         return new CoverLetterDetailResult.QuestionResult(
                 null,
                 result.getQuestion().getId(),
@@ -171,11 +169,11 @@ public class CoverLetterDetailQueryService {
                 result.getMaxAnswerLength(),
                 result.getInputAnswer(),
                 result.getInputAnswerLength(),
-                completed ? result.getAiReport() : null,
-                completed ? result.getRewrittenAnswer() : null,
-                completed ? result.getRewrittenAnswerLength() : null,
-                completed ? result.getFinalAnswer() : null,
-                completed ? result.getFinalAnswerLength() : null
+                result.getAiReport(),
+                result.getRewrittenAnswer(),
+                result.getRewrittenAnswerLength(),
+                result.getFinalAnswer(),
+                result.getFinalAnswerLength()
         );
     }
 
