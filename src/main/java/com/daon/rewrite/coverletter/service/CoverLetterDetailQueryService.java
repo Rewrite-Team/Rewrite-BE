@@ -48,6 +48,7 @@ public class CoverLetterDetailQueryService {
         CoverLetterDetailResult.ReviewVersionResult reviewVersion = findLatestReviewVersion(coverLetter);
         LlmJob reviewJob = findCurrentReviewJob(coverLetter);
 
+        // 진행·실패 Job의 임시 문항 결과를 우선 반환한다.
         if (reviewJob != null) {
             List<ReviewJobQuestionResult> jobResults = reviewJobQuestionResultRepository
                     .findByLlmJobIdOrderByQuestionOrderAsc(reviewJob.getId());
@@ -60,6 +61,8 @@ public class CoverLetterDetailQueryService {
                 );
             }
         }
+
+        // Job 결과가 없으면 최신 성공 버전을 반환한다.
         if (reviewVersion != null && coverLetter.getStatus() != CoverLetterStatus.WRITING) {
             return new CoverLetterDetailResult(
                     coverLetter,
@@ -68,6 +71,8 @@ public class CoverLetterDetailQueryService {
                     findVersionQuestions(reviewVersion.value())
             );
         }
+
+        // 첨삭 전에는 원본 문항을 반환한다.
         return new CoverLetterDetailResult(
                 coverLetter,
                 reviewVersion,
