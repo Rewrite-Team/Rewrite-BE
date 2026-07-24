@@ -3,19 +3,16 @@ package com.daon.rewrite.coverletter.controller;
 import com.daon.rewrite.coverletter.dto.CoverLetterListResponse;
 import com.daon.rewrite.coverletter.dto.CoverLetterDetailResponse;
 import com.daon.rewrite.coverletter.dto.CreateCoverLetterResponse;
-import com.daon.rewrite.coverletter.dto.DeleteCoverLetterResponse;
 import com.daon.rewrite.coverletter.dto.SaveBasicInfoRequest;
-import com.daon.rewrite.coverletter.dto.SaveBasicInfoResponse;
 import com.daon.rewrite.coverletter.dto.SavePreferencesRequest;
-import com.daon.rewrite.coverletter.dto.SavePreferencesResponse;
 import com.daon.rewrite.coverletter.dto.SaveQuestionsRequest;
-import com.daon.rewrite.coverletter.dto.SaveQuestionsResponse;
 import com.daon.rewrite.coverletter.dto.SubmitCoverLetterResponse;
 import com.daon.rewrite.coverletter.entity.CoverLetter;
 import com.daon.rewrite.coverletter.service.CoverLetterService;
 import com.daon.rewrite.coverletter.service.CoverLetterReviewStatusStreamService;
 import com.daon.rewrite.coverletter.service.CoverLetterDetailQueryService;
 import com.daon.rewrite.coverletter.service.SubmitCoverLetterResult;
+import com.daon.rewrite.global.response.SuccessResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
@@ -67,13 +64,13 @@ public class CoverLetterController {
     }
 
     @DeleteMapping("/cover-letters/{coverLetterId}")
-    public DeleteCoverLetterResponse deleteMyCoverLetter(@PathVariable String coverLetterId) {
+    public SuccessResponse deleteMyCoverLetter(@PathVariable String coverLetterId) {
         coverLetterService.deleteMyCoverLetter(coverLetterId);
-        return DeleteCoverLetterResponse.completed();
+        return SuccessResponse.completed();
     }
 
     @PutMapping("/cover-letters/{coverLetterId}/basic-info")
-    public SaveBasicInfoResponse saveBasicInfo(
+    public SuccessResponse saveBasicInfo(
             @PathVariable String coverLetterId,
             @RequestBody SaveBasicInfoRequest request
     ) {
@@ -84,11 +81,11 @@ public class CoverLetterController {
                 request.positionTitle(),
                 request.jobPostingUrl()
         );
-        return SaveBasicInfoResponse.completed();
+        return SuccessResponse.completed();
     }
 
     @PutMapping("/cover-letters/{coverLetterId}/preferences")
-    public SavePreferencesResponse savePreferences(
+    public SuccessResponse savePreferences(
             @PathVariable String coverLetterId,
             @RequestBody SavePreferencesRequest request
     ) {
@@ -96,11 +93,11 @@ public class CoverLetterController {
                 coverLetterId,
                 request.preferences()
         );
-        return SavePreferencesResponse.completed();
+        return SuccessResponse.completed();
     }
 
     @PutMapping("/cover-letters/{coverLetterId}/questions")
-    public SaveQuestionsResponse saveQuestions(
+    public SuccessResponse saveQuestions(
             @PathVariable String coverLetterId,
             @RequestBody SaveQuestionsRequest request
     ) {
@@ -108,7 +105,7 @@ public class CoverLetterController {
                 coverLetterId,
                 request.toInputs()
         );
-        return SaveQuestionsResponse.completed();
+        return SuccessResponse.completed();
     }
 
     @PostMapping("/cover-letters/{coverLetterId}/submit")

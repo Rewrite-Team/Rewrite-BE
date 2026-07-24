@@ -2,11 +2,11 @@ package com.daon.rewrite.reviewversion.controller;
 
 import com.daon.rewrite.coverletter.dto.CoverLetterDetailResponse;
 import com.daon.rewrite.coverletter.service.CoverLetterDetailQueryService;
+import com.daon.rewrite.global.response.SuccessResponse;
 import com.daon.rewrite.reviewversion.dto.ReviewVersionListResponse;
 import com.daon.rewrite.reviewversion.dto.RequestReReviewRequest;
 import com.daon.rewrite.reviewversion.dto.RequestReReviewResponse;
 import com.daon.rewrite.reviewversion.dto.SaveFinalAnswersRequest;
-import com.daon.rewrite.reviewversion.dto.SaveFinalAnswersResponse;
 import com.daon.rewrite.reviewversion.service.ReviewVersionCommandService;
 import com.daon.rewrite.reviewversion.service.ReviewVersionQueryService;
 import lombok.RequiredArgsConstructor;
@@ -54,7 +54,7 @@ public class ReviewVersionController {
     }
 
     @PutMapping("/cover-letters/{coverLetterId}/review-versions/{versionId}/final-answers")
-    public SaveFinalAnswersResponse saveFinalAnswers(
+    public SuccessResponse saveFinalAnswers(
             @PathVariable String coverLetterId,
             @PathVariable String versionId,
             @RequestBody SaveFinalAnswersRequest request
@@ -64,6 +64,6 @@ public class ReviewVersionController {
                 versionId,
                 request == null ? null : request.toInputs()
         );
-        return SaveFinalAnswersResponse.completed();
+        return SuccessResponse.completed();
     }
 }
