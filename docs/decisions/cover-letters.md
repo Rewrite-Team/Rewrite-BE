@@ -670,6 +670,8 @@ PUT /cover-letters/{coverLetterId}/questions
 
 ## Decision 047: step1 기본 정보 저장은 PUT 전체 replace로 처리한다
 
+> Validation 규칙은 Decision 096으로 대체됐다. `PUT` 전체 replace 정책은 유지하며, WRITING에서는 누락·`null`·빈 문자열을 `null`로 임시저장하고 API-014 제출 시 필수값을 검증한다.
+
 ### 결정
 
 등록 step1의 기본 정보 저장 API는 `PUT`을 사용하며, 전체 replace 방식으로 동작한다.
@@ -737,6 +739,8 @@ step1은 필드별 편집 API라기보다 화면 전체 상태를 임시저장�
 
 
 ## Decision 048: step2 우대사항 저장은 PUT 전체 replace로 처리한다
+
+> Validation 규칙은 Decision 096으로 대체됐다. `PUT` 전체 replace 정책은 유지하며, WRITING에서는 누락·`null`·빈 문자열을 `null`로 임시저장하고 API-014 제출 시 필수값을 검증한다.
 
 ### 결정
 
