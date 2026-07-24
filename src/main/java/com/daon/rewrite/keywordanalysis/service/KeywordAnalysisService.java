@@ -18,6 +18,7 @@ import com.daon.rewrite.llmjob.entity.LlmJobTargetType;
 import com.daon.rewrite.llmjob.entity.LlmJobType;
 import com.daon.rewrite.llmjob.repository.LlmJobRepository;
 import com.daon.rewrite.llmjob.service.LlmJobCreatedEvent;
+import com.daon.rewrite.llmjob.service.LlmJobService;
 import com.daon.rewrite.reviewversion.repository.ReviewVersionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -34,10 +35,6 @@ public class KeywordAnalysisService {
 
     private static final String KEYWORD_ANALYSIS_ID_PREFIX = "ka";
     private static final String LLM_JOB_ID_PREFIX = "job";
-    private static final List<LlmJobStatus> RUNNING_JOB_STATUSES = List.of(
-            LlmJobStatus.PENDING,
-            LlmJobStatus.PROCESSING
-    );
 
     private final CurrentUserProvider currentUserProvider;
     private final CoverLetterRepository coverLetterRepository;
@@ -45,6 +42,7 @@ public class KeywordAnalysisService {
     private final KeywordAnalysisKeywordRepository keywordAnalysisKeywordRepository;
     private final ReviewVersionRepository reviewVersionRepository;
     private final LlmJobRepository llmJobRepository;
+    private final LlmJobService llmJobService;
     private final IdGenerator idGenerator;
     private final Clock clock;
     private final ApplicationEventPublisher eventPublisher;
@@ -59,7 +57,7 @@ public class KeywordAnalysisService {
         if (coverLetter.getLatestReviewedVersionId() == null) {
             throw new BusinessException(ErrorCode.CONFLICT);
         }
-        LlmJob runningJob = findRunningJob(coverLetter.getId());
+        LlmJob runningJob = llmJobService.findRunningCoverLetterJob(coverLetter.getId());
         if (runningJob != null && runningJob.getType() == LlmJobType.KEYWORD_ANALYSIS) {
             KeywordAnalysis keywordAnalysis = keywordAnalysisRepository.findByCoverLetterId(coverLetter.getId())
                     .orElseThrow(() -> new BusinessException(ErrorCode.INTERNAL_ERROR));
@@ -127,16 +125,6 @@ public class KeywordAnalysisService {
         }
         return keywordAnalysisKeywordRepository
                 .findByKeywordAnalysisIdOrderByKeywordOrderAsc(keywordAnalysis.getId());
-    }
-
-    private LlmJob findRunningJob(String coverLetterId) {
-        return llmJobRepository
-                .findFirstByTargetTypeAndTargetIdAndStatusInOrderByCreatedAtDescIdDesc(
-                        LlmJobTargetType.COVER_LETTER,
-                        coverLetterId,
-                        RUNNING_JOB_STATUSES
-                )
-                .orElse(null);
     }
 
     private LlmJob findLatestKeywordAnalysisJob(String coverLetterId) {

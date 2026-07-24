@@ -9,11 +9,10 @@ import com.daon.rewrite.global.exception.ErrorCode;
 import com.daon.rewrite.global.response.ErrorResponse;
 import com.daon.rewrite.global.util.IdGenerator;
 import com.daon.rewrite.llmjob.entity.LlmJob;
-import com.daon.rewrite.llmjob.entity.LlmJobStatus;
-import com.daon.rewrite.llmjob.entity.LlmJobTargetType;
 import com.daon.rewrite.llmjob.entity.LlmJobType;
 import com.daon.rewrite.llmjob.repository.LlmJobRepository;
 import com.daon.rewrite.llmjob.service.LlmJobCreatedEvent;
+import com.daon.rewrite.llmjob.service.LlmJobService;
 import com.daon.rewrite.reviewversion.entity.ReviewVersion;
 import com.daon.rewrite.reviewversion.entity.ReviewJobQuestionResult;
 import com.daon.rewrite.reviewversion.entity.ReviewVersionQuestionResult;
@@ -42,10 +41,6 @@ public class ReviewVersionCommandService {
     private static final int MAX_REQUEST_INSTRUCTION_LENGTH = 1000;
     private static final String LLM_JOB_ID_PREFIX = "job";
     private static final String JOB_QUESTION_RESULT_ID_PREFIX = "rjqr";
-    private static final List<LlmJobStatus> RUNNING_JOB_STATUSES = List.of(
-            LlmJobStatus.PENDING,
-            LlmJobStatus.PROCESSING
-    );
 
     private final CurrentUserProvider currentUserProvider;
     private final CoverLetterRepository coverLetterRepository;
@@ -53,6 +48,7 @@ public class ReviewVersionCommandService {
     private final ReviewVersionQuestionResultRepository questionResultRepository;
     private final ReviewJobQuestionResultRepository jobQuestionResultRepository;
     private final LlmJobRepository llmJobRepository;
+    private final LlmJobService llmJobService;
     private final IdGenerator idGenerator;
     private final Clock clock;
     private final ApplicationEventPublisher eventPublisher;
@@ -95,7 +91,7 @@ public class ReviewVersionCommandService {
             throw new BusinessException(ErrorCode.CONFLICT);
         }
 
-        LlmJob runningJob = findRunningJob(coverLetter.getId());
+        LlmJob runningJob = llmJobService.findRunningCoverLetterJob(coverLetter.getId());
         if (runningJob != null && runningJob.getType() == LlmJobType.COVER_LETTER_RE_REVIEW) {
             return new RequestReReviewResult(coverLetter, runningJob);
         }
@@ -131,16 +127,6 @@ public class ReviewVersionCommandService {
         eventPublisher.publishEvent(new LlmJobCreatedEvent(job.getId()));
 
         return new RequestReReviewResult(coverLetter, job);
-    }
-
-    private LlmJob findRunningJob(String coverLetterId) {
-        return llmJobRepository
-                .findFirstByTargetTypeAndTargetIdAndStatusInOrderByCreatedAtDescIdDesc(
-                        LlmJobTargetType.COVER_LETTER,
-                        coverLetterId,
-                        RUNNING_JOB_STATUSES
-                )
-                .orElse(null);
     }
 
     private String validateAndNormalizeRequestInstruction(String requestInstruction) {

@@ -20,6 +20,7 @@ import com.daon.rewrite.llmjob.entity.LlmJobTargetType;
 import com.daon.rewrite.llmjob.entity.LlmJobType;
 import com.daon.rewrite.llmjob.repository.LlmJobRepository;
 import com.daon.rewrite.llmjob.service.LlmJobCreatedEvent;
+import com.daon.rewrite.llmjob.service.LlmJobService;
 import com.daon.rewrite.reviewversion.repository.ReviewVersionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -42,10 +43,6 @@ public class InterviewService {
     private static final String INTERVIEW_SESSION_ID_PREFIX = "is";
     private static final String LLM_JOB_ID_PREFIX = "job";
     private static final int MAX_INTERVIEW_QUESTION_LIST_SIZE = 20;
-    private static final List<LlmJobStatus> RUNNING_JOB_STATUSES = List.of(
-            LlmJobStatus.PENDING,
-            LlmJobStatus.PROCESSING
-    );
     private static final List<LlmJobType> INTERVIEW_QUESTION_JOB_TYPES = List.of(
             LlmJobType.INTERVIEW_INITIAL_QUESTION_GENERATION,
             LlmJobType.INTERVIEW_ADDITIONAL_QUESTION_GENERATION
@@ -58,6 +55,7 @@ public class InterviewService {
     private final InterviewQuestionRepository interviewQuestionRepository;
     private final InterviewThreadRepository interviewThreadRepository;
     private final LlmJobRepository llmJobRepository;
+    private final LlmJobService llmJobService;
     private final IdGenerator idGenerator;
     private final Clock clock;
     private final ApplicationEventPublisher eventPublisher;
@@ -142,7 +140,7 @@ public class InterviewService {
         if (existingSession != null && existingSession.getStatus() == InterviewSessionStatus.ACTIVE) {
             return new StartInterviewResult(existingSession, null);
         }
-        LlmJob runningJob = findRunningJob(coverLetter.getId());
+        LlmJob runningJob = llmJobService.findRunningCoverLetterJob(coverLetter.getId());
         if (existingSession != null
                 && existingSession.getStatus() == InterviewSessionStatus.QUESTION_GENERATING
                 && runningJob != null
@@ -188,7 +186,7 @@ public class InterviewService {
         }
         validateReviewedCoverLetter(coverLetter);
         String sourceReviewVersionId = selectSourceReviewVersionId(coverLetter, null);
-        LlmJob runningJob = findRunningJob(coverLetter.getId());
+        LlmJob runningJob = llmJobService.findRunningCoverLetterJob(coverLetter.getId());
         if (runningJob != null && runningJob.getType() == LlmJobType.INTERVIEW_ADDITIONAL_QUESTION_GENERATION) {
             return new AddInterviewQuestionResult(interviewSession, runningJob);
         }
@@ -212,16 +210,6 @@ public class InterviewService {
         if (coverLetter.getLatestReviewedVersionId() == null) {
             throw new BusinessException(ErrorCode.CONFLICT);
         }
-    }
-
-    private LlmJob findRunningJob(String coverLetterId) {
-        return llmJobRepository
-                .findFirstByTargetTypeAndTargetIdAndStatusInOrderByCreatedAtDescIdDesc(
-                        LlmJobTargetType.COVER_LETTER,
-                        coverLetterId,
-                        RUNNING_JOB_STATUSES
-                )
-                .orElse(null);
     }
 
     private LlmJob findLatestInterviewQuestionJob(String coverLetterId) {

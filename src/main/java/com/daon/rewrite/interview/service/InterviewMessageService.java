@@ -16,10 +16,10 @@ import com.daon.rewrite.interview.repository.InterviewThreadRepository;
 import com.daon.rewrite.llmjob.entity.LlmJob;
 import com.daon.rewrite.llmjob.entity.LlmJobStatus;
 import com.daon.rewrite.llmjob.entity.LlmJobRequestRefType;
-import com.daon.rewrite.llmjob.entity.LlmJobTargetType;
 import com.daon.rewrite.llmjob.entity.LlmJobType;
 import com.daon.rewrite.llmjob.repository.LlmJobRepository;
 import com.daon.rewrite.llmjob.service.LlmJobCreatedEvent;
+import com.daon.rewrite.llmjob.service.LlmJobService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -36,16 +36,13 @@ public class InterviewMessageService {
     private static final String INTERVIEW_MESSAGE_ID_PREFIX = "im";
     private static final String LLM_JOB_ID_PREFIX = "job";
     private static final int MAX_CONTENT_LENGTH = 2000;
-    private static final List<LlmJobStatus> RUNNING_JOB_STATUSES = List.of(
-            LlmJobStatus.PENDING,
-            LlmJobStatus.PROCESSING
-    );
 
     private final CurrentUserProvider currentUserProvider;
     private final CoverLetterRepository coverLetterRepository;
     private final InterviewThreadRepository interviewThreadRepository;
     private final InterviewMessageRepository interviewMessageRepository;
     private final LlmJobRepository llmJobRepository;
+    private final LlmJobService llmJobService;
     private final IdGenerator idGenerator;
     private final Clock clock;
     private final ApplicationEventPublisher eventPublisher;
@@ -88,7 +85,7 @@ public class InterviewMessageService {
         CoverLetter coverLetter = coverLetterRepository
                 .findActiveByIdAndOwnerIdForUpdate(coverLetterId, currentUser.id())
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
-        if (hasRunningJob(coverLetter.getId())) {
+        if (llmJobService.findRunningCoverLetterJob(coverLetter.getId()) != null) {
             throw new BusinessException(ErrorCode.LLM_JOB_ALREADY_RUNNING);
         }
 
@@ -122,16 +119,6 @@ public class InterviewMessageService {
                 message.getFollowUpQuestion(),
                 message.getCreatedAt()
         );
-    }
-
-    private boolean hasRunningJob(String coverLetterId) {
-        return llmJobRepository
-                .findFirstByTargetTypeAndTargetIdAndStatusInOrderByCreatedAtDescIdDesc(
-                        LlmJobTargetType.COVER_LETTER,
-                        coverLetterId,
-                        RUNNING_JOB_STATUSES
-                )
-                .isPresent();
     }
 
     private LlmJob findLatestFeedbackJob(String userMessageId) {

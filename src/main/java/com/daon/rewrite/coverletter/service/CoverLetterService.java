@@ -12,11 +12,10 @@ import com.daon.rewrite.global.exception.ErrorCode;
 import com.daon.rewrite.global.response.ErrorResponse;
 import com.daon.rewrite.global.util.IdGenerator;
 import com.daon.rewrite.llmjob.entity.LlmJob;
-import com.daon.rewrite.llmjob.entity.LlmJobStatus;
-import com.daon.rewrite.llmjob.entity.LlmJobTargetType;
 import com.daon.rewrite.llmjob.entity.LlmJobType;
 import com.daon.rewrite.llmjob.repository.LlmJobRepository;
 import com.daon.rewrite.llmjob.service.LlmJobCreatedEvent;
+import com.daon.rewrite.llmjob.service.LlmJobService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
@@ -50,14 +49,11 @@ public class CoverLetterService {
     private static final int MAX_MAX_ANSWER_LENGTH = 5000;
     private static final int MAX_ORIGINAL_ANSWER_LENGTH = 5000;
     private static final String LLM_JOB_ID_PREFIX = "job";
-    private static final List<LlmJobStatus> RUNNING_JOB_STATUSES = List.of(
-            LlmJobStatus.PENDING,
-            LlmJobStatus.PROCESSING
-    );
     private final CurrentUserProvider currentUserProvider;
     private final CoverLetterRepository coverLetterRepository;
     private final CoverLetterQuestionRepository coverLetterQuestionRepository;
     private final LlmJobRepository llmJobRepository;
+    private final LlmJobService llmJobService;
     private final IdGenerator idGenerator;
     private final Clock clock;
     private final ApplicationEventPublisher eventPublisher;
@@ -99,7 +95,7 @@ public class CoverLetterService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
 
         Instant now = Instant.now(clock);
-        LlmJob runningJob = findRunningJob(coverLetter.getId());
+        LlmJob runningJob = llmJobService.findRunningCoverLetterJob(coverLetter.getId());
         if (runningJob != null) {
             runningJob.cancel(now);
         }
@@ -194,7 +190,7 @@ public class CoverLetterService {
                 .findActiveByIdAndOwnerIdForUpdate(coverLetterId, currentUser.id())
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
 
-        LlmJob runningJob = findRunningJob(coverLetter.getId());
+        LlmJob runningJob = llmJobService.findRunningCoverLetterJob(coverLetter.getId());
         if (runningJob != null) {
             if (coverLetter.getStatus() == CoverLetterStatus.REVIEWING
                     && runningJob.getType() == LlmJobType.COVER_LETTER_REVIEW) {
@@ -227,16 +223,6 @@ public class CoverLetterService {
         eventPublisher.publishEvent(new LlmJobCreatedEvent(job.getId()));
 
         return new SubmitCoverLetterResult(coverLetter, job);
-    }
-
-    private LlmJob findRunningJob(String coverLetterId) {
-        return llmJobRepository
-                .findFirstByTargetTypeAndTargetIdAndStatusInOrderByCreatedAtDescIdDesc(
-                        LlmJobTargetType.COVER_LETTER,
-                        coverLetterId,
-                        RUNNING_JOB_STATUSES
-                )
-                .orElse(null);
     }
 
     private void validateSubmit(CoverLetter coverLetter, List<CoverLetterQuestion> questions) {
