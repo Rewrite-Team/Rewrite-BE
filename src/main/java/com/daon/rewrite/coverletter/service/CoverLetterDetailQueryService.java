@@ -22,6 +22,7 @@ import com.daon.rewrite.reviewversion.repository.ReviewVersionQuestionResultRepo
 import com.daon.rewrite.reviewversion.repository.ReviewVersionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -42,7 +43,7 @@ public class CoverLetterDetailQueryService {
     private final ReviewVersionRepository reviewVersionRepository;
     private final ReviewVersionQuestionResultRepository reviewVersionQuestionResultRepository;
 
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public CoverLetterDetailResult findCurrent(String coverLetterId) {
         CoverLetter coverLetter = findMyActiveCoverLetter(coverLetterId);
         CoverLetterDetailResult.ReviewVersionResult reviewVersion = findLatestReviewVersion(coverLetter);
@@ -130,7 +131,7 @@ public class CoverLetterDetailQueryService {
                         REVIEW_JOB_TYPES,
                         statuses
                 )
-                .orElse(null);
+                .orElseThrow(() -> new BusinessException(ErrorCode.INTERNAL_ERROR));
     }
 
     private List<CoverLetterDetailResult.QuestionResult> findOriginalQuestions(CoverLetter coverLetter) {
