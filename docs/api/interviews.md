@@ -325,7 +325,7 @@ COMMON의 인증·CSRF·서버 오류 처리를 기본으로 적용한다. 질�
 | API-026 | 400 | `VALIDATION_ERROR` | `cursor` 형식 오류 또는 `size`가 1~20 범위를 벗어남 | 목록 추가를 중단한다. 최초 조회는 cursor를 생략하고, 이후에는 서버가 반환한 `nextCursor`만 사용한다. |
 | API-026 | 404 | `NOT_FOUND` | 세션 없음·비소유 또는 삭제된 자기소개서의 세션 | 면접 화면을 종료하고 API-025를 재조회한다. `items=[]`는 데이터 없음만 의미하며 진행·실패는 API-025와 API-015로 판단한다. |
 | API-027 | 404 | `NOT_FOUND` | 세션 없음·비소유 또는 삭제된 자기소개서의 세션 | API-025를 재조회한다. |
-| API-027 | 409 | `CONFLICT` | 세션이 `ACTIVE`가 아니거나 자기소개서가 `REVIEWED`가 아님 | API-025를 재조회하고 가능한 동작만 활성화한다. |
+| API-027 | 409 | `CONFLICT` | 세션이 `ACTIVE`가 아니거나 `latestReviewedVersionId`가 없어 성공한 첨삭 버전이 없음 | API-025를 재조회하고 가능한 동작만 활성화한다. |
 | API-027 | 409 | `LLM_JOB_ALREADY_RUNNING` | 추가 질문 생성 외 다른 AI Job이 진행 중 | 다른 AI 작업이 진행 중임을 안내하고 자동 재시도하지 않는다. |
 | API-028 | - | `API별 오류 없음` | Deprecated되어 호출하지 않는 API | API-026의 `threadId`를 사용한다. `DEPRECATED`는 실제 HTTP 오류 코드가 아니다. |
 | API-029 | 404 | `NOT_FOUND` | thread 없음·비소유 또는 삭제된 자기소개서에 연결됨 | 대화 화면을 종료하고 API-025를 재조회한다. `jobId`가 있으면 API-016에 연결하고, 연결 실패 시 API-015를 polling한다. |
