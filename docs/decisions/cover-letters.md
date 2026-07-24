@@ -1113,6 +1113,8 @@ Response:
 
 ## Decision 054: 제출 중복 호출 시 기존 진행 중 Job을 반환한다
 
+> 응답 계약은 Decision 084로 대체됐다. 기존 Job을 반환하는 멱등 처리 정책은 유지하며, 응답은 `displayStatus`와 nullable `jobId`만 포함한다.
+
 ### 결정
 
 자기소개서 제출 API가 중복 호출되었고, 이미 최초 첨삭 Job이 `PENDING` 또는 `PROCESSING` 상태이면 새 LLM Job을 만들지 않는다.
@@ -1129,8 +1131,7 @@ Response:
 
 ```json
 {
-  "coverLetterId": "cl_01HZ...",
-  "status": "REVIEWING",
+  "displayStatus": "REVIEWING",
   "jobId": "job_existing_01HZ..."
 }
 ```
@@ -1230,13 +1231,15 @@ LLM 실패는 일시 장애일 수 있다. 최초 첨삭 실패 후 복구 경�
 
 
 
-## Decision 056: REVIEWED 상태에서 submit 재호출 시 기존 최신 첨삭 결과 정보를 반환한다
+## Decision 056: REVIEWED 상태에서 submit 재호출 시 새 Job을 만들지 않는다
+
+> 응답 계약은 Decision 084로 대체됐다. 새 Job을 생성하지 않는 멱등 처리 정책은 유지하며, 응답은 `displayStatus`와 nullable `jobId`만 포함한다.
 
 ### 결정
 
 이미 최초 첨삭이 완료되어 `CoverLetter.status=REVIEWED`인 자기소개서에 대해 submit API가 다시 호출되면 새 LLM Job을 만들지 않는다.
 
-대신 기존 최신 `ReviewVersion` 정보를 반환한다.
+대신 첨삭 완료 상태를 반환한다. 최신 `ReviewVersion`은 API-012로 조회한다.
 
 적용 API:
 
@@ -1248,10 +1251,8 @@ Response:
 
 ```json
 {
-  "coverLetterId": "cl_01HZ...",
-  "status": "REVIEWED",
-  "jobId": null,
-  "latestReviewedVersionId": "rv_01HZ..."
+  "displayStatus": "REVIEWED",
+  "jobId": null
 }
 ```
 
@@ -1263,7 +1264,7 @@ Response:
 
 ### 고려한 대안
 
-1. `REVIEWED` 상태에서는 기존 최신 `ReviewVersion` 정보 반환
+1. `REVIEWED` 상태에서는 첨삭 완료 상태 반환
    - submit API를 멱등적으로 다룰 수 있다.
    - 프론트엔드는 응답을 보고 바로 결과 화면으로 이동할 수 있다.
    - 새 LLM Job을 만들지 않아 비용과 버전 충돌을 막을 수 있다.
