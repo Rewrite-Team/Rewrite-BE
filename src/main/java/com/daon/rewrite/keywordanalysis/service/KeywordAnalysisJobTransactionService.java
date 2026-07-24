@@ -107,7 +107,7 @@ class KeywordAnalysisJobTransactionService {
     @Transactional
     public void complete(String jobId, List<KeywordAnalysisResult> results) {
         LlmJob job = findKeywordAnalysisJobForUpdate(jobId);
-        if (job.getStatus() == LlmJobStatus.COMPLETED || job.getStatus() == LlmJobStatus.FAILED) {
+        if (job.getStatus().isTerminal()) {
             return;
         }
         if (job.getStatus() != LlmJobStatus.PROCESSING) {
@@ -149,7 +149,7 @@ class KeywordAnalysisJobTransactionService {
     @Transactional
     public void fail(String jobId, KeywordAnalysisClientException.Reason reason) {
         LlmJob job = findKeywordAnalysisJobForUpdate(jobId);
-        if (job.getStatus() == LlmJobStatus.COMPLETED || job.getStatus() == LlmJobStatus.FAILED) {
+        if (job.getStatus().isTerminal()) {
             return;
         }
 
@@ -172,7 +172,7 @@ class KeywordAnalysisJobTransactionService {
     @Transactional
     public void failUnexpected(String jobId) {
         LlmJob job = findKeywordAnalysisJobForUpdate(jobId);
-        if (job.getStatus() == LlmJobStatus.COMPLETED || job.getStatus() == LlmJobStatus.FAILED) {
+        if (job.getStatus().isTerminal()) {
             return;
         }
 

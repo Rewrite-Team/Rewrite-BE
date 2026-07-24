@@ -84,7 +84,7 @@ class InterviewMessageFeedbackJobTransactionService {
     @Transactional
     public void complete(String jobId, InterviewMessageFeedbackResult result) {
         LlmJob job = findInterviewMessageFeedbackJobForUpdate(jobId);
-        if (job.getStatus() == LlmJobStatus.COMPLETED || job.getStatus() == LlmJobStatus.FAILED) {
+        if (job.getStatus().isTerminal()) {
             return;
         }
         if (job.getStatus() != LlmJobStatus.PROCESSING) {
@@ -116,7 +116,7 @@ class InterviewMessageFeedbackJobTransactionService {
     @Transactional
     public void fail(String jobId, InterviewMessageFeedbackClientException.Reason reason) {
         LlmJob job = findInterviewMessageFeedbackJobForUpdate(jobId);
-        if (job.getStatus() == LlmJobStatus.COMPLETED || job.getStatus() == LlmJobStatus.FAILED) {
+        if (job.getStatus().isTerminal()) {
             return;
         }
 
@@ -132,7 +132,7 @@ class InterviewMessageFeedbackJobTransactionService {
     @Transactional
     public void failUnexpected(String jobId) {
         LlmJob job = findInterviewMessageFeedbackJobForUpdate(jobId);
-        if (job.getStatus() == LlmJobStatus.COMPLETED || job.getStatus() == LlmJobStatus.FAILED) {
+        if (job.getStatus().isTerminal()) {
             return;
         }
 

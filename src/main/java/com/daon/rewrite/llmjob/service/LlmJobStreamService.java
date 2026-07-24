@@ -5,7 +5,6 @@ import com.daon.rewrite.llmjob.dto.InterviewFeedbackDeltaResponse;
 import com.daon.rewrite.llmjob.dto.LlmJobStateEventResponse;
 import com.daon.rewrite.llmjob.dto.ReviewQuestionsEventResponse;
 import com.daon.rewrite.llmjob.entity.LlmJob;
-import com.daon.rewrite.llmjob.entity.LlmJobStatus;
 import com.daon.rewrite.llmjob.entity.LlmJobType;
 import com.daon.rewrite.llmjob.repository.LlmJobRepository;
 import com.daon.rewrite.reviewversion.entity.ReviewJobQuestionResult;
@@ -54,7 +53,7 @@ public class LlmJobStreamService {
             LlmJob job = llmJobService.findMyJob(jobId);
             sendInitial(connection, job);
             stream.finishInitialization();
-            if (isTerminal(job.getStatus())) {
+        if (job.getStatus().isTerminal()) {
                 stream.close();
             }
         }
@@ -86,7 +85,7 @@ public class LlmJobStreamService {
         Map<String, JobConnection> jobConnections = connections.getOrDefault(jobId, Map.of());
         if (jobConnections.isEmpty()) {
             LlmJob job = llmJobRepository.findById(jobId).orElse(null);
-            if (job == null || isTerminal(job.getStatus())) {
+            if (job == null || job.getStatus().isTerminal()) {
                 feedbackBuffers.remove(jobId);
             }
             return;
@@ -110,7 +109,7 @@ public class LlmJobStreamService {
                     connection.stream().send(JOB_STATE_EVENT, state);
                     connection.lastState(state);
                 }
-                if (isTerminal(job.getStatus())) {
+                if (job.getStatus().isTerminal()) {
                     connection.stream().close();
                     feedbackBuffers.remove(jobId);
                 }
@@ -171,12 +170,6 @@ public class LlmJobStreamService {
     private boolean isReviewJob(LlmJob job) {
         return job.getType() == LlmJobType.COVER_LETTER_REVIEW
                 || job.getType() == LlmJobType.COVER_LETTER_RE_REVIEW;
-    }
-
-    private boolean isTerminal(LlmJobStatus status) {
-        return status == LlmJobStatus.COMPLETED
-                || status == LlmJobStatus.FAILED
-                || status == LlmJobStatus.CANCELED;
     }
 
     private void removeConnection(String jobId, String connectionId) {

@@ -119,7 +119,7 @@ class InterviewQuestionGenerationJobTransactionService {
     @Transactional
     public void complete(String jobId, List<InterviewQuestionGenerationResult> results) {
         LlmJob job = findInterviewQuestionGenerationJobForUpdate(jobId);
-        if (job.getStatus() == LlmJobStatus.COMPLETED || job.getStatus() == LlmJobStatus.FAILED) {
+        if (job.getStatus().isTerminal()) {
             return;
         }
         if (job.getStatus() != LlmJobStatus.PROCESSING) {
@@ -181,7 +181,7 @@ class InterviewQuestionGenerationJobTransactionService {
     @Transactional
     public void fail(String jobId, InterviewQuestionGenerationClientException.Reason reason) {
         LlmJob job = findInterviewQuestionGenerationJobForUpdate(jobId);
-        if (job.getStatus() == LlmJobStatus.COMPLETED || job.getStatus() == LlmJobStatus.FAILED) {
+        if (job.getStatus().isTerminal()) {
             return;
         }
 
@@ -201,7 +201,7 @@ class InterviewQuestionGenerationJobTransactionService {
     @Transactional
     public void failUnexpected(String jobId) {
         LlmJob job = findInterviewQuestionGenerationJobForUpdate(jobId);
-        if (job.getStatus() == LlmJobStatus.COMPLETED || job.getStatus() == LlmJobStatus.FAILED) {
+        if (job.getStatus().isTerminal()) {
             return;
         }
 

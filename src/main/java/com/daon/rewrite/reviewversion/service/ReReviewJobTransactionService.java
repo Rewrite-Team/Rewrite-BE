@@ -88,7 +88,7 @@ class ReReviewJobTransactionService {
     public void fail(String jobId, ReviewClientException.Reason reason) {
         CoverLetterJobLockService.LockedCoverLetterJob locked = coverLetterJobLockService.lock(jobId);
         LlmJob job = validateReReviewJob(locked.job());
-        if (job.getStatus() == LlmJobStatus.COMPLETED || job.getStatus() == LlmJobStatus.FAILED) {
+        if (job.getStatus().isTerminal()) {
             return;
         }
 
@@ -109,7 +109,7 @@ class ReReviewJobTransactionService {
     public void failUnexpected(String jobId) {
         CoverLetterJobLockService.LockedCoverLetterJob locked = coverLetterJobLockService.lock(jobId);
         LlmJob job = validateReReviewJob(locked.job());
-        if (job.getStatus() == LlmJobStatus.COMPLETED || job.getStatus() == LlmJobStatus.FAILED) {
+        if (job.getStatus().isTerminal()) {
             return;
         }
         CoverLetter coverLetter = locked.coverLetter();

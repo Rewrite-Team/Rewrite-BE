@@ -51,6 +51,9 @@ public class ReviewVersionService {
         if (job.getStatus() == LlmJobStatus.COMPLETED) {
             return findCompletedResult(job);
         }
+        if (job.getStatus() == LlmJobStatus.CANCELED) {
+            return null;
+        }
         if (job.getStatus() != LlmJobStatus.PROCESSING) {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR);
         }
@@ -102,6 +105,9 @@ public class ReviewVersionService {
 
         if (job.getStatus() == LlmJobStatus.COMPLETED) {
             return findCompletedResult(job);
+        }
+        if (job.getStatus() == LlmJobStatus.CANCELED) {
+            return null;
         }
         if (job.getStatus() != LlmJobStatus.PROCESSING) {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR);

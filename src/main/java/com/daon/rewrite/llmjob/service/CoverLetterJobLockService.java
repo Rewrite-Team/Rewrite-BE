@@ -24,7 +24,7 @@ public class CoverLetterJobLockService {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR);
         }
 
-        CoverLetter coverLetter = coverLetterRepository.findActiveByIdForUpdate(target.getTargetId())
+        CoverLetter coverLetter = coverLetterRepository.findByIdForUpdate(target.getTargetId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.INTERNAL_ERROR));
         LlmJob job = llmJobRepository.findByIdForUpdate(jobId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.INTERNAL_ERROR));
