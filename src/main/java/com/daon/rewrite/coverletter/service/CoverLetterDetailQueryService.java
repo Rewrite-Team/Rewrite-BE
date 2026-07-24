@@ -130,7 +130,7 @@ public class CoverLetterDetailQueryService {
                         REVIEW_JOB_TYPES,
                         statuses
                 )
-                .orElseThrow(() -> new BusinessException(ErrorCode.INTERNAL_ERROR));
+                .orElse(null);
     }
 
     private List<CoverLetterDetailResult.QuestionResult> findOriginalQuestions(CoverLetter coverLetter) {
