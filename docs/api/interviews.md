@@ -58,7 +58,7 @@ GET /cover-letters/{coverLetterId}/interview
 ```
 
 면접 세션이 없는 것은 정상 상태이므로 `200 OK`와 `interviewSession: null`을 반환한다.
-`coverLetter`는 면접 세션 존재 여부와 관계없이 항상 반환하며, AI 면접 화면의 자기소개서 제목, 회사명, 직무 표시에 사용한다. `id`, `title`, `companyName`, `positionTitle`은 모두 non-null이다.
+`coverLetter`는 면접 세션 존재 여부와 관계없이 항상 반환하며, AI 면접 화면의 자기소개서 제목, 회사명, 직무 표시에 사용한다. `id`는 non-null이고, 등록 중인 자기소개서를 직접 조회하면 `title`, `companyName`, `positionTitle`은 `null`일 수 있다. 면접을 시작할 수 있는 첨삭 완료 상태에서는 모두 non-null이다.
 자기소개서가 존재하지 않거나 현재 사용자 소유가 아니거나 soft delete된 경우에는 `NOT_FOUND`를 반환한다.
 재첨삭 후에도 기존 면접 세션을 유지하므로 자기소개서의 현재 상태와 관계없이 세션을 조회한다.
 `interviewSession.jobId`는 아직 화면에서 처리해야 하는 질문 생성 Job이 있을 때 반환한다. `QUESTION_GENERATING`에서는 실행 중이거나 실패한 초기 질문 생성 Job ID를 반환한다. `ACTIVE`에서는 추가 질문 생성 Job이 `PENDING`, `PROCESSING`, `FAILED`이면 해당 Job ID를 반환하고, 처리할 질문 생성 Job이 없으면 `null`이다. 면접 답변 피드백 Job은 질문별 thread에 속하므로 API-025에 포함하지 않는다.
@@ -115,7 +115,6 @@ Response:
 Validation:
 
 ```text
-coverLetter.status는 REVIEWED여야 한다.
 최신 성공 ReviewVersion이 존재해야 한다.
 같은 자기소개서에 PENDING 또는 PROCESSING 상태의 LLM Job이 없어야 한다.
 ```
@@ -173,9 +172,9 @@ Response:
 POST /interviews/{interviewSessionId}/questions
 ```
 
-Request body는 없다. 서버는 항상 해당 자기소개서의 최신 첨삭 버전인 `CoverLetter.latestReviewVersionId`를 기준으로 질문을 생성한다.
+Request body는 없다. 서버는 항상 해당 자기소개서의 최신 첨삭 버전인 `CoverLetter.latestReviewedVersionId`를 기준으로 질문을 생성한다.
 
-요청 시점의 최신 첨삭 버전은 Job의 `requestRef.type=REVIEW_VERSION`, `requestRef.id=latestReviewVersionId`로 확정한다. 추가 질문 생성 Job은 `type=INTERVIEW_ADDITIONAL_QUESTION_GENERATION`, `progress.total=1`로 생성한다.
+요청 시점의 최신 첨삭 버전은 Job의 `requestRef.type=REVIEW_VERSION`, `requestRef.id=latestReviewedVersionId`로 확정한다. 추가 질문 생성 Job은 `type=INTERVIEW_ADDITIONAL_QUESTION_GENERATION`, `progress.total=1`로 생성한다.
 
 추가 질문은 자기소개서 최종 작성본을 기반으로 총 1개 생성한다. 질문 종류는 구분하지 않는다.
 
@@ -208,7 +207,7 @@ Validation:
 
 ```text
 interviewSession.status는 ACTIVE여야 한다.
-연결된 coverLetter.status는 REVIEWED여야 한다.
+연결된 자기소개서에 최신 성공 ReviewVersion이 존재해야 한다.
 동일한 추가 질문 생성 Job 외에 같은 자기소개서의 PENDING 또는 PROCESSING LLM Job이 없어야 한다.
 ```
 
@@ -317,7 +316,7 @@ COMMON의 인증·CSRF·서버 오류 처리를 기본으로 적용한다. 질�
 | API | HTTP 상태 | 오류 코드 | 발생 조건 | 프론트엔드 처리 |
 |---|---:|---|---|---|
 | API-022 | 404 | `NOT_FOUND` | 자기소개서 없음·비소유·삭제 | 대상 없음 안내 후 목록으로 이동한다. |
-| API-022 | 409 | `CONFLICT` | 자기소개서가 `REVIEWED`가 아니거나 성공한 첨삭 버전이 없음 | API-012를 재조회해 현재 상태 화면으로 전환한다. |
+| API-022 | 409 | `CONFLICT` | 성공한 첨삭 버전이 없음 | API-012를 재조회해 현재 상태 화면으로 전환한다. |
 | API-022 | 409 | `LLM_JOB_ALREADY_RUNNING` | 초기 질문 생성 외 다른 AI Job이 진행 중 | 다른 AI 작업이 진행 중임을 안내하고 자동 재시도하지 않는다. |
 | API-023 | 400 | `VALIDATION_ERROR` | `content` 누락, trim 후 빈 값 또는 2000자 초과 | `details[field=content].reason`을 답변 입력란에 표시한다. |
 | API-023 | 404 | `NOT_FOUND` | thread 없음·비소유 또는 삭제된 자기소개서에 연결됨 | 대화 화면을 종료하고 API-025를 재조회한다. |
@@ -326,7 +325,7 @@ COMMON의 인증·CSRF·서버 오류 처리를 기본으로 적용한다. 질�
 | API-026 | 400 | `VALIDATION_ERROR` | `cursor` 형식 오류 또는 `size`가 1~20 범위를 벗어남 | 목록 추가를 중단한다. 최초 조회는 cursor를 생략하고, 이후에는 서버가 반환한 `nextCursor`만 사용한다. |
 | API-026 | 404 | `NOT_FOUND` | 세션 없음·비소유 또는 삭제된 자기소개서의 세션 | 면접 화면을 종료하고 API-025를 재조회한다. `items=[]`는 데이터 없음만 의미하며 진행·실패는 API-025와 API-015로 판단한다. |
 | API-027 | 404 | `NOT_FOUND` | 세션 없음·비소유 또는 삭제된 자기소개서의 세션 | API-025를 재조회한다. |
-| API-027 | 409 | `CONFLICT` | 세션이 `ACTIVE`가 아니거나 자기소개서가 `REVIEWED`가 아님 | API-025를 재조회하고 가능한 동작만 활성화한다. |
+| API-027 | 409 | `CONFLICT` | 세션이 `ACTIVE`가 아니거나 `latestReviewedVersionId`가 없어 성공한 첨삭 버전이 없음 | API-025를 재조회하고 가능한 동작만 활성화한다. |
 | API-027 | 409 | `LLM_JOB_ALREADY_RUNNING` | 추가 질문 생성 외 다른 AI Job이 진행 중 | 다른 AI 작업이 진행 중임을 안내하고 자동 재시도하지 않는다. |
 | API-028 | - | `API별 오류 없음` | Deprecated되어 호출하지 않는 API | API-026의 `threadId`를 사용한다. `DEPRECATED`는 실제 HTTP 오류 코드가 아니다. |
 | API-029 | 404 | `NOT_FOUND` | thread 없음·비소유 또는 삭제된 자기소개서에 연결됨 | 대화 화면을 종료하고 API-025를 재조회한다. `jobId`가 있으면 API-016에 연결하고, 연결 실패 시 API-015를 polling한다. |

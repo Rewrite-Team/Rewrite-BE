@@ -1,7 +1,7 @@
 package com.daon.rewrite.coverletter.entity;
 
 public enum CoverLetterStatus {
-    DRAFT,
+    WRITING,
     REVIEWING,
     REVIEWED,
     REVIEW_FAILED

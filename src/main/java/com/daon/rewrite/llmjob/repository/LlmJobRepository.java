@@ -3,6 +3,8 @@ package com.daon.rewrite.llmjob.repository;
 import com.daon.rewrite.llmjob.entity.LlmJob;
 import com.daon.rewrite.llmjob.entity.LlmJobStatus;
 import com.daon.rewrite.llmjob.entity.LlmJobTargetType;
+import com.daon.rewrite.llmjob.entity.LlmJobType;
+import com.daon.rewrite.llmjob.entity.LlmJobRequestRefType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -15,10 +17,45 @@ import java.util.Optional;
 
 public interface LlmJobRepository extends JpaRepository<LlmJob, String> {
 
-    Optional<LlmJob> findFirstByTargetTypeAndTargetIdAndStatusInOrderByCreatedAtDesc(
+    interface JobTarget {
+        String getTargetId();
+
+        LlmJobTargetType getTargetType();
+    }
+
+    @Query("select job.targetId as targetId, job.targetType as targetType from LlmJob job where job.id = :id")
+    Optional<JobTarget> findTargetById(@Param("id") String id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    Optional<LlmJob> findFirstByTargetTypeAndTargetIdAndStatusInOrderByCreatedAtDescIdDesc(
             LlmJobTargetType targetType,
             String targetId,
             Collection<LlmJobStatus> statuses
+    );
+
+    Optional<LlmJob> findFirstByTargetTypeAndTargetIdAndTypeInAndStatusInOrderByCreatedAtDescIdDesc(
+            LlmJobTargetType targetType,
+            String targetId,
+            Collection<LlmJobType> types,
+            Collection<LlmJobStatus> statuses
+    );
+
+    Optional<LlmJob> findFirstByTargetTypeAndTargetIdAndTypeOrderByCreatedAtDescIdDesc(
+            LlmJobTargetType targetType,
+            String targetId,
+            LlmJobType type
+    );
+
+    Optional<LlmJob> findFirstByTargetTypeAndTargetIdAndTypeInOrderByCreatedAtDescIdDesc(
+            LlmJobTargetType targetType,
+            String targetId,
+            Collection<LlmJobType> types
+    );
+
+    Optional<LlmJob> findFirstByTypeAndRequestRefTypeAndRequestRefIdOrderByCreatedAtDescIdDesc(
+            LlmJobType type,
+            LlmJobRequestRefType requestRefType,
+            String requestRefId
     );
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

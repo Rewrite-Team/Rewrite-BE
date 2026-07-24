@@ -403,9 +403,9 @@ PRD가 이미 `v0.1` 형태의 버전 표시를 예시로 제시한다. 따라�
 최초 첨삭 성공: CoverLetter.status=REVIEWED, ReviewVersion(v0.1) 생성
 최초 첨삭 실패: CoverLetter.status=REVIEW_FAILED, LlmJob.status=FAILED
 
-재첨삭 진행: CoverLetter.status=REVIEWED 유지, LlmJob.status=PENDING|PROCESSING
-재첨삭 성공: CoverLetter.status=REVIEWED 유지, 새 ReviewVersion(v0.n) 생성
-재첨삭 실패: CoverLetter.status=REVIEWED 유지, LlmJob.status=FAILED
+재첨삭 진행: CoverLetter.status=REVIEWING, LlmJob.status=PENDING|PROCESSING
+재첨삭 성공: CoverLetter.status=REVIEWED, 새 ReviewVersion(v0.n) 생성
+재첨삭 실패: CoverLetter.status=REVIEW_FAILED, 기존 최신 ReviewVersion 유지, LlmJob.status=FAILED
 ```
 
 `ReviewVersion`은 성공한 첨삭 결과만 저장하므로 별도의 `status` 필드를 갖지 않는다. 진행 중, 실패, 취소 상태는 `LlmJob.status`로만 표현한다.

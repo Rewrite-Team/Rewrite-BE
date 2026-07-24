@@ -3,7 +3,6 @@ package com.daon.rewrite.keywordanalysis.service;
 import com.daon.rewrite.auth.CurrentUser;
 import com.daon.rewrite.auth.CurrentUserProvider;
 import com.daon.rewrite.coverletter.entity.CoverLetter;
-import com.daon.rewrite.coverletter.entity.CoverLetterStatus;
 import com.daon.rewrite.coverletter.repository.CoverLetterRepository;
 import com.daon.rewrite.global.exception.BusinessException;
 import com.daon.rewrite.global.exception.ErrorCode;
@@ -16,8 +15,10 @@ import com.daon.rewrite.keywordanalysis.repository.KeywordAnalysisRepository;
 import com.daon.rewrite.llmjob.entity.LlmJob;
 import com.daon.rewrite.llmjob.entity.LlmJobStatus;
 import com.daon.rewrite.llmjob.entity.LlmJobTargetType;
+import com.daon.rewrite.llmjob.entity.LlmJobType;
 import com.daon.rewrite.llmjob.repository.LlmJobRepository;
 import com.daon.rewrite.llmjob.service.LlmJobCreatedEvent;
+import com.daon.rewrite.llmjob.service.LlmJobService;
 import com.daon.rewrite.reviewversion.repository.ReviewVersionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -34,40 +35,39 @@ public class KeywordAnalysisService {
 
     private static final String KEYWORD_ANALYSIS_ID_PREFIX = "ka";
     private static final String LLM_JOB_ID_PREFIX = "job";
-    private static final List<LlmJobStatus> RUNNING_JOB_STATUSES = List.of(
-            LlmJobStatus.PENDING,
-            LlmJobStatus.PROCESSING
-    );
 
     private final CurrentUserProvider currentUserProvider;
     private final CoverLetterRepository coverLetterRepository;
-    private final ReviewVersionRepository reviewVersionRepository;
     private final KeywordAnalysisRepository keywordAnalysisRepository;
     private final KeywordAnalysisKeywordRepository keywordAnalysisKeywordRepository;
+    private final ReviewVersionRepository reviewVersionRepository;
     private final LlmJobRepository llmJobRepository;
+    private final LlmJobService llmJobService;
     private final IdGenerator idGenerator;
     private final Clock clock;
     private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
-    public StartKeywordAnalysisResult startMyKeywordAnalysis(
-            String coverLetterId,
-            String sourceReviewVersionId
-    ) {
+    public StartKeywordAnalysisResult startMyKeywordAnalysis(String coverLetterId) {
         CurrentUser currentUser = currentUserProvider.currentUser();
         CoverLetter coverLetter = coverLetterRepository
                 .findActiveByIdAndOwnerIdForUpdate(coverLetterId, currentUser.id())
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
 
-        if (coverLetter.getStatus() != CoverLetterStatus.REVIEWED
-                || coverLetter.getLatestReviewVersionId() == null) {
+        if (coverLetter.getLatestReviewedVersionId() == null) {
             throw new BusinessException(ErrorCode.CONFLICT);
         }
-        if (findRunningJob(coverLetter.getId()) != null) {
+        LlmJob runningJob = llmJobService.findRunningCoverLetterJob(coverLetter.getId());
+        if (runningJob != null && runningJob.getType() == LlmJobType.KEYWORD_ANALYSIS) {
+            KeywordAnalysis keywordAnalysis = keywordAnalysisRepository.findByCoverLetterId(coverLetter.getId())
+                    .orElseThrow(() -> new BusinessException(ErrorCode.INTERNAL_ERROR));
+            return new StartKeywordAnalysisResult(keywordAnalysis, runningJob);
+        }
+        if (runningJob != null) {
             throw new BusinessException(ErrorCode.LLM_JOB_ALREADY_RUNNING);
         }
 
-        String selectedSourceReviewVersionId = selectSourceReviewVersionId(coverLetter, sourceReviewVersionId);
+        String selectedSourceReviewVersionId = coverLetter.getLatestReviewedVersionId();
         Instant now = Instant.now(clock);
         KeywordAnalysis keywordAnalysis = keywordAnalysisRepository.findByCoverLetterId(coverLetter.getId())
                 .map(existing -> {
@@ -100,10 +100,23 @@ public class KeywordAnalysisService {
 
         return keywordAnalysisRepository.findByCoverLetterId(coverLetter.getId())
                 .map(keywordAnalysis -> {
+                    var sourceReviewVersion = reviewVersionRepository
+                            .findByIdAndCoverLetterId(
+                                    keywordAnalysis.getSourceReviewVersionId(),
+                                    coverLetter.getId()
+                            )
+                            .orElseThrow(() -> new BusinessException(ErrorCode.INTERNAL_ERROR));
+                    LlmJob job = findLatestKeywordAnalysisJob(coverLetter.getId());
                     List<KeywordAnalysisKeyword> keywords = findCompletedKeywords(keywordAnalysis);
-                    return LatestKeywordAnalysisResult.of(coverLetter.getId(), keywordAnalysis, keywords);
+                    return LatestKeywordAnalysisResult.of(
+                            coverLetter,
+                            sourceReviewVersion,
+                            keywordAnalysis,
+                            job,
+                            keywords
+                    );
                 })
-                .orElseGet(() -> LatestKeywordAnalysisResult.empty(coverLetter.getId()));
+                .orElseGet(() -> LatestKeywordAnalysisResult.empty(coverLetter));
     }
 
     private List<KeywordAnalysisKeyword> findCompletedKeywords(KeywordAnalysis keywordAnalysis) {
@@ -114,32 +127,19 @@ public class KeywordAnalysisService {
                 .findByKeywordAnalysisIdOrderByKeywordOrderAsc(keywordAnalysis.getId());
     }
 
-    private String selectSourceReviewVersionId(CoverLetter coverLetter, String sourceReviewVersionId) {
-        String normalizedSourceReviewVersionId = normalize(sourceReviewVersionId);
-        String selectedSourceReviewVersionId = normalizedSourceReviewVersionId == null
-                ? coverLetter.getLatestReviewVersionId()
-                : normalizedSourceReviewVersionId;
-        reviewVersionRepository
-                .findByIdAndCoverLetterId(selectedSourceReviewVersionId, coverLetter.getId())
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
-        return selectedSourceReviewVersionId;
-    }
-
-    private LlmJob findRunningJob(String coverLetterId) {
-        return llmJobRepository
-                .findFirstByTargetTypeAndTargetIdAndStatusInOrderByCreatedAtDesc(
+    private LlmJob findLatestKeywordAnalysisJob(String coverLetterId) {
+        LlmJob job = llmJobRepository
+                .findFirstByTargetTypeAndTargetIdAndTypeOrderByCreatedAtDescIdDesc(
                         LlmJobTargetType.COVER_LETTER,
                         coverLetterId,
-                        RUNNING_JOB_STATUSES
+                        LlmJobType.KEYWORD_ANALYSIS
                 )
                 .orElse(null);
-    }
-
-    private String normalize(String value) {
-        if (value == null) {
+        if (job == null || job.getStatus() == LlmJobStatus.COMPLETED
+                || job.getStatus() == LlmJobStatus.CANCELED) {
             return null;
         }
-        String normalized = value.strip();
-        return normalized.isEmpty() ? null : normalized;
+        return job;
     }
+
 }

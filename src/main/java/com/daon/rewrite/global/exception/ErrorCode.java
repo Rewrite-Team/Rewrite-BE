@@ -26,9 +26,9 @@ public enum ErrorCode {
             "요청이 현재 리소스 상태와 충돌합니다."
     ),
 
-    COVER_LETTER_NOT_DRAFT(
+    COVER_LETTER_NOT_WRITING(
             HttpStatus.CONFLICT,
-            "COVER_LETTER_NOT_DRAFT",
+            "COVER_LETTER_NOT_WRITING",
             "제출된 자기소개서의 원본 정보는 수정할 수 없습니다."
     ),
 

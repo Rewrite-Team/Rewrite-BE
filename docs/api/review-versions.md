@@ -10,7 +10,7 @@ GET /cover-letters/{coverLetterId}/review-versions
 
 첨삭 버전 목록에는 성공적으로 생성된 `ReviewVersion`만 포함한다. 진행 중이거나 실패한 첨삭 시도는 목록에 포함하지 않는다.
 
-응답의 `isLatest`는 저장 필드가 아니라 `ReviewVersion.id == CoverLetter.latestReviewVersionId` 여부로 계산한 파생 필드다.
+응답의 `isLatest`는 저장 필드가 아니라 `ReviewVersion.id == CoverLetter.latestReviewedVersionId` 여부로 계산한 파생 필드다.
 
 목록은 프론트엔드가 버전 히스토리를 과거부터 최신 순서로 바로 표시할 수 있도록 `createdAt` 오름차순으로 반환한다. 성공한 첨삭 버전이 없으면 `items`는 빈 배열 `[]`이다. 페이지네이션은 제공하지 않는다.
 
@@ -83,7 +83,7 @@ Response:
 
 API-018은 API-012 자기소개서 상세와 동일한 최상위 응답 구조를 사용한다. `coverLetter.displayStatus`는 자기소개서의 현재 표시 상태이고, 선택한 버전의 결과를 `reviewVersion`과 `questions`에 반환한다. 과거 성공 버전에는 진행 Job이 없으므로 `reviewJob`은 항상 `null`이다.
 
-응답의 `reviewVersion.isLatest`는 저장 필드가 아니라 `ReviewVersion.id == CoverLetter.latestReviewVersionId` 여부로 계산한 파생 필드다.
+응답의 `reviewVersion.isLatest`는 저장 필드가 아니라 `ReviewVersion.id == CoverLetter.latestReviewedVersionId` 여부로 계산한 파생 필드다.
 
 ### AI 첨삭 다시받기
 
@@ -103,7 +103,6 @@ Validation:
 
 ```text
 requestInstruction: 선택·nullable, trim 후 Unicode code point 기준 최대 1000자
-자기소개서 상태는 REVIEWED여야 한다.
 최신 성공 ReviewVersion이 존재해야 한다.
 ```
 
@@ -118,7 +117,7 @@ Response:
 }
 ```
 
-재첨삭 진행 중에도 내부 `CoverLetter.status`는 `REVIEWED`를 유지하지만 프론트엔드 표시 상태는 `displayStatus=REVIEWING`이다. 클라이언트는 `jobId`로 API-016에 연결한다.
+재첨삭 Job을 생성하면 `CoverLetter.status`를 `REVIEWING`으로 갱신한다. 클라이언트는 `jobId`로 API-016에 연결한다.
 
 동일한 자기소개서의 재첨삭 Job이 이미 `PENDING` 또는 `PROCESSING`이면 새 Job을 만들지 않고 기존 Job의 같은 성공 응답을 반환한다. 중복 요청의 `requestInstruction`은 기존 Job에 반영하지 않는다. 키워드 분석이나 면접처럼 다른 종류의 LLM Job이 진행 중이면 `LLM_JOB_ALREADY_RUNNING`을 반환한다.
 
@@ -141,7 +140,7 @@ Conflict Response:
 }
 ```
 
-자기소개서가 `REVIEWED`가 아니거나 최신 성공 버전이 없으면 `CONFLICT`를 반환한다. 존재하지 않거나 다른 사용자 소유이거나 삭제된 자기소개서는 `NOT_FOUND`, `requestInstruction`이 1000자를 초과하면 `VALIDATION_ERROR`와 `details`를 반환한다.
+최신 성공 버전이 없으면 `CONFLICT`를 반환한다. 존재하지 않거나 다른 사용자 소유이거나 삭제된 자기소개서는 `NOT_FOUND`, `requestInstruction`이 1000자를 초과하면 `VALIDATION_ERROR`와 `details`를 반환한다.
 
 ### 최종 작성본 일괄 저장
 
@@ -219,7 +218,7 @@ COMMON의 인증·CSRF·서버 오류 처리를 기본으로 적용하고, 아�
 | API-019 | 409 | `REVIEW_VERSION_NOT_LATEST` | 열린 버전이 더 이상 최신 버전이 아님 | 자동 재전송하지 않고 API-012 또는 API-018로 최신 데이터를 조회한다. |
 | API-024 | 400 | `VALIDATION_ERROR` | `requestInstruction`이 1000자 초과 | 입력란에 `details[].reason`을 표시한다. |
 | API-024 | 404 | `NOT_FOUND` | 자기소개서 없음·비소유·삭제 | 대상 없음 안내 후 목록으로 이동한다. |
-| API-024 | 409 | `CONFLICT` | 자기소개서가 `REVIEWED`가 아니거나 최신 성공 버전이 없음 | API-012를 재조회해 현재 상태 화면으로 전환한다. |
+| API-024 | 409 | `CONFLICT` | 최신 성공 버전이 없음 | API-012를 재조회해 현재 상태 화면으로 전환한다. |
 | API-024 | 409 | `LLM_JOB_ALREADY_RUNNING` | 재첨삭 외 다른 AI Job이 진행 중 | 다른 AI 작업이 진행 중임을 안내하고 요청을 중단한다. 오류 응답에 기존 `jobId`가 없으므로 Job 복구를 가정하지 않는다. |
 
 동일한 재첨삭 Job에 대한 중복 요청은 오류가 아니라 기존 `jobId`를 담은 `200 OK`다.

@@ -28,7 +28,6 @@ Response:
 Validation:
 
 ```text
-coverLetter.status는 REVIEWED여야 한다.
 최신 성공 ReviewVersion이 존재해야 한다.
 분석 결과 keywords는 최대 20개다.
 keywords[].importance는 1~100 범위의 정수다.
@@ -68,6 +67,8 @@ GET /cover-letters/{coverLetterId}/keyword-analysis/latest
 `status`는 `NOT_STARTED`, `PROCESSING`, `COMPLETED`, `FAILED` 중 하나다.
 `keywords`는 완료 상태에서만 분석 결과를 담고, 그 외 상태에서는 빈 배열이다.
 `coverLetter`는 모든 상태에서 반환한다. `sourceReviewVersion`은 분석 기준이 확정된 `PROCESSING`, `COMPLETED`, `FAILED`에서 반환하고, 분석 전 `NOT_STARTED`에서는 `null`이다. 화면에 필요하지 않은 첨삭 버전 생성 시각은 반환하지 않는다.
+
+`coverLetter.title`, `companyName`, `positionTitle`은 등록 중인 자기소개서를 직접 조회하면 `null`일 수 있다. 첨삭이 완료되어 키워드 분석을 시작할 수 있는 상태에서는 모두 non-null이다.
 
 `jobId`는 `PROCESSING`에서 현재 실행 중인 Job ID, `FAILED`에서 가장 최근 실패한 Job ID를 반환한다. `NOT_STARTED`, `COMPLETED`에서는 `null`이다.
 
@@ -166,7 +167,7 @@ COMMON의 인증·CSRF·서버 오류 처리를 기본으로 적용하고, AI �
 | API | HTTP 상태 | 오류 코드 | 발생 조건 | 프론트엔드 처리 |
 |---|---:|---|---|---|
 | API-020 | 404 | `NOT_FOUND` | 자기소개서 없음·비소유·삭제 | 대상 없음 안내 후 목록으로 이동한다. |
-| API-020 | 409 | `CONFLICT` | 자기소개서가 `REVIEWED`가 아니거나 성공한 첨삭 버전이 없음 | API-012를 재조회해 현재 상태 화면으로 전환한다. |
+| API-020 | 409 | `CONFLICT` | 성공한 첨삭 버전이 없음 | API-012를 재조회해 현재 상태 화면으로 전환한다. |
 | API-020 | 409 | `LLM_JOB_ALREADY_RUNNING` | 키워드 분석 외 다른 AI Job이 진행 중 | 다른 AI 작업이 진행 중임을 안내하고 자동 재시도하지 않는다. 오류 응답에 기존 `jobId`가 없으므로 복구를 가정하지 않는다. |
 | API-021 | 404 | `NOT_FOUND` | 자기소개서 없음·비소유·삭제 | 대상 없음 안내 후 목록으로 이동한다. |
 

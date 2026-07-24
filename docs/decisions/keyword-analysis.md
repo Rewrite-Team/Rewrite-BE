@@ -164,7 +164,7 @@ PRD는 키워드 분석을 히스토리 기능이 아니라 현재 자기소개�
 
 키워드 분석 결과가 이미 있으면 키워드 분석 결과 화면에 `AI 키워드 재분석` 버튼을 노출한다.
 
-사용자가 `AI 키워드 재분석`을 실행하면 새 `KeywordAnalysis` 리소스를 만들지 않고 기존 `KeywordAnalysis`를 `PROCESSING`으로 전환한 뒤, 가장 최근 첨삭 버전인 `CoverLetter.latestReviewVersionId`를 기준으로 다시 분석한다. 분석 성공 시 기존 `keywords`, `sourceReviewVersionId`, `completedAt`을 최신 결과로 갱신한다.
+사용자가 `AI 키워드 재분석`을 실행하면 새 `KeywordAnalysis` 리소스를 만들지 않고 기존 `KeywordAnalysis`를 `PROCESSING`으로 전환한 뒤, 가장 최근 첨삭 버전인 `CoverLetter.latestReviewedVersionId`를 기준으로 다시 분석한다. 분석 성공 시 기존 `keywords`, `sourceReviewVersionId`, `completedAt`을 최신 결과로 갱신한다.
 
 API도 같은 정책을 따른다. 현재 유효한 키워드 분석 결과가 있는 자기소개서에 `POST /cover-letters/{coverLetterId}/keyword-analysis`를 호출하면 같은 `keywordAnalysisId`를 재사용해 새 LLM Job을 시작한다.
 

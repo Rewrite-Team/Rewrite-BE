@@ -5,5 +5,9 @@ public enum LlmJobStatus {
     PROCESSING,
     COMPLETED,
     FAILED,
-    CANCELED
+    CANCELED;
+
+    public boolean isTerminal() {
+        return this == COMPLETED || this == FAILED || this == CANCELED;
+    }
 }

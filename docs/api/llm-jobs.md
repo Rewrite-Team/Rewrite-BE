@@ -73,7 +73,7 @@ Job ID는 path와 중복되므로 응답하지 않는다. Job type, target, 내�
 GET /llm-jobs/{jobId}/stream
 ```
 
-아직 구현되지 않았다. API-016은 최초 첨삭·재첨삭, 키워드 분석, 초기·추가 면접 질문 생성, 면접 답변 피드백 Job의 상태를 전달하는 공통 SSE API다. 이벤트는 공통 상태 `job.state`, 첨삭 문항 `review.questions`, 면접 피드백 `interview.feedback.delta` 세 종류만 사용한다.
+API-016은 최초 첨삭·재첨삭, 키워드 분석, 초기·추가 면접 질문 생성, 면접 답변 피드백 Job의 상태를 전달하는 공통 SSE API다. 이벤트는 공통 상태 `job.state`, 첨삭 문항 `review.questions`, 면접 피드백 `interview.feedback.delta` 세 종류만 사용한다.
 
 클라이언트는 시작 API가 반환한 `jobId`로 연결한다. 연결 직후 서버는 모든 Job에 현재 상태를 담은 `job.state`를 먼저 전송한다. 첨삭 Job이면 이미 임시 저장된 완료 문항 결과를 `review.questions`로 이어서 전송한다. Job의 상태 또는 진행률이 바뀔 때마다 같은 `job.state` 구조를 다시 전송한다. 이 순서로 상세 조회와 SSE 연결 사이에 발생한 상태 변경과 완료 문항을 누락하지 않는다. Job이 최종 실패해도 `review.questions`와 API-012는 성공한 완료 문항 결과를 반환한다.
 

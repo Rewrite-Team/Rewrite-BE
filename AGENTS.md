@@ -4,9 +4,9 @@
 - 팀 작업용 저장소이므로 기존 문서, GitHub 템플릿, 테스트 기준을 우선한다.
 - 문서 라우팅은 `docs/README.md`를 먼저 확인한다.
 - 개발 진행 상태와 다음 작업은 `docs/status.md`를 기준으로 확인한다.
-- 주요 제품/기능 요구사항은 `docs/requirements.md`를 기준으로 확인한다.
-- API 계약과 구현 상태는 `docs/api/README.md`와 관련 도메인별 API 문서를 기준으로 확인한다.
-- API와 persistence 설계 결정 및 트레이드오프는 `docs/decisions/README.md`와 관련 결정 문서를 참고한다.
+- 모든 제품 동작, 기능 흐름, API 계약과 관련 결정사항의 최종 기준은 Notion `Rewrite API (자동 동기화)` 문서다.
+- `docs/requirements.md`, `docs/api/`, `docs/decisions/`는 Notion API 계약을 구현하고 설명하는 저장소 내 문서로 사용한다.
+- Notion에 기록하지 않는 내부 architecture, persistence, transaction, worker 결정은 Notion API 계약을 변경하지 않는 범위에서 가장 단순한 구조를 선택한다.
 
 ## Default workflow
 
@@ -15,7 +15,8 @@
 - issue, PR, commit, branch, push, 진행 현황 보고처럼 Codex 작업 절차와 관련된 요청은 `docs/codex-workflow.md`를 먼저 확인한다.
 - 기존 패턴을 우선하고, 불필요한 새 추상화나 범위 밖 리팩터링은 피한다.
 - 기능, 기획, API, 설계 결정, 아키텍처, 테스트 기준을 변경하면 `docs/README.md`의 Change Impact Matrix에 따라 관련 문서를 함께 갱신한다.
-- 문서와 코드가 충돌하면 충돌 내용을 사용자에게 알리고, 어느 쪽을 기준으로 할지 확인한다.
+- Notion API 문서와 저장소 문서 또는 코드가 충돌하면 Notion을 기준으로 저장소 문서와 코드를 정정한다.
+- 요구사항을 충족하려면 Notion API 계약 변경이 필요하거나 Notion 내용이 모호·누락된 경우에는 임의로 결정하거나 Notion을 수정하지 않고, 필요한 변경안과 영향을 사용자에게 먼저 설명해 승인을 받는다.
 
 ## Codex engineering principles
 
@@ -46,10 +47,11 @@
 ## API documentation rules
 
 - API와 관련된 설계, 구현, 수정, 리뷰 또는 문서화 작업을 시작할 때마다 코드나 저장소 문서를 변경하기 전에 관련 `API ID`의 Notion `Rewrite API (자동 동기화)` 페이지를 먼저 조회한다. 새 API는 사용할 `API ID`로 기존 페이지 존재 여부를 먼저 확인한다. Notion 페이지를 조회할 수 없으면 작업을 진행하지 않고 사용자에게 알린다.
+- Notion `Rewrite API (자동 동기화)`의 path, request, response, error, validation, 상태, 화면 흐름, polling, SSE 계약을 모든 API 관련 결정과 구현의 최종 기준으로 사용한다.
 - API를 추가하거나 변경하면 `docs/api/README.md`와 `docs/api/` 하위 관련 도메인 문서를 갱신한다.
-- Git 저장소의 Markdown 문서와 실제 코드는 API 계약과 구현 상태의 기준 원본이다.
-- API를 추가, 삭제하거나 path, request, response, error, validation, 상태 또는 구현 여부를 변경하면 같은 작업에서 Notion `Rewrite API (자동 동기화)` 데이터베이스도 갱신한다.
-- Notion은 프론트엔드 개발자가 보는 동기화 문서이며, `API ID`를 고유 키로 사용한다. Notion에서 직접 수정한 내용은 저장소로 역동기화하지 않는다.
+- Git 저장소의 Markdown 문서와 실제 코드는 Notion API 계약에 맞춰 유지하며, 충돌 시 Notion을 기준으로 동기화한다.
+- API를 추가, 삭제하거나 path, request, response, error, validation, 상태 또는 구현 여부를 변경하려면 Notion 변경 필요성과 변경안 전체를 먼저 사용자에게 알리고 승인받은 뒤 Notion, 저장소 문서와 코드를 함께 갱신한다.
+- Notion은 `API ID`를 고유 키로 사용하며, Notion에서 변경된 계약은 저장소 문서와 코드에 반영한다.
 - Notion 페이지에는 프론트엔드 구현에 영향을 주는 호출 방법, 요청·응답, validation, 오류 처리, 화면 상태·polling·SSE·redirect·Cookie·CSRF만 기록한다. 내부 Service, Repository, Entity, DB, transaction, worker 구조는 기록하지 않는다.
 - Notion의 Request와 Success Response에는 필드 경로, 타입, 필수 여부, nullable 조건과 설명을 표로 기록한다. 배열 내부 필드는 `items[].id`처럼 펼친다.
 - Notion의 Error Handling은 HTTP 상태, 오류 코드, 발생 조건과 프론트엔드 처리 방법을 표로 기록한다.
@@ -82,7 +84,7 @@
 
 ## OpenAPI / Swagger management
 
-- 현재 프로젝트의 API 계약 기준은 `docs/api/README.md`와 `docs/api/` 하위 도메인 문서다.
+- 현재 프로젝트의 API 계약 기준은 Notion `Rewrite API (자동 동기화)`이며, `docs/api/README.md`와 `docs/api/` 하위 도메인 문서는 저장소 내 동기화 문서다.
 - Swagger/OpenAPI는 실제 구현된 controller/DTO 기준의 확인 문서로만 사용한다.
 - 명세 우선 방식으로 server stub을 생성하지 않는다. 코드 우선 생성과 Markdown 계약 문서를 병행한다.
 - OpenAPI annotation을 추가하는 경우 controller 동작, DTO, 에러 응답과 일치해야 한다.

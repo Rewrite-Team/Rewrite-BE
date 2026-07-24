@@ -27,10 +27,13 @@ public class InterviewMessageController {
     @PostMapping("/interview-threads/{threadId}/messages")
     public SendInterviewMessageResponse sendInterviewMessage(
             @PathVariable String threadId,
-            @RequestBody SendInterviewMessageRequest request
+            @RequestBody(required = false) SendInterviewMessageRequest request
     ) {
         return SendInterviewMessageResponse.from(
-                interviewMessageService.sendMyInterviewMessage(threadId, request.content())
+                interviewMessageService.sendMyInterviewMessage(
+                        threadId,
+                        request == null ? null : request.content()
+                )
         );
     }
 }

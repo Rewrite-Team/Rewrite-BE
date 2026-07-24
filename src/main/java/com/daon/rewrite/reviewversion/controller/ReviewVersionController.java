@@ -1,11 +1,12 @@
 package com.daon.rewrite.reviewversion.controller;
 
-import com.daon.rewrite.reviewversion.dto.ReviewVersionDetailResponse;
+import com.daon.rewrite.coverletter.dto.CoverLetterDetailResponse;
+import com.daon.rewrite.coverletter.service.CoverLetterDetailQueryService;
+import com.daon.rewrite.global.response.SuccessResponse;
 import com.daon.rewrite.reviewversion.dto.ReviewVersionListResponse;
 import com.daon.rewrite.reviewversion.dto.RequestReReviewRequest;
 import com.daon.rewrite.reviewversion.dto.RequestReReviewResponse;
 import com.daon.rewrite.reviewversion.dto.SaveFinalAnswersRequest;
-import com.daon.rewrite.reviewversion.dto.SaveFinalAnswersResponse;
 import com.daon.rewrite.reviewversion.service.ReviewVersionCommandService;
 import com.daon.rewrite.reviewversion.service.ReviewVersionQueryService;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +23,7 @@ public class ReviewVersionController {
 
     private final ReviewVersionQueryService reviewVersionQueryService;
     private final ReviewVersionCommandService reviewVersionCommandService;
+    private final CoverLetterDetailQueryService coverLetterDetailQueryService;
 
     @GetMapping("/cover-letters/{coverLetterId}/review-versions")
     public ReviewVersionListResponse findReviewVersions(@PathVariable String coverLetterId) {
@@ -44,27 +46,24 @@ public class ReviewVersionController {
     }
 
     @GetMapping("/cover-letters/{coverLetterId}/review-versions/{versionId}")
-    public ReviewVersionDetailResponse findReviewVersion(
+    public CoverLetterDetailResponse findReviewVersion(
             @PathVariable String coverLetterId,
             @PathVariable String versionId
     ) {
-        return ReviewVersionDetailResponse.from(
-                reviewVersionQueryService.findMyReviewVersion(coverLetterId, versionId)
-        );
+        return CoverLetterDetailResponse.from(coverLetterDetailQueryService.findVersion(coverLetterId, versionId));
     }
 
     @PutMapping("/cover-letters/{coverLetterId}/review-versions/{versionId}/final-answers")
-    public SaveFinalAnswersResponse saveFinalAnswers(
+    public SuccessResponse saveFinalAnswers(
             @PathVariable String coverLetterId,
             @PathVariable String versionId,
             @RequestBody SaveFinalAnswersRequest request
     ) {
-        return SaveFinalAnswersResponse.from(
-                reviewVersionCommandService.saveMyFinalAnswers(
-                        coverLetterId,
-                        versionId,
-                        request == null ? null : request.toInputs()
-                )
+        reviewVersionCommandService.saveMyFinalAnswers(
+                coverLetterId,
+                versionId,
+                request == null ? null : request.toInputs()
         );
+        return SuccessResponse.completed();
     }
 }

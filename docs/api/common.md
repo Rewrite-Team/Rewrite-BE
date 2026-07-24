@@ -23,17 +23,17 @@ LLM 작업 요청 API는 즉시 `jobId`를 반환한다. API-016을 지원하는
 자기소개서 상태는 다음 값을 사용한다.
 
 ```text
-DRAFT
+WRITING
 REVIEWING
 REVIEWED
 REVIEW_FAILED
 ```
 
-첨삭 실패 시 상태 전이는 최초 첨삭과 재첨삭을 구분한다.
+첨삭 실패 시 최초 첨삭과 재첨삭 모두 자기소개서 상태를 갱신한다.
 
 ```text
 최초 첨삭 실패: REVIEWING -> REVIEW_FAILED
-재첨삭 실패: REVIEWED 유지, 실패한 LLM Job만 FAILED
+재첨삭 실패: REVIEWING -> REVIEW_FAILED, 기존 latestReviewedVersionId 유지
 ```
 
 ### 문항별 첨삭 결과
@@ -196,7 +196,7 @@ API 응답 DTO로 변환할 때는 `ZoneId.of("Asia/Seoul")` 기준으로 변환
 | 404 Not Found | `NOT_FOUND` | 리소스 없음·비소유·삭제 | 대상이 없거나 접근할 수 없음을 안내하고 해당 도메인의 이전 화면으로 이동한다. |
 | 409 Conflict | `CONFLICT` | 요청 시점의 리소스 상태가 작업 조건과 맞지 않음 | API별로 명시된 현재 상태 조회를 수행하고 가능한 화면으로 전환한다. |
 | 409 Conflict | `LLM_JOB_ALREADY_RUNNING` | 같은 자기소개서에서 다른 종류의 AI Job이 진행 중 | 다른 AI 작업이 진행 중임을 안내하고 새 요청을 중단한다. 오류 응답에 `jobId`가 없으면 기존 Job 복구를 가정하지 않는다. |
-| 409 Conflict | `COVER_LETTER_NOT_DRAFT` | DRAFT가 아닌 자기소개서에 임시저장을 요청함 | 자동저장을 중단하고 상세를 재조회해 읽기 전용 또는 현재 상태 화면으로 전환한다. |
+| 409 Conflict | `COVER_LETTER_NOT_WRITING` | WRITING가 아닌 자기소개서에 임시저장을 요청함 | 자동저장을 중단하고 상세를 재조회해 읽기 전용 또는 현재 상태 화면으로 전환한다. |
 | 409 Conflict | `REVIEW_VERSION_NOT_LATEST` | 최신 버전이 아닌 첨삭 버전에 최종 답변 저장을 요청함 | 자동 재전송하지 않고 최신 버전과 상세를 다시 조회한다. |
 | 500 Internal Server Error | `INTERNAL_ERROR` | 예상하지 못한 서버 오류 | 공통 일시 오류를 표시하며 상태 변경 요청을 자동 재전송하지 않는다. |
 
@@ -269,7 +269,7 @@ finalAnswer
   "updatedAt": "2026-06-20T14:30:00",
   "submittedAt": "2026-06-20T14:10:00",
   "deletedAt": null,
-  "latestReviewVersionId": "rv_01HZ..."
+  "latestReviewedVersionId": "rv_01HZ..."
 }
 ```
 
@@ -310,13 +310,13 @@ MVP에서는 삭제된 자기소개서 목록 조회 API와 사용자-facing 복
 제약:
 
 ```text
-DRAFT 임시저장: question, maxAnswerLength, originalAnswer는 nullable
+WRITING 임시저장: question, maxAnswerLength, originalAnswer는 nullable
 제출 시 question: trim 후 Unicode code point 기준 1~300자
 제출 시 maxAnswerLength: 100~5000
 제출 시 originalAnswer: trim 후 Unicode code point 기준 1~5000자
 ```
 
-서버는 `question`과 `originalAnswer`의 앞뒤 공백을 제거한다. DRAFT 저장에서는 누락·`null`·trim 후 빈 문자열을 `null`로 저장하고, 값이 있으면 최대 길이와 숫자 범위를 검증한다. API-014 제출 시에는 모든 필드의 필수값과 최소 길이·범위를 최종 검증한다.
+서버는 `question`과 `originalAnswer`의 앞뒤 공백을 제거한다. WRITING 저장에서는 누락·`null`·trim 후 빈 문자열을 `null`로 저장하고, 값이 있으면 최대 길이와 숫자 범위를 검증한다. API-014 제출 시에는 모든 필드의 필수값과 최소 길이·범위를 최종 검증한다.
 
 ### ReviewVersion
 
@@ -324,7 +324,7 @@ DRAFT 임시저장: question, maxAnswerLength, originalAnswer는 nullable
 
 `ReviewVersion`은 성공한 첨삭 결과에 대해서만 생성되는 완료 스냅샷이다. LLM Job 진행 중이거나 실패한 첨삭 시도는 `ReviewVersion`으로 저장하지 않고 `LlmJob`과 `CoverLetter.status`로 표현한다.
 
-최신 첨삭 버전의 저장 기준은 `CoverLetter.latestReviewVersionId`다. `ReviewVersion`은 `isLatest`를 저장 필드로 갖지 않는다.
+최신 첨삭 버전의 저장 기준은 `CoverLetter.latestReviewedVersionId`다. `ReviewVersion`은 `isLatest`를 저장 필드로 갖지 않는다.
 
 성공한 첨삭 결과만 `ReviewVersion`으로 저장하므로 `ReviewVersion`은 별도의 `status` 필드를 갖지 않는다.
 

@@ -9,14 +9,17 @@ import com.daon.rewrite.global.exception.ErrorCode;
 import com.daon.rewrite.global.response.ErrorResponse;
 import com.daon.rewrite.global.util.IdGenerator;
 import com.daon.rewrite.interview.entity.InterviewMessage;
+import com.daon.rewrite.interview.entity.InterviewMessageRole;
 import com.daon.rewrite.interview.entity.InterviewThread;
 import com.daon.rewrite.interview.repository.InterviewMessageRepository;
 import com.daon.rewrite.interview.repository.InterviewThreadRepository;
 import com.daon.rewrite.llmjob.entity.LlmJob;
 import com.daon.rewrite.llmjob.entity.LlmJobStatus;
-import com.daon.rewrite.llmjob.entity.LlmJobTargetType;
+import com.daon.rewrite.llmjob.entity.LlmJobRequestRefType;
+import com.daon.rewrite.llmjob.entity.LlmJobType;
 import com.daon.rewrite.llmjob.repository.LlmJobRepository;
 import com.daon.rewrite.llmjob.service.LlmJobCreatedEvent;
+import com.daon.rewrite.llmjob.service.LlmJobService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -33,16 +36,13 @@ public class InterviewMessageService {
     private static final String INTERVIEW_MESSAGE_ID_PREFIX = "im";
     private static final String LLM_JOB_ID_PREFIX = "job";
     private static final int MAX_CONTENT_LENGTH = 2000;
-    private static final List<LlmJobStatus> RUNNING_JOB_STATUSES = List.of(
-            LlmJobStatus.PENDING,
-            LlmJobStatus.PROCESSING
-    );
 
     private final CurrentUserProvider currentUserProvider;
     private final CoverLetterRepository coverLetterRepository;
     private final InterviewThreadRepository interviewThreadRepository;
     private final InterviewMessageRepository interviewMessageRepository;
     private final LlmJobRepository llmJobRepository;
+    private final LlmJobService llmJobService;
     private final IdGenerator idGenerator;
     private final Clock clock;
     private final ApplicationEventPublisher eventPublisher;
@@ -61,8 +61,16 @@ public class InterviewMessageService {
                 .stream()
                 .map(this::toItemResult)
                 .toList();
+        String latestUserMessageId = interviewMessageRepository
+                .findFirstByThreadIdAndRoleOrderByCreatedAtDescIdDesc(
+                        thread.getId(),
+                        InterviewMessageRole.USER
+                )
+                .map(InterviewMessage::getId)
+                .orElse(null);
+        LlmJob job = findLatestFeedbackJob(latestUserMessageId);
 
-        return new InterviewMessageListResult(thread.getId(), items);
+        return new InterviewMessageListResult(job == null ? null : job.getId(), items);
     }
 
     @Transactional
@@ -77,7 +85,7 @@ public class InterviewMessageService {
         CoverLetter coverLetter = coverLetterRepository
                 .findActiveByIdAndOwnerIdForUpdate(coverLetterId, currentUser.id())
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
-        if (hasRunningJob(coverLetter.getId())) {
+        if (llmJobService.findRunningCoverLetterJob(coverLetter.getId()) != null) {
             throw new BusinessException(ErrorCode.LLM_JOB_ALREADY_RUNNING);
         }
 
@@ -113,14 +121,22 @@ public class InterviewMessageService {
         );
     }
 
-    private boolean hasRunningJob(String coverLetterId) {
-        return llmJobRepository
-                .findFirstByTargetTypeAndTargetIdAndStatusInOrderByCreatedAtDesc(
-                        LlmJobTargetType.COVER_LETTER,
-                        coverLetterId,
-                        RUNNING_JOB_STATUSES
+    private LlmJob findLatestFeedbackJob(String userMessageId) {
+        if (userMessageId == null) {
+            return null;
+        }
+        LlmJob job = llmJobRepository
+                .findFirstByTypeAndRequestRefTypeAndRequestRefIdOrderByCreatedAtDescIdDesc(
+                        LlmJobType.INTERVIEW_MESSAGE_FEEDBACK,
+                        LlmJobRequestRefType.INTERVIEW_MESSAGE,
+                        userMessageId
                 )
-                .isPresent();
+                .orElse(null);
+        if (job == null || job.getStatus() == LlmJobStatus.COMPLETED
+                || job.getStatus() == LlmJobStatus.CANCELED) {
+            return null;
+        }
+        return job;
     }
 
     private String validateAndNormalizeContent(String content) {

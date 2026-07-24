@@ -54,7 +54,7 @@ API 계약: `../api/README.md`
 | Decision 029 | 키워드 분석 결과 화면에서 재분석을 제공한다 | `keyword-analysis.md` | REQ-009 | API-020 - API-021 | Active |
 | Decision 030 | 면접 답변은 최대 2000자로 제한한다 | `interviews.md` | REQ-010 | API-022 - API-023, API-025 - API-029 | Active |
 | Decision 031 | 면접 꼬리질문은 피드백과 같은 assistant 메시지에 저장한다 | `interviews.md` | REQ-010 | API-022 - API-023, API-025 - API-029 | Active |
-| Decision 032 | 최초 첨삭 실패만 CoverLetter.status를 REVIEW_FAILED로 변경한다 | `cover-letters.md` | REQ-003, REQ-004, REQ-005 | API-007 - API-014 | Active |
+| Decision 032 | 최초 첨삭 실패만 CoverLetter.status를 REVIEW_FAILED로 변경한다 | `cover-letters.md` | REQ-003, REQ-004, REQ-005 | API-007 - API-014 | Superseded by Decision 077 |
 | Decision 033 | 키워드 분석과 면접 세션은 Job 실패 시 FAILED 상태로 저장한다 | `llm-jobs.md` | REQ-005, REQ-009, REQ-010 | API-015 - API-016, LLM 시작 API | Active |
 | Decision 034 | FAILED 키워드 분석과 면접 세션은 같은 리소스로 재시도한다 | `llm-jobs.md` | REQ-005, REQ-009, REQ-010 | API-015 - API-016, LLM 시작 API | Active |
 | Decision 035 | 공고 링크는 URL 형식만 검증한다 | `cover-letters.md` | REQ-003, REQ-004, REQ-005 | API-007 - API-014 | Active |
@@ -118,7 +118,7 @@ API 계약: `../api/README.md`
 | Decision 093 | 추가 면접 질문 생성은 Job ID만 반환하고 현재 세션 조회로 복구한다 | `interviews.md` | REQ-010 | API-016, API-025 - API-027 | Active |
 | Decision 094 | 면접 메시지 조회는 표시 문장과 점수만 공개하고 피드백 Job을 복구한다 | `interviews.md` | REQ-010 | API-016, API-023, API-029 | Active |
 | Decision 095 | 사용자 답변 전송은 메시지 ID와 Job ID만 반환한다 | `interviews.md` | REQ-010 | API-016, API-023 | Active |
-| Decision 096 | 등록 단계 API는 미완성 DRAFT를 임시저장하고 제출 시 필수값을 검증한다 | `cover-letters.md` | REQ-004, REQ-005 | API-009 - API-012, API-014 | Active |
+| Decision 096 | 등록 단계 API는 미완성 WRITING를 임시저장하고 제출 시 필수값을 검증한다 | `cover-letters.md` | REQ-004, REQ-005 | API-009 - API-012, API-014 | Active |
 | Decision 097 | 프론트엔드 오류 계약은 공통 복구와 화면별 최소 도메인 오류로 구분한다 | `common.md` | REQ-001, REQ-003 - REQ-010 | COMMON, API-001 - API-030 | Active |
 | Decision 098 | 면접 피드백은 검증된 전체 문장을 분할해 점진 전송한다 | `interviews.md` | REQ-010 | API-016, API-023, API-029 | Active |
 | Decision 099 | 면접 질문 목록은 최신 질문 우선 cursor 무한 스크롤로 조회한다 | `interviews.md` | REQ-010 | API-026 | Active |

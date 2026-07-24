@@ -57,9 +57,8 @@ public class CoverLetter {
     private Instant deletedAt;
 
     @Column(name = "latest_review_version_id", length = 64)
-    private String latestReviewVersionId;
+    private String latestReviewedVersionId;
 
-    // 초안 생성에 필요한 필수 컬럼만 채움
     private CoverLetter(String id, String ownerId, CoverLetterStatus status, Instant createdAt) {
         this.id = id;
         this.ownerId = ownerId;
@@ -68,8 +67,8 @@ public class CoverLetter {
         this.updatedAt = createdAt;
     }
 
-    public static CoverLetter draft(String id, String ownerId, Instant now) {
-        return new CoverLetter(id, ownerId, CoverLetterStatus.DRAFT, now);
+    public static CoverLetter create(String id, String ownerId, Instant now) {
+        return new CoverLetter(id, ownerId, CoverLetterStatus.WRITING, now);
     }
 
     public void fillBasicInfo(String title, String companyName, String positionTitle, String jobPostingUrl, Instant now) {
@@ -104,16 +103,12 @@ public class CoverLetter {
 
     public void completeReview(String reviewVersionId, Instant now) {
         this.status = CoverLetterStatus.REVIEWED;
-        this.latestReviewVersionId = reviewVersionId;
+        this.latestReviewedVersionId = reviewVersionId;
         this.updatedAt = now;
     }
 
     public void failReview(Instant now) {
         this.status = CoverLetterStatus.REVIEW_FAILED;
         this.updatedAt = now;
-    }
-
-    public void setLatestReviewVersionId(String latestReviewVersionId) {
-        this.latestReviewVersionId = latestReviewVersionId;
     }
 }

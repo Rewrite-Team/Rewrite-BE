@@ -12,7 +12,11 @@ public record CoverLetterListResponse(
         long totalItems,
         int totalPages
 ) {
-    public static CoverLetterListResponse from(Page<CoverLetter> pageResult, int requestedPage, int requestedSize) {
+    public static CoverLetterListResponse from(
+            Page<CoverLetter> pageResult,
+            int requestedPage,
+            int requestedSize
+    ) {
         return new CoverLetterListResponse(
                 pageResult.getContent()
                         .stream()

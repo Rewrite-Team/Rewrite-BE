@@ -12,11 +12,10 @@ import com.daon.rewrite.global.exception.ErrorCode;
 import com.daon.rewrite.global.response.ErrorResponse;
 import com.daon.rewrite.global.util.IdGenerator;
 import com.daon.rewrite.llmjob.entity.LlmJob;
-import com.daon.rewrite.llmjob.entity.LlmJobStatus;
-import com.daon.rewrite.llmjob.entity.LlmJobTargetType;
 import com.daon.rewrite.llmjob.entity.LlmJobType;
 import com.daon.rewrite.llmjob.repository.LlmJobRepository;
 import com.daon.rewrite.llmjob.service.LlmJobCreatedEvent;
+import com.daon.rewrite.llmjob.service.LlmJobService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
@@ -50,33 +49,29 @@ public class CoverLetterService {
     private static final int MAX_MAX_ANSWER_LENGTH = 5000;
     private static final int MAX_ORIGINAL_ANSWER_LENGTH = 5000;
     private static final String LLM_JOB_ID_PREFIX = "job";
-    private static final List<LlmJobStatus> RUNNING_JOB_STATUSES = List.of(
-            LlmJobStatus.PENDING,
-            LlmJobStatus.PROCESSING
-    );
-
     private final CurrentUserProvider currentUserProvider;
     private final CoverLetterRepository coverLetterRepository;
     private final CoverLetterQuestionRepository coverLetterQuestionRepository;
     private final LlmJobRepository llmJobRepository;
+    private final LlmJobService llmJobService;
     private final IdGenerator idGenerator;
     private final Clock clock;
     private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
-    public CoverLetter createDraft() {
+    public CoverLetter create() {
         CurrentUser currentUser = currentUserProvider.currentUser();
-        CoverLetter draft = CoverLetter.draft(
+        CoverLetter coverLetter = CoverLetter.create(
                 idGenerator.generate(COVER_LETTER_ID_PREFIX),
                 currentUser.id(),
                 Instant.now(clock)
         );
 
-        return coverLetterRepository.save(draft);
+        return coverLetterRepository.save(coverLetter);
     }
 
     @Transactional(readOnly = true)
-    public Page<CoverLetter> findMyCoverLetters(int page, int size, CoverLetterStatus status) {
+    public Page<CoverLetter> findMyCoverLetters(int page, int size) {
         validateListQuery(page, size);
 
         CurrentUser currentUser = currentUserProvider.currentUser();
@@ -86,30 +81,29 @@ public class CoverLetterService {
                 Sort.by(Sort.Direction.DESC, "createdAt")
         );
 
-        if (status == null) {
-            return coverLetterRepository.findByOwnerIdAndDeletedAtIsNull(currentUser.id(), pageable);
-        }
-
-        return coverLetterRepository.findByOwnerIdAndStatusAndDeletedAtIsNull(
+        return coverLetterRepository.findByOwnerIdAndDeletedAtIsNull(
                 currentUser.id(),
-                status,
                 pageable
         );
     }
 
     @Transactional
-    public CoverLetter deleteMyCoverLetter(String coverLetterId) {
+    public void deleteMyCoverLetter(String coverLetterId) {
         CurrentUser currentUser = currentUserProvider.currentUser();
         CoverLetter coverLetter = coverLetterRepository
-                .findByIdAndOwnerIdAndDeletedAtIsNull(coverLetterId, currentUser.id())
+                .findActiveByIdAndOwnerIdForUpdate(coverLetterId, currentUser.id())
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
 
-        coverLetter.markDeleted(Instant.now(clock));
-        return coverLetter;
+        Instant now = Instant.now(clock);
+        LlmJob runningJob = llmJobService.findRunningCoverLetterJob(coverLetter.getId());
+        if (runningJob != null) {
+            runningJob.cancel(now);
+        }
+        coverLetter.markDeleted(now);
     }
 
     @Transactional
-    public CoverLetter saveBasicInfo(
+    public void saveBasicInfo(
             String coverLetterId,
             String title,
             String companyName,
@@ -118,11 +112,11 @@ public class CoverLetterService {
     ) {
         CurrentUser currentUser = currentUserProvider.currentUser();
         CoverLetter coverLetter = coverLetterRepository
-                .findByIdAndOwnerIdAndDeletedAtIsNull(coverLetterId, currentUser.id())
+                .findActiveByIdAndOwnerIdForUpdate(coverLetterId, currentUser.id())
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
 
-        if (coverLetter.getStatus() != CoverLetterStatus.DRAFT) {
-            throw new BusinessException(ErrorCode.COVER_LETTER_NOT_DRAFT);
+        if (coverLetter.getStatus() != CoverLetterStatus.WRITING) {
+            throw new BusinessException(ErrorCode.COVER_LETTER_NOT_WRITING);
         }
 
         BasicInfoInput input = validateAndNormalizeBasicInfo(
@@ -139,35 +133,33 @@ public class CoverLetterService {
                 Instant.now(clock)
         );
 
-        return coverLetter;
     }
 
     @Transactional
-    public CoverLetter savePreferences(String coverLetterId, String preferences) {
+    public void savePreferences(String coverLetterId, String preferences) {
         CurrentUser currentUser = currentUserProvider.currentUser();
         CoverLetter coverLetter = coverLetterRepository
-                .findByIdAndOwnerIdAndDeletedAtIsNull(coverLetterId, currentUser.id())
+                .findActiveByIdAndOwnerIdForUpdate(coverLetterId, currentUser.id())
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
 
-        if (coverLetter.getStatus() != CoverLetterStatus.DRAFT) {
-            throw new BusinessException(ErrorCode.COVER_LETTER_NOT_DRAFT);
+        if (coverLetter.getStatus() != CoverLetterStatus.WRITING) {
+            throw new BusinessException(ErrorCode.COVER_LETTER_NOT_WRITING);
         }
 
         String normalizedPreferences = validateAndNormalizePreferences(preferences);
         coverLetter.fillPreferences(normalizedPreferences, Instant.now(clock));
 
-        return coverLetter;
     }
 
     @Transactional
-    public SaveQuestionsResult saveQuestions(String coverLetterId, List<SaveQuestionInput> questions) {
+    public void saveQuestions(String coverLetterId, List<SaveQuestionInput> questions) {
         CurrentUser currentUser = currentUserProvider.currentUser();
         CoverLetter coverLetter = coverLetterRepository
-                .findByIdAndOwnerIdAndDeletedAtIsNull(coverLetterId, currentUser.id())
+                .findActiveByIdAndOwnerIdForUpdate(coverLetterId, currentUser.id())
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
 
-        if (coverLetter.getStatus() != CoverLetterStatus.DRAFT) {
-            throw new BusinessException(ErrorCode.COVER_LETTER_NOT_DRAFT);
+        if (coverLetter.getStatus() != CoverLetterStatus.WRITING) {
+            throw new BusinessException(ErrorCode.COVER_LETTER_NOT_WRITING);
         }
 
         List<NormalizedQuestionInput> normalizedQuestions = validateAndNormalizeQuestions(questions);
@@ -189,7 +181,6 @@ public class CoverLetterService {
         savedQuestions = coverLetterQuestionRepository.saveAll(savedQuestions);
 
         coverLetter.touch(Instant.now(clock));
-        return new SaveQuestionsResult(coverLetter, savedQuestions);
     }
 
     @Transactional
@@ -199,27 +190,22 @@ public class CoverLetterService {
                 .findActiveByIdAndOwnerIdForUpdate(coverLetterId, currentUser.id())
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
 
-        // 이미 최초 AI 첨삭이 완료된 자소서에 submit 이 다시 호출된다면 새로운 첨삭 job 생성 없이 coverLetter 반환
-        if (coverLetter.getStatus() == CoverLetterStatus.REVIEWED) {
-            if (coverLetter.getLatestReviewVersionId() == null) {
-                throw new BusinessException(ErrorCode.INTERNAL_ERROR);
+        LlmJob runningJob = llmJobService.findRunningCoverLetterJob(coverLetter.getId());
+        if (runningJob != null) {
+            if (coverLetter.getStatus() == CoverLetterStatus.REVIEWING
+                    && runningJob.getType() == LlmJobType.COVER_LETTER_REVIEW) {
+                return new SubmitCoverLetterResult(coverLetter, runningJob);
+            }
+            throw new BusinessException(ErrorCode.LLM_JOB_ALREADY_RUNNING);
+        }
+        if (coverLetter.getLatestReviewedVersionId() != null) {
+            if (coverLetter.getStatus() != CoverLetterStatus.REVIEWED) {
+                throw new BusinessException(ErrorCode.CONFLICT);
             }
             return new SubmitCoverLetterResult(coverLetter, null);
         }
-
-        LlmJob runningJob = findRunningJob(coverLetter.getId());
-        // 최소첨삭 진행 중인 자소서가 있는 경우
         if (coverLetter.getStatus() == CoverLetterStatus.REVIEWING) {
-            // 실제 진행중인 COVER_LETTER_REVIEW Job이 없는것은 모순, 예외처리
-            if (runningJob == null || runningJob.getType() != LlmJobType.COVER_LETTER_REVIEW) {
-                throw new BusinessException(ErrorCode.INTERNAL_ERROR);
-            }
-            // 기존 첨삭중인 job 반환
-            return new SubmitCoverLetterResult(coverLetter, runningJob);
-        }
-        // 자소서 status 가 REVIEWING 이 아닌데 첨삭 진행중인 job 이 있는것은 모순, 추가 job 생성 방지
-        if (runningJob != null) {
-            throw new BusinessException(ErrorCode.LLM_JOB_ALREADY_RUNNING);
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR);
         }
 
         List<CoverLetterQuestion> questions = coverLetterQuestionRepository
@@ -237,16 +223,6 @@ public class CoverLetterService {
         eventPublisher.publishEvent(new LlmJobCreatedEvent(job.getId()));
 
         return new SubmitCoverLetterResult(coverLetter, job);
-    }
-
-    private LlmJob findRunningJob(String coverLetterId) {
-        return llmJobRepository
-                .findFirstByTargetTypeAndTargetIdAndStatusInOrderByCreatedAtDesc(
-                        LlmJobTargetType.COVER_LETTER,
-                        coverLetterId,
-                        RUNNING_JOB_STATUSES
-                )
-                .orElse(null);
     }
 
     private void validateSubmit(CoverLetter coverLetter, List<CoverLetterQuestion> questions) {
@@ -270,7 +246,8 @@ public class CoverLetterService {
                         "질문을 입력해야 합니다.",
                         details
                 );
-                if (question.getMaxAnswerLength() < MIN_MAX_ANSWER_LENGTH
+                if (question.getMaxAnswerLength() == null
+                        || question.getMaxAnswerLength() < MIN_MAX_ANSWER_LENGTH
                         || question.getMaxAnswerLength() > MAX_MAX_ANSWER_LENGTH) {
                     details.add(new ErrorResponse.ErrorDetail(
                             "questions[" + index + "].maxAnswerLength",
@@ -315,27 +292,24 @@ public class CoverLetterService {
             String jobPostingUrl
     ) {
         List<ErrorResponse.ErrorDetail> details = new ArrayList<>();
-        String normalizedTitle = normalizeRequiredText(
+        String normalizedTitle = normalizeOptionalText(
                 "title",
                 title,
                 MAX_TITLE_LENGTH,
-                "자기소개서 제목은 필수입니다.",
                 "자기소개서 제목은 최대 50자까지 입력할 수 있습니다.",
                 details
         );
-        String normalizedCompanyName = normalizeRequiredText(
+        String normalizedCompanyName = normalizeOptionalText(
                 "companyName",
                 companyName,
                 MAX_COMPANY_NAME_LENGTH,
-                "회사명은 필수입니다.",
                 "회사명은 최대 30자까지 입력할 수 있습니다.",
                 details
         );
-        String normalizedPositionTitle = normalizeRequiredText(
+        String normalizedPositionTitle = normalizeOptionalText(
                 "positionTitle",
                 positionTitle,
                 MAX_POSITION_TITLE_LENGTH,
-                "직무명은 필수입니다.",
                 "직무명은 최대 30자까지 입력할 수 있습니다.",
                 details
         );
@@ -353,20 +327,15 @@ public class CoverLetterService {
         );
     }
 
-    private String normalizeRequiredText(
+    private String normalizeOptionalText(
             String field,
             String value,
             int maxLength,
-            String blankMessage,
             String tooLongMessage,
             List<ErrorResponse.ErrorDetail> details
     ) {
         String normalized = normalize(value);
-        if (normalized == null || normalized.isEmpty()) {
-            details.add(new ErrorResponse.ErrorDetail(field, blankMessage));
-            return normalized;
-        }
-        if (countCodePoints(normalized) > maxLength) {
+        if (normalized != null && countCodePoints(normalized) > maxLength) {
             details.add(new ErrorResponse.ErrorDetail(field, tooLongMessage));
         }
         return normalized;
@@ -374,11 +343,10 @@ public class CoverLetterService {
 
     private String validateAndNormalizePreferences(String preferences) {
         List<ErrorResponse.ErrorDetail> details = new ArrayList<>();
-        String normalizedPreferences = normalizeRequiredText(
+        String normalizedPreferences = normalizeOptionalText(
                 "preferences",
                 preferences,
                 MAX_PREFERENCES_LENGTH,
-                "채용 우대사항은 필수입니다.",
                 "채용 우대사항은 최대 3000자까지 입력할 수 있습니다.",
                 details
         );
@@ -392,12 +360,8 @@ public class CoverLetterService {
 
     private List<NormalizedQuestionInput> validateAndNormalizeQuestions(List<SaveQuestionInput> questions) {
         List<ErrorResponse.ErrorDetail> details = new ArrayList<>();
-        if (questions == null || questions.isEmpty()) {
-            details.add(new ErrorResponse.ErrorDetail(
-                    "questions",
-                    "질문과 답변을 1개 이상 입력해야 합니다."
-            ));
-            throw new BusinessException(ErrorCode.VALIDATION_ERROR, details);
+        if (questions == null) {
+            return List.of();
         }
 
         List<NormalizedQuestionInput> normalizedQuestions = new ArrayList<>();
@@ -411,20 +375,18 @@ public class CoverLetterService {
                 continue;
             }
 
-            String normalizedQuestion = normalizeRequiredText(
+            String normalizedQuestion = normalizeOptionalText(
                     "questions[" + index + "].question",
                     question.question(),
                     MAX_QUESTION_LENGTH,
-                    "질문을 입력해야 합니다.",
                     "질문은 최대 300자까지 입력할 수 있습니다.",
                     details
             );
             validateMaxAnswerLength(index, question.maxAnswerLength(), details);
-            String normalizedOriginalAnswer = normalizeRequiredText(
+            String normalizedOriginalAnswer = normalizeOptionalText(
                     "questions[" + index + "].originalAnswer",
                     question.originalAnswer(),
                     MAX_ORIGINAL_ANSWER_LENGTH,
-                    "답변을 입력해야 합니다.",
                     "답변은 최대 5000자까지 입력할 수 있습니다.",
                     details
             );
@@ -448,9 +410,9 @@ public class CoverLetterService {
             Integer maxAnswerLength,
             List<ErrorResponse.ErrorDetail> details
     ) {
-        if (maxAnswerLength == null
-                || maxAnswerLength < MIN_MAX_ANSWER_LENGTH
-                || maxAnswerLength > MAX_MAX_ANSWER_LENGTH) {
+        if (maxAnswerLength != null
+                && (maxAnswerLength < MIN_MAX_ANSWER_LENGTH
+                || maxAnswerLength > MAX_MAX_ANSWER_LENGTH)) {
             details.add(new ErrorResponse.ErrorDetail(
                     "questions[" + index + "].maxAnswerLength",
                     "최대 답변 글자 수는 100자 이상 5000자 이하여야 합니다."
@@ -485,7 +447,8 @@ public class CoverLetterService {
         if (value == null) {
             return null;
         }
-        return value.strip();
+        String normalized = value.strip();
+        return normalized.isEmpty() ? null : normalized;
     }
 
     private int countCodePoints(String value) {
