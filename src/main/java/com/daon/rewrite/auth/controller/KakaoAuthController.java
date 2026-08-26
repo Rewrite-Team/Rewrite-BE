@@ -1,6 +1,7 @@
 package com.daon.rewrite.auth.controller;
 
 import com.daon.rewrite.auth.config.AuthProperties;
+import com.daon.rewrite.auth.config.AuthCookieFactory;
 import com.daon.rewrite.auth.service.AuthTokenPair;
 import com.daon.rewrite.auth.service.KakaoAuthorizeResult;
 import com.daon.rewrite.auth.service.KakaoLoginResult;
@@ -66,8 +67,8 @@ public class KakaoAuthController {
     private ResponseEntity<Void> success(AuthTokenPair tokens) {
         return ResponseEntity.status(HttpStatus.FOUND)
                 .location(URI.create(properties.frontendSuccessUrl()))
-                .header(HttpHeaders.SET_COOKIE, accessTokenCookie(tokens.accessToken()).toString())
-                .header(HttpHeaders.SET_COOKIE, refreshTokenCookie(tokens.refreshToken()).toString())
+                .header(HttpHeaders.SET_COOKIE, AuthCookieFactory.accessToken(tokens.accessToken()).toString())
+                .header(HttpHeaders.SET_COOKIE, AuthCookieFactory.refreshToken(tokens.refreshToken()).toString())
                 .header(HttpHeaders.SET_COOKIE, clearOauthNonceCookie().toString())
                 .build();
     }
@@ -87,16 +88,8 @@ public class KakaoAuthController {
                 .toUri();
     }
 
-    private static ResponseCookie accessTokenCookie(String value) {
-        return authCookie("access_token", value, "/", 1800);    // access_token 30분 유지
-    }
-
-    private static ResponseCookie refreshTokenCookie(String value) {
-        return authCookie("refresh_token", value, "/auth", 1209600);       // refresh_token 14일 유지
-    }
-
     private static ResponseCookie oauthNonceCookie(String value, long maxAge) {
-        return authCookie(OAUTH_NONCE_COOKIE, value, "/auth/kakao", maxAge); // nonce 는 /auth/kakao 에만 필요
+        return AuthCookieFactory.cookie(OAUTH_NONCE_COOKIE, value, "/auth/kakao", maxAge); // nonce 는 /auth/kakao 에만 필요
     }
 
     // 카카오 로그인 검증에 사용한 일회성 Nonce 쿠키를 삭제
@@ -104,13 +97,4 @@ public class KakaoAuthController {
         return oauthNonceCookie("", 0);
     }
 
-    private static ResponseCookie authCookie(String name, String value, String path, long maxAge) {
-        return ResponseCookie.from(name, value)
-                .httpOnly(true)
-                .secure(true)
-                .sameSite("Lax")
-                .path(path)
-                .maxAge(maxAge)
-                .build();
-    }
 }
