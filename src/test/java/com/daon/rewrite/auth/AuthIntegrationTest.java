@@ -451,6 +451,137 @@ class AuthIntegrationTest {
     }
 
     @Test
+    void logoutRevokesRefreshTokenAndClearsAuthCookiesWithoutValidAccessToken() throws Exception {
+        AuthTokenPair loginTokens = loginPersistenceService.login(
+                new KakaoUser("kakao-logout", "로그아웃 사용자", null)
+        );
+        String csrfToken = csrfTokenService.issue();
+
+        var result = mockMvc.perform(post("/auth/logout")
+                        .cookie(
+                                new Cookie("access_token", "invalid.jwt.token"),
+                                new Cookie("refresh_token", loginTokens.refreshToken())
+                        )
+                        .header("X-CSRF-Token", csrfToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andReturn();
+
+        assertThat(result.getResponse().getHeaders(HttpHeaders.SET_COOKIE))
+                .anyMatch(value -> hasCookieAttributes(
+                        value, "access_token=;", "Path=/", "Max-Age=0"))
+                .anyMatch(value -> hasCookieAttributes(
+                        value, "refresh_token=;", "Path=/auth", "Max-Age=0"));
+
+        RefreshToken loggedOutToken = refreshTokenRepository.findById(
+                authTokenService.hashRefreshToken(loginTokens.refreshToken())
+        ).orElseThrow();
+        assertThat(loggedOutToken.getRevokedAt()).isNotNull();
+
+        mockMvc.perform(post("/auth/refresh")
+                        .cookie(new Cookie("refresh_token", loginTokens.refreshToken()))
+                        .header("X-CSRF-Token", csrfToken))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
+    }
+
+    @Test
+    void logoutIsIdempotentWithoutUsableAuthCookies() throws Exception {
+        User user = userRepository.save(User.create(
+                "user_logout_idempotent",
+                AuthProvider.KAKAO,
+                "kakao-logout-idempotent",
+                "멱등 사용자",
+                null,
+                Instant.now()
+        ));
+        String expiredRefreshToken = authTokenService.issueRefreshToken();
+        refreshTokenRepository.save(RefreshToken.create(
+                authTokenService.hashRefreshToken(expiredRefreshToken),
+                user,
+                Instant.now().minusSeconds(120),
+                Instant.now().minusSeconds(60)
+        ));
+        AuthTokenPair repeatedLogoutTokens = loginPersistenceService.login(
+                new KakaoUser("kakao-logout-repeat", "반복 사용자", null)
+        );
+        String csrfToken = csrfTokenService.issue();
+
+        Instant now = Instant.now();
+        String expiredAccessToken = encodeToken(
+                "rewrite",
+                List.of("rewrite-web"),
+                "access",
+                now.minusSeconds(600),
+                now.minusSeconds(300)
+        );
+        for (Cookie accessCookie : List.of(
+                new Cookie("access_token", "invalid.jwt.token"),
+                new Cookie("access_token", expiredAccessToken)
+        )) {
+            assertSuccessfulLogout(null, accessCookie, csrfToken);
+        }
+
+        assertSuccessfulLogout("unknown-refresh-token", null, csrfToken);
+        assertSuccessfulLogout(expiredRefreshToken, null, csrfToken);
+        assertSuccessfulLogout(repeatedLogoutTokens.refreshToken(), null, csrfToken);
+        assertSuccessfulLogout(repeatedLogoutTokens.refreshToken(), null, csrfToken);
+
+        RefreshToken expired = refreshTokenRepository.findById(
+                authTokenService.hashRefreshToken(expiredRefreshToken)
+        ).orElseThrow();
+        RefreshToken repeatedlyLoggedOut = refreshTokenRepository.findById(
+                authTokenService.hashRefreshToken(repeatedLogoutTokens.refreshToken())
+        ).orElseThrow();
+        assertThat(expired.getRevokedAt()).isNull();
+        assertThat(repeatedlyLoggedOut.getRevokedAt()).isNotNull();
+    }
+
+    @Test
+    void logoutRequiresCsrfTokenBeforeRevokingRefreshToken() throws Exception {
+        AuthTokenPair loginTokens = loginPersistenceService.login(
+                new KakaoUser("kakao-logout-csrf", "로그아웃 CSRF 사용자", null)
+        );
+
+        mockMvc.perform(post("/auth/logout")
+                        .cookie(new Cookie("refresh_token", loginTokens.refreshToken())))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("CSRF_TOKEN_INVALID"))
+                .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE));
+
+        RefreshToken token = refreshTokenRepository.findById(
+                authTokenService.hashRefreshToken(loginTokens.refreshToken())
+        ).orElseThrow();
+        assertThat(token.getRevokedAt()).isNull();
+    }
+
+    @Test
+    void concurrentLogoutRequestsAreBothSuccessfulAndRevokeTokenOnce() throws Exception {
+        AuthTokenPair loginTokens = loginPersistenceService.login(
+                new KakaoUser("kakao-logout-concurrent", "동시 로그아웃 사용자", null)
+        );
+        String csrfToken = csrfTokenService.issue();
+        CountDownLatch start = new CountDownLatch(1);
+
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            Future<Integer> first = executor.submit(() -> logoutStatusAfter(
+                    start, loginTokens.refreshToken(), csrfToken
+            ));
+            Future<Integer> second = executor.submit(() -> logoutStatusAfter(
+                    start, loginTokens.refreshToken(), csrfToken
+            ));
+
+            start.countDown();
+            assertThat(List.of(first.get(), second.get())).containsOnly(200);
+        }
+
+        RefreshToken token = refreshTokenRepository.findById(
+                authTokenService.hashRefreshToken(loginTokens.refreshToken())
+        ).orElseThrow();
+        assertThat(token.getRevokedAt()).isNotNull();
+    }
+
+    @Test
     void unauthenticatedStateChangingRequestReturnsUnauthorizedBeforeCsrfError() throws Exception {
         Instant now = Instant.now();
         String expiredAccessToken = encodeToken(
@@ -528,6 +659,38 @@ class AuthIntegrationTest {
             throws Exception {
         start.await();
         return mockMvc.perform(post("/auth/refresh")
+                        .cookie(new Cookie("refresh_token", refreshToken))
+                        .header("X-CSRF-Token", csrfToken))
+                .andReturn()
+                .getResponse()
+                .getStatus();
+    }
+
+    private void assertSuccessfulLogout(String refreshToken, Cookie accessCookie, String csrfToken)
+            throws Exception {
+        var request = post("/auth/logout").header("X-CSRF-Token", csrfToken);
+        if (accessCookie != null) {
+            request.cookie(accessCookie);
+        }
+        if (refreshToken != null) {
+            request.cookie(new Cookie("refresh_token", refreshToken));
+        }
+
+        var result = mockMvc.perform(request)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andReturn();
+        assertThat(result.getResponse().getHeaders(HttpHeaders.SET_COOKIE))
+                .anyMatch(value -> hasCookieAttributes(
+                        value, "access_token=;", "Path=/", "Max-Age=0"))
+                .anyMatch(value -> hasCookieAttributes(
+                        value, "refresh_token=;", "Path=/auth", "Max-Age=0"));
+    }
+
+    private int logoutStatusAfter(CountDownLatch start, String refreshToken, String csrfToken)
+            throws Exception {
+        start.await();
+        return mockMvc.perform(post("/auth/logout")
                         .cookie(new Cookie("refresh_token", refreshToken))
                         .header("X-CSRF-Token", csrfToken))
                 .andReturn()

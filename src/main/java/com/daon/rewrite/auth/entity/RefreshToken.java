@@ -54,7 +54,7 @@ public class RefreshToken {
         return new RefreshToken(tokenHash, user, createdAt, expiresAt);
     }
 
-    public boolean canRotate(Instant now) {
+    public boolean isActive(Instant now) {
         return revokedAt == null && expiresAt.isAfter(now);
     }
 
