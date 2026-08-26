@@ -30,3 +30,19 @@ spring:
         options:
           model: gpt-5-nano  # GPT-5 models do not support temperature parameter
           temperature: 1 # temperature 미 설정 시 기본값 0.7 이 들어가면서 error 발생. 해당 모델은 temperature: 1 만 가능
+
+rewrite:
+  auth:
+    issuer: rewrite
+    audience: rewrite-web
+    jwt-secret-base64: ${AUTH_JWT_SECRET_BASE64:}
+    frontend-origin: ${FRONTEND_ORIGIN:http://localhost:3000}
+    frontend-success-url: ${FRONTEND_SUCCESS_URL:http://localhost:3000}
+    frontend-login-url: ${FRONTEND_LOGIN_URL:http://localhost:3000/login}
+    kakao:
+      client-id: ${KAKAO_CLIENT_ID:}
+      client-secret: ${KAKAO_CLIENT_SECRET:}
+      redirect-uri: ${KAKAO_REDIRECT_URI:http://localhost:8080/auth/kakao/callback}
+      authorize-uri: https://kauth.kakao.com/oauth/authorize
+      token-uri: https://kauth.kakao.com/oauth/token
+      user-info-uri: https://kapi.kakao.com/v2/user/me

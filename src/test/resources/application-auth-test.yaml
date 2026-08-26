@@ -1,0 +1,38 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:rewrite-auth-test;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    open-in-view: false
+  h2:
+    console:
+      enabled: false
+  ai:
+    retry:
+      max-attempts: 1
+    openai:
+      api-key: test-key
+      chat:
+        options:
+          model: gpt-5-nano
+          temperature: 1
+
+rewrite:
+  auth:
+    issuer: rewrite
+    audience: rewrite-web
+    jwt-secret-base64: MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE=
+    frontend-origin: https://rewrite.example.com
+    frontend-success-url: https://rewrite.example.com
+    frontend-login-url: https://rewrite.example.com/login
+    kakao:
+      client-id: test-client
+      client-secret: test-secret
+      redirect-uri: https://api.rewrite.example.com/auth/kakao/callback
+      authorize-uri: https://kauth.kakao.com/oauth/authorize
+      token-uri: https://kauth.kakao.com/oauth/token
+      user-info-uri: https://kapi.kakao.com/v2/user/me

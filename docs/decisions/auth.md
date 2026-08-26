@@ -65,6 +65,8 @@ Rewrite는 현재 PRD 기준으로 브라우저 기반 웹 제품이다. 웹 서
 
 프론트엔드는 사용자를 백엔드의 로그인 시작 URL로 이동시키고, 백엔드는 카카오 인증 URL로 리다이렉트한다. 카카오 인증 완료 후 카카오는 백엔드 callback URL로 `code`를 전달한다. 백엔드는 code를 access token으로 교환하고, 카카오 사용자 정보를 조회한 뒤 Rewrite 서비스용 인증 cookie를 설정하고 프론트엔드로 리다이렉트한다.
 
+로그인 시작 시 백엔드는 256-bit OAuth `state`와 별도의 256-bit 브라우저 nonce를 생성한다. 원문은 각각 카카오 redirect query와 5분 수명의 `oauth_login_nonce` HttpOnly Cookie로 전달하고, 서버에는 두 값의 해시와 만료 시각만 저장한다. callback은 state와 브라우저 nonce가 모두 일치할 때만 state를 원자적으로 한 번 소비한다. 이를 통해 state URL이 다른 브라우저에서 재생되는 로그인 CSRF를 차단한다.
+
 API 형태:
 
 ```http
@@ -72,11 +74,19 @@ GET /auth/kakao/authorize
 GET /auth/kakao/callback?code=...&state=...
 ```
 
+로그인 시작 응답:
+
+```http
+Set-Cookie: oauth_login_nonce=...; HttpOnly; Secure; SameSite=Lax; Path=/auth/kakao; Max-Age=300
+Location: https://kauth.kakao.com/oauth/authorize?...&state=...
+```
+
 callback 성공 시 응답:
 
 ```http
 Set-Cookie: access_token=...; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=...
 Set-Cookie: refresh_token=...; HttpOnly; Secure; SameSite=Lax; Path=/auth; Max-Age=...
+Set-Cookie: oauth_login_nonce=; HttpOnly; Secure; SameSite=Lax; Path=/auth/kakao; Max-Age=0
 Location: https://rewrite.example.com
 ```
 
