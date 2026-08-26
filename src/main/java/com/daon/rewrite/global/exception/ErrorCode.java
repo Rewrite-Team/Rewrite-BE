@@ -8,6 +8,18 @@ import org.springframework.http.HttpStatus;
 @RequiredArgsConstructor
 public enum ErrorCode {
 
+    UNAUTHORIZED(
+            HttpStatus.UNAUTHORIZED,
+            "UNAUTHORIZED",
+            "인증이 필요합니다."
+    ),
+
+    CSRF_TOKEN_INVALID(
+            HttpStatus.FORBIDDEN,
+            "CSRF_TOKEN_INVALID",
+            "CSRF 토큰이 유효하지 않습니다."
+    ),
+
     NOT_FOUND(
             HttpStatus.NOT_FOUND,
             "NOT_FOUND",

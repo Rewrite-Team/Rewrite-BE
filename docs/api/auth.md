@@ -18,8 +18,11 @@ Response:
 
 ```http
 302 Found
+Set-Cookie: oauth_login_nonce=...; HttpOnly; Secure; SameSite=Lax; Path=/auth/kakao; Max-Age=300
 Location: https://kauth.kakao.com/oauth/authorize?client_id=...&redirect_uri=...&response_type=code&state=...
 ```
+
+`oauth_login_nonce`는 로그인 시작 브라우저와 OAuth `state`를 결합하기 위한 5분 수명의 임시 Cookie다. JavaScript에서 읽지 않으며 callback 성공·취소·실패 시 만료한다.
 
 로그인 시작 처리에 실패하면 JSON 오류를 반환하지 않고 프론트엔드 로그인 화면으로 리다이렉트한다.
 
@@ -34,15 +37,17 @@ Location: https://rewrite.example.com/login?error=KAKAO_LOGIN_FAILED
 
 ```http
 GET /auth/kakao/callback?code={authorizationCode}&state={state}
+Cookie: oauth_login_nonce=...
 ```
 
 사용자가 카카오 로그인 또는 동의를 취소하면 카카오는 다음 형태로 callback을 호출한다.
 
 ```http
 GET /auth/kakao/callback?error=access_denied&error_description=...&state={state}
+Cookie: oauth_login_nonce=...
 ```
 
-`code`와 `error` 중 하나만 전달되어야 하며 `state`는 두 경우 모두 필수다. `error_description`은 선택값이며 프론트엔드에 전달하지 않는다.
+`code`와 `error` 중 하나만 전달되어야 하며 `state`와 `oauth_login_nonce` Cookie는 두 경우 모두 필수다. `error_description`은 선택값이며 프론트엔드에 전달하지 않는다. 백엔드는 state와 nonce를 로그인 시작 시 저장한 해시와 비교하고 5분 TTL 안에서 한 번만 소비한다.
 
 Description:
 
@@ -57,6 +62,7 @@ Success Response:
 302 Found
 Set-Cookie: access_token=...; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=1800
 Set-Cookie: refresh_token=...; HttpOnly; Secure; SameSite=Lax; Path=/auth; Max-Age=1209600
+Set-Cookie: oauth_login_nonce=; HttpOnly; Secure; SameSite=Lax; Path=/auth/kakao; Max-Age=0
 Location: https://rewrite.example.com
 ```
 
@@ -64,6 +70,7 @@ Failure Response:
 
 ```http
 302 Found
+Set-Cookie: oauth_login_nonce=; HttpOnly; Secure; SameSite=Lax; Path=/auth/kakao; Max-Age=0
 Location: https://rewrite.example.com/login?error=KAKAO_LOGIN_FAILED
 ```
 
@@ -71,10 +78,11 @@ Location: https://rewrite.example.com/login?error=KAKAO_LOGIN_FAILED
 
 ```http
 302 Found
+Set-Cookie: oauth_login_nonce=; HttpOnly; Secure; SameSite=Lax; Path=/auth/kakao; Max-Age=0
 Location: https://rewrite.example.com/login?error=KAKAO_LOGIN_CANCELED
 ```
 
-`KAKAO_LOGIN_CANCELED`이면 프론트엔드는 “카카오 로그인이 취소되었습니다.”를 표시한다. state 불일치, authorization code 교환 실패, 카카오 사용자 조회 또는 사용자 저장 실패는 `KAKAO_LOGIN_FAILED`로 처리한다. 두 경우 모두 로그인 버튼을 다시 활성화하고 자동 재시도하지 않는다. 알 수 없는 오류 코드는 일반 로그인 실패로 처리하며, 카카오 `error_description`, state 검증 원인과 백엔드 오류 메시지는 노출하지 않는다.
+`KAKAO_LOGIN_CANCELED`이면 프론트엔드는 “카카오 로그인이 취소되었습니다.”를 표시한다. state·nonce 누락/불일치/만료/재사용, authorization code 교환 실패, 카카오 사용자 조회 또는 사용자 저장 실패는 `KAKAO_LOGIN_FAILED`로 처리한다. 두 경우 모두 로그인 버튼을 다시 활성화하고 자동 재시도하지 않는다. 알 수 없는 오류 코드는 일반 로그인 실패로 처리하며, 카카오 `error_description`, state 검증 원인과 백엔드 오류 메시지는 노출하지 않는다.
 
 ### CSRF 토큰 조회
 

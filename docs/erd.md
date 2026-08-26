@@ -20,6 +20,7 @@ API 계약은 `docs/api/README.md`와 도메인별 API 문서를 기준으로 �
 ```mermaid
 erDiagram
     USERS ||--o{ COVER_LETTERS : owns
+    USERS ||--o{ REFRESH_TOKENS : has
 
     COVER_LETTERS ||--o{ COVER_LETTER_QUESTIONS : has
     COVER_LETTERS ||--o{ REVIEW_VERSIONS : has
@@ -45,10 +46,26 @@ erDiagram
 
     USERS {
         string id PK
+        string provider_user_id
         string nickname
         string profile_image_url
         string provider
         instant created_at
+        instant updated_at
+    }
+
+    REFRESH_TOKENS {
+        string token_hash PK
+        string user_id FK
+        instant created_at
+        instant expires_at
+        instant revoked_at
+    }
+
+    OAUTH_LOGIN_STATES {
+        string state_hash PK
+        string browser_nonce_hash
+        instant expires_at
     }
 
     COVER_LETTERS {
@@ -205,10 +222,34 @@ erDiagram
 | Column | Nullable | Relationship / Policy |
 |---|---:|---|
 | `id` | No | PK. Opaque user id |
+| `provider_user_id` | No | OAuth provider 사용자 식별자. `(provider, provider_user_id)` unique |
 | `nickname` | No | 카카오 프로필 또는 서비스 표시명 |
 | `profile_image_url` | Yes | 프로필 이미지가 없을 수 있음 |
 | `provider` | No | MVP 값은 `KAKAO` |
 | `created_at` | No | 생성 시각 |
+| `updated_at` | No | 프로필 마지막 갱신 시각 |
+
+### refresh_tokens
+
+Rewrite refresh token 저장 테이블이다. 원문은 Cookie로만 전달하고 DB에는 SHA-256 해시만 저장한다.
+
+| Column | Nullable | Relationship / Policy |
+|---|---:|---|
+| `token_hash` | No | PK. refresh token SHA-256 해시 |
+| `user_id` | No | FK to `users.id` |
+| `created_at` | No | 발급 시각 |
+| `expires_at` | No | 발급 후 14일 |
+| `revoked_at` | Yes | 갱신·로그아웃으로 폐기되기 전까지 null |
+
+### oauth_login_states
+
+로그인 CSRF 방지를 위한 단기 OAuth state 저장 테이블이다.
+
+| Column | Nullable | Relationship / Policy |
+|---|---:|---|
+| `state_hash` | No | PK. 카카오 authorization 요청 state의 SHA-256 해시 |
+| `browser_nonce_hash` | No | 로그인 시작 브라우저 nonce의 SHA-256 해시 |
+| `expires_at` | No | 발급 후 5분 |
 
 ### cover_letters
 
