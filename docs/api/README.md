@@ -67,7 +67,7 @@ API 설계 결정과 트레이드오프는 `../decisions/README.md`를 함께 �
 | API-001 | GET | `/auth/kakao/authorize` | Verified | REQ-008 | #94 state·브라우저 nonce 기반 카카오 로그인 시작 구현·검증 |
 | API-002 | GET | `/auth/kakao/callback` | Verified | REQ-008 | #94 callback·사용자 저장·인증 Cookie 발급 구현·검증 |
 | API-003 | GET | `/auth/csrf-token` | Verified | REQ-008 | #94 인증 없는 토큰 발급과 상태 변경 요청의 `CSRF_TOKEN_INVALID` 검증 구현·검증 |
-| API-004 | POST | `/auth/refresh` | Planned | REQ-008 | refresh token rotation |
+| API-004 | POST | `/auth/refresh` | Implemented | REQ-008 | #96 비관적 잠금과 원자적 refresh token rotation, 401 Cookie 만료 구현 |
 | API-005 | GET | `/user/me` | Verified | REQ-008 | #94 실제 access token 기반 내 정보 조회 구현·검증 |
 | API-006 | POST | `/auth/logout` | Planned | REQ-008 | 로그아웃 |
 | API-007 | GET | `/cover-letters` | Implemented | REQ-003 | 상태 필터 없이 저장된 `CoverLetter.status`를 `displayStatus`로 반환 |

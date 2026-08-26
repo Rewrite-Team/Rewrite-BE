@@ -10,8 +10,10 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import lombok.AccessLevel;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+@Getter
 @Entity
 @Table(name = "refresh_tokens")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -50,5 +52,13 @@ public class RefreshToken {
 
     public static RefreshToken create(String tokenHash, User user, Instant createdAt, Instant expiresAt) {
         return new RefreshToken(tokenHash, user, createdAt, expiresAt);
+    }
+
+    public boolean canRotate(Instant now) {
+        return revokedAt == null && expiresAt.isAfter(now);
+    }
+
+    public void revoke(Instant now) {
+        this.revokedAt = now;
     }
 }

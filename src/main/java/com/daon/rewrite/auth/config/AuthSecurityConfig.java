@@ -42,7 +42,8 @@ public class AuthSecurityConfig {
     private static final Set<String> PUBLIC_AUTH_PATHS = Set.of(
             "/auth/kakao/authorize",
             "/auth/kakao/callback",
-            "/auth/csrf-token"
+            "/auth/csrf-token",
+            "/auth/refresh"
     );
 
     @Bean
