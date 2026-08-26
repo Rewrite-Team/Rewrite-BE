@@ -29,7 +29,7 @@ public class TokenRefreshService {
         Instant now = Instant.now(clock);
         RefreshToken currentToken = refreshTokenRepository
                 .findByTokenHashForUpdate(authTokenService.hashRefreshToken(refreshTokenValue))
-                .filter(token -> token.canRotate(now))
+                .filter(token -> token.isActive(now))
                 .orElseThrow(() -> new BusinessException(ErrorCode.UNAUTHORIZED));
 
         currentToken.revoke(now);

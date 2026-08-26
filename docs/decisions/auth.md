@@ -237,6 +237,10 @@ Set-Cookie: access_token=...; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=18
 Set-Cookie: refresh_token=...; HttpOnly; Secure; SameSite=Lax; Path=/auth; Max-Age=1209600
 ```
 
+토큰 갱신과 로그아웃은 프론트엔드의 동일한 인증 요청 흐름에서 직렬화한다. 로그아웃 의사가 설정되면 새 토큰 갱신을 시작하지 않고, 이미 진행 중인 갱신의 응답과 Cookie 반영이 끝난 뒤 최신 Cookie로 로그아웃을 호출한다. 로그아웃을 시작한 뒤에는 갱신을 기다리던 인증 요청도 재시도하지 않는다.
+
+서버의 refresh token row 잠금만으로는 먼저 완료된 rotation의 새 access token 응답이 로그아웃 응답보다 늦게 브라우저에 도착하는 상황까지 막을 수 없다. 현재 access token은 stateless JWT이고 서버 세션·폐기 목록을 두지 않으므로, 인증 요청 순서를 클라이언트에서 직렬화해 늦은 갱신 응답이 로그아웃 Cookie를 덮어쓰지 않도록 한다.
+
 ### PRD 근거
 
 - 로그인은 카카오 로그인으로 진행한다.
@@ -271,4 +275,5 @@ Rewrite는 브라우저 기반 웹 서비스이고 HttpOnly Cookie 인증을 사
 - 단점
   - 서버가 refresh token 저장소와 폐기 상태를 관리해야 한다.
   - 동시 refresh 요청이 발생하면 race condition 처리가 필요하다.
+  - 토큰 갱신과 로그아웃이 경쟁하지 않도록 프론트엔드 인증 요청 흐름을 직렬화해야 한다.
   - API 테스트와 클라이언트 구현에서 refresh 실패 처리를 고려해야 한다.

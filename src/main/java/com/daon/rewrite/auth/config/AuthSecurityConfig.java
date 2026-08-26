@@ -43,7 +43,8 @@ public class AuthSecurityConfig {
             "/auth/kakao/authorize",
             "/auth/kakao/callback",
             "/auth/csrf-token",
-            "/auth/refresh"
+            "/auth/refresh",
+            "/auth/logout"
     );
 
     @Bean
