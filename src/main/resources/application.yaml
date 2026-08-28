@@ -18,7 +18,7 @@ spring:
 
   h2:
     console:
-      enabled: true
+      enabled: false
       path: /h2-console
 
   ai:
@@ -32,6 +32,9 @@ spring:
           temperature: 1 # temperature 미 설정 시 기본값 0.7 이 들어가면서 error 발생. 해당 모델은 temperature: 1 만 가능
 
 rewrite:
+  internal-tools:
+    username: ${INTERNAL_TOOLS_USERNAME:0000}
+    password: ${INTERNAL_TOOLS_PASSWORD:0000}
   auth:
     issuer: rewrite
     audience: rewrite-web

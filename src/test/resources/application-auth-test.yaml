@@ -22,6 +22,9 @@ spring:
           temperature: 1
 
 rewrite:
+  internal-tools:
+    username: rewrite-tools
+    password: test-password
   auth:
     issuer: rewrite
     audience: rewrite-web
