@@ -36,9 +36,11 @@ class OpenApiSecurityIntegrationTest {
     @Test
     void openApiDocumentAcceptsInternalToolsCredentials() throws Exception {
         mockMvc.perform(get("/v3/api-docs")
-                        .with(httpBasic("rewrite-tools", "test-password")))
+                .with(httpBasic("rewrite-tools", "test-password")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.info.title").value("Rewrite API"));
+                .andExpect(jsonPath("$.info.title").value("Rewrite API"))
+                .andExpect(jsonPath("$.paths['/auth/kakao/authorize']").exists())
+                .andExpect(jsonPath("$.paths['/auth/kakao/callback']").exists());
     }
 
     @Test
