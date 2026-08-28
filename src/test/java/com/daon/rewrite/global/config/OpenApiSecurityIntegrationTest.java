@@ -40,7 +40,17 @@ class OpenApiSecurityIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.info.title").value("Rewrite API"))
                 .andExpect(jsonPath("$.paths['/auth/kakao/authorize']").exists())
-                .andExpect(jsonPath("$.paths['/auth/kakao/callback']").exists());
+                .andExpect(jsonPath("$.paths['/auth/kakao/callback']").exists())
+                .andExpect(jsonPath("$.components.securitySchemes.csrfToken.type")
+                        .value("apiKey"))
+                .andExpect(jsonPath("$.components.securitySchemes.csrfToken.in")
+                        .value("header"))
+                .andExpect(jsonPath("$.components.securitySchemes.csrfToken.name")
+                        .value("X-CSRF-Token"))
+                .andExpect(jsonPath("$.paths['/auth/refresh'].post.security[0].csrfToken")
+                        .isArray())
+                .andExpect(jsonPath("$.paths['/auth/csrf-token'].get.security")
+                        .doesNotExist());
     }
 
     @Test
