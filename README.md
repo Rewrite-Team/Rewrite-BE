@@ -26,6 +26,30 @@ Run the application:
 OPENAI_API_KEY=your-api-key ./gradlew bootRun
 ```
 
+## API 확인
+
+애플리케이션 실행 후 다음 경로에서 구현된 API를 확인할 수 있습니다.
+
+- Swagger UI: `http://localhost:8080/swagger-ui/index.html`
+- OpenAPI JSON: `http://localhost:8080/v3/api-docs`
+
+`local`, `test` profile에서는 별도 인증 없이 접근할 수 있다. 그 외 profile에서는 Swagger에 내부 도구용 Basic Auth를 적용하며 다음 환경변수가 필요하다.
+
+```bash
+INTERNAL_TOOLS_USERNAME= {username}
+INTERNAL_TOOLS_PASSWORD= {password}
+```
+
+Basic Auth는 Swagger와 H2 Console 접근만 보호한다. Swagger에서 실제 Rewrite API를 호출할 때는 기존 카카오 로그인으로 발급한 인증 Cookie와, 상태 변경 요청인 경우 CSRF 토큰이 별도로 필요하다.
+
+H2 Console은 기본 프로필과 운영 환경에서 비활성화되어 있다. 실제 카카오/JWT 인증을 유지하는 `devtools` profile에서만 활성화할 수 있으며, Swagger와 동일한 내부 도구용 Basic Auth 계정을 사용한다.
+
+```bash
+SPRING_PROFILES_ACTIVE=devtools
+```
+
+위 설정으로 실행한 뒤 `http://localhost:8080/h2-console`로 접근한다. 운영 환경에서는 `devtools` profile을 활성화하지 않는다. Swagger/OpenAPI는 실제 controller와 DTO 구현 확인용이며, API 계약의 기준은 Notion `Rewrite API (자동 동기화)`와 `docs/api/` 문서다.
+
 ## Documentation
 
 - `AGENTS.md`: Codex가 반드시 따라야 하는 저장소 작업 규칙

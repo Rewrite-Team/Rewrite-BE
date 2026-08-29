@@ -14,6 +14,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
@@ -48,6 +49,7 @@ public class AuthSecurityConfig {
     );
 
     @Bean
+    @Order(3)
     SecurityFilterChain authSecurityFilterChain(
             HttpSecurity http,      // Spring Security 설정을 조립하는 빌더
             JwtDecoder jwtDecoder,  // access token JWT 서명/완료/issuer/audience/purpose 를 검증
