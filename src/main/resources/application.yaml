@@ -49,3 +49,10 @@ rewrite:
       authorize-uri: https://kauth.kakao.com/oauth/authorize
       token-uri: https://kauth.kakao.com/oauth/token
       user-info-uri: https://kapi.kakao.com/v2/user/me
+
+springdoc:
+  swagger-ui:
+    filter: true  # swagger UI 상단에 검색 입력창 표시
+    doc-expansion: none # 처음 swagger UI를 열었을 때 모든 도메인과 API를 접힌 상태로 표시
+    tags-sorter: alpha  # 인증, 자기소개서, 첨삭 버전 과 같은 도메인 태그를 이름순(오름차순) 정렬 (controller 선언순서에 영향받지 않음)
+    operations-sorter: alpha  # 각 태그 안의 API를 알파벡순으로 정렬 (controller에 작성된 순서가 아니라 경로 문자열 기준 오름차순 배치)

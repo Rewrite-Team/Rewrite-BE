@@ -2,6 +2,7 @@ package com.daon.rewrite.auth.controller;
 
 import com.daon.rewrite.auth.dto.CsrfTokenResponse;
 import com.daon.rewrite.auth.service.CsrfTokenService;
+import com.daon.rewrite.global.openapi.RewriteApi;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Profile;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -35,6 +36,17 @@ public class CsrfTokenController {
     따라서 CSRF 토큰이 공개 발급인데도 의미가 있다
      */
     @GetMapping("/auth/csrf-token")
+    @RewriteApi(
+            id = "API-003",
+            summary = "CSRF 토큰 조회",
+            tag = "인증",
+            purpose = "상태 변경 요청의 X-CSRF-Token 헤더에 사용할 토큰을 인증 없이 발급한다.",
+            screens = {"공통", "로그인"},
+            trigger = "앱 초기화 또는 CSRF_TOKEN_INVALID 복구 시 호출한다.",
+            behavior = "토큰은 브라우저 메모리에 보관하고 POST·PUT·PATCH·DELETE 요청 헤더에 사용한다.",
+            success = "발급 토큰을 메모리에 교체하고 대기 중인 상태 변경 요청을 진행한다.",
+            authenticated = false
+    )
     public CsrfTokenResponse issue() {
         return new CsrfTokenResponse(csrfTokenService.issue());
     }

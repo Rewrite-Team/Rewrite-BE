@@ -33,7 +33,7 @@ OPENAI_API_KEY=your-api-key ./gradlew bootRun
 - Swagger UI: `http://localhost:8080/swagger-ui/index.html`
 - OpenAPI JSON: `http://localhost:8080/v3/api-docs`
 
-`local`, `test` profile에서는 별도 인증 없이 접근할 수 있다. 그 외 profile에서는 Swagger에 내부 도구용 Basic Auth를 적용하며 다음 환경변수가 필요하다.
+`local`, `test` profile에서는 별도 인증 없이 접근할 수 있다. 이 profile에서는 실제 인증 controller가 비활성화되므로 API-001~004, API-006을 제외한 24개 API를 확인한다. 인증 API를 포함한 활성 API 29개 전체 문서는 그 외 profile에서 내부 도구용 Basic Auth로 접근하며 다음 환경변수가 필요하다.
 
 ```bash
 INTERNAL_TOOLS_USERNAME= {username}
@@ -48,7 +48,7 @@ H2 Console은 기본 프로필과 운영 환경에서 비활성화되어 있다.
 SPRING_PROFILES_ACTIVE=devtools
 ```
 
-위 설정으로 실행한 뒤 `http://localhost:8080/h2-console`로 접근한다. 운영 환경에서는 `devtools` profile을 활성화하지 않는다. Swagger/OpenAPI는 실제 controller와 DTO 구현 확인용이며, API 계약의 기준은 Notion `Rewrite API (자동 동기화)`와 `docs/api/` 문서다.
+위 설정으로 실행한 뒤 `http://localhost:8080/h2-console`로 접근한다. 운영 환경에서는 `devtools` profile을 활성화하지 않는다. Swagger UI는 API 번호, 사용 목적, 사용 화면, 호출 시점, 주요 동작과 오류 조건을 확인하는 핵심 API 문서다. 생성된 OpenAPI는 controller, DTO와 `@RewriteApi`를 기준으로 하며 Notion은 보조 동기화 문서로 사용한다.
 
 ## Documentation
 
@@ -62,11 +62,11 @@ SPRING_PROFILES_ACTIVE=devtools
 - `docs/architecture.md`: 패키지 구조와 계층 책임
 - `docs/conventions.md`: Java/Spring/API/예외 처리 규칙
 - `docs/testing.md`: 테스트 전략과 검증 명령
-- `docs/codex-workflow.md`: Codex 품질 원칙 적용, 위험도 기반 리뷰, issue/commit/PR 절차와 Notion API 문서 동기화 절차
+- `docs/codex-workflow.md`: Codex 품질 원칙 적용, 위험도 기반 리뷰, issue/commit/PR 절차와 OpenAPI·Notion 문서 동기화 절차
 
 ## Development
 
 작업 전 `docs/README.md`에서 작업 유형별로 필요한 문서를 확인합니다.
 Codex를 통한 작업 범위 판단, 변경 영향 확인, 위험도 기반 리뷰와 issue, PR, commit 절차는 `docs/codex-workflow.md`를 따릅니다.
-API 계약 또는 구현 상태를 수정할 때는 같은 문서에 정의된 Notion 프론트엔드용 API 문서 동기화 절차를 따릅니다. 저장소의 Markdown 문서와 실제 코드가 기준 원본입니다.
+API 계약 또는 구현 상태를 수정할 때는 controller·DTO·`@RewriteApi`, OpenAPI 통합 테스트와 관련 저장소 문서를 함께 갱신합니다. Notion은 생성된 OpenAPI와 저장소 문서를 기준으로 동기화합니다.
 GitHub issue 또는 PR 생성 시에는 `.github` 하위 템플릿을 사용합니다.
