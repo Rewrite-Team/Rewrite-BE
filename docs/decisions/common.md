@@ -208,3 +208,39 @@ completedAt
 - 단점
   - 프론트엔드는 개별 API 페이지와 COMMON 페이지를 함께 따라야 한다.
   - 서버 내부의 세부 provider 실패 원인은 사용자-facing 오류 코드만으로 구분할 수 없다.
+
+## Decision 100: Swagger UI를 핵심 API 문서로 사용한다
+
+### 결정
+
+개발자가 API 번호, 사용 목적, 사용 화면, 호출 시점, 주요 동작, 성공 후 처리와 오류 조건을 한 곳에서 확인할 수 있도록 Swagger UI를 핵심 API 문서로 사용한다.
+
+controller와 DTO가 path, request와 response를 정의하고 `@RewriteApi`가 코드에서 추론할 수 없는 사용 맥락과 오류 조건을 정의한다. 생성된 OpenAPI 명세는 두 정보를 통합한다. Notion `Rewrite API (자동 동기화)`는 OpenAPI와 저장소 문서를 기준으로 갱신하는 보조 문서로 사용한다.
+
+API 설명은 다음 순서로 통일한다.
+
+1. 사용 목적
+2. 사용 화면
+3. 호출 시점
+4. 주요 동작
+5. 성공 후 처리
+6. 오류
+
+같은 HTTP 상태에서 복수 오류 코드가 발생하면 하나의 response 아래 named example로 구분한다. 비동기 Job의 `FAILED`는 정상 응답 또는 SSE의 작업 상태이며 HTTP 오류 응답과 분리한다.
+
+API-028을 제외한 활성 API 29개는 모두 `@RewriteApi`를 사용한다. API-028은 Deprecated이며 controller와 OpenAPI path를 제공하지 않는다. Swagger UI에서 계약과 사용 맥락을 우선 확인하고 Markdown에는 상태, 설계 배경과 교차 API 흐름만 남긴다.
+
+### 선택 이유
+
+controller·DTO와 분리된 API 문서만 사용하면 구현 변경이 문서에 늦게 반영되기 쉽다. 코드 우선 OpenAPI에 사용 맥락과 오류 조건을 함께 선언하면 구현과 문서의 차이를 테스트로 검증할 수 있고, 프론트엔드와 백엔드가 하나의 문서 화면을 공유할 수 있다.
+
+### 트레이드오프
+
+- 장점
+  - API 번호, 화면 맥락, schema와 오류 예시를 한 화면에서 확인할 수 있다.
+  - 구현과 문서의 불일치를 OpenAPI 통합 테스트로 방지할 수 있다.
+  - Notion 동기화를 구조화된 `x-rewrite-*` 메타데이터로 확장할 수 있다.
+- 단점
+  - controller annotation이 길어질 수 있다.
+  - 복잡한 화면 흐름과 설계 배경은 Swagger와 저장소 보완 문서를 함께 확인해야 한다.
+  - 복잡한 화면 흐름과 설계 배경은 OpenAPI만으로 충분히 표현하기 어렵다.

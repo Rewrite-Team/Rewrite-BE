@@ -1,6 +1,6 @@
 # API Documentation
 
-이 디렉터리는 Rewrite 백엔드 API 계약과 구현 상태를 도메인별로 관리한다.
+이 디렉터리는 Rewrite 백엔드 API 상태, 도메인 라우팅과 OpenAPI만으로 설명하기 어려운 교차 API 흐름을 관리한다. 구현된 API의 핵심 조회 문서는 Swagger UI이며, controller·DTO·`@RewriteApi`에서 생성한 OpenAPI 명세를 사용한다.
 
 PRD: `../requirements.md`
 
@@ -30,11 +30,13 @@ PRD: `../requirements.md`
 | Interviews | API-022 - API-023, API-025 - API-029 | `interviews.md` | `../decisions/interviews.md` |
 | Common Rules | 공통 인증, 에러, 시간, 도메인 모델 | `common.md` | `../decisions/common.md` |
 
-## Notion API 문서 동기화
+## OpenAPI와 Notion 문서 동기화
 
-Git 저장소의 Markdown 문서와 실제 코드는 API 계약과 구현 상태의 기준 원본이다. Notion `Rewrite API (자동 동기화)` 데이터베이스는 프론트엔드 개발자가 보는 동기화 문서이며, Notion 직접 수정으로 저장소를 덮어쓰지 않는다.
+controller와 DTO가 HTTP 계약을 정의하고 `@RewriteApi`가 API ID, 사용 목적, 화면, 호출 시점, 주요 동작, 성공 후 처리와 오류 조건을 정의한다. Swagger UI는 생성된 OpenAPI를 표시하는 핵심 API 문서다. Notion `Rewrite API (자동 동기화)`는 OpenAPI와 저장소 문서를 기준으로 갱신하는 보조 문서이며, Notion 직접 수정으로 저장소를 덮어쓰지 않는다.
 
-- API를 추가, 삭제하거나 path, request, response, error, validation, 상태 또는 구현 여부를 변경하면 같은 작업에서 Markdown 계약과 Notion을 `API ID`로 갱신한다.
+- API를 추가, 삭제하거나 path, request, response, error, validation, 상태 또는 구현 여부를 변경하면 같은 작업에서 코드, OpenAPI 테스트, 필요한 Markdown과 Notion을 `API ID`로 갱신한다.
+- `@RewriteApi`가 적용된 API는 summary를 `API-009 · 기본 정보 저장` 형식으로 표시하고 사용 목적, 사용 화면, 호출 시점, 주요 동작, 성공 후 처리와 오류를 Swagger UI에서 확인할 수 있어야 한다.
+- API-028을 제외한 활성 API 29개는 모두 `@RewriteApi`를 사용한다. API-028은 Deprecated이며 controller와 OpenAPI path를 제공하지 않는다.
 - API-001~030의 오류 계약은 COMMON의 인증·CSRF·서버 오류 복구와 각 도메인 문서의 화면별 최소 오류로 구분한다. 비동기 Job 실패는 HTTP 오류와 분리한다.
 - 데이터베이스 속성은 `Name`, `Method`, `Path`, `상태`, `사용 화면`, `설명`, `API ID`를 사용한다. `API ID`는 숨김 고유 키이며 제목은 `API-007 · 내 자기소개서 목록` 형식으로 작성한다.
 - `상태`는 `구현 중`, `구현 완료`, Deprecated API에만 `사용 안 함`을 사용한다. `사용 화면`은 공통, 로그인, 자기소개서 목록, 자기소개서 등록, 첨삭 진행, 첨삭 결과, 키워드 분석, AI 면접 중 필요한 값을 모두 지정한다.
@@ -47,7 +49,7 @@ Git 저장소의 Markdown 문서와 실제 코드는 API 계약과 구현 상태
 
 ## API 구현 상태 추적
 
-이 문서는 Rewrite 백엔드 API 계약과 구현 상태의 기준 문서다.
+이 문서는 Rewrite 백엔드 API 구현 상태의 기준 문서다.
 
 기능 요구사항과 제품 범위는 `../requirements.md`를 함께 확인한다.
 API 설계 결정과 트레이드오프는 `../decisions/README.md`를 함께 확인한다.
@@ -72,14 +74,14 @@ API 설계 결정과 트레이드오프는 `../decisions/README.md`를 함께 �
 | API-006 | POST | `/auth/logout` | Implemented | REQ-008 | #98 인증 상태와 무관한 멱등 로그아웃, 유효 refresh token 폐기와 refresh 직렬화 계약 반영 |
 | API-007 | GET | `/cover-letters` | Implemented | REQ-003 | 상태 필터 없이 저장된 `CoverLetter.status`를 `displayStatus`로 반환 |
 | API-008 | POST | `/cover-letters` | Implemented | REQ-003 | 생성 응답을 `id` 단일 필드로 구현 |
-| API-009 | PUT | `/cover-letters/{coverLetterId}/basic-info` | Implemented | REQ-004 | nullable 기본 정보 WRITING 스냅샷과 `success` 응답 구현 |
+| API-009 | PUT | `/cover-letters/{coverLetterId}/basic-info` | Implemented | REQ-004 | nullable 기본 정보 WRITING 스냅샷과 `success` 응답 구현, Swagger 문서화 적용 |
 | API-010 | PUT | `/cover-letters/{coverLetterId}/preferences` | Implemented | REQ-004 | nullable 우대사항 WRITING 스냅샷과 `success` 응답 구현 |
 | API-011 | PUT | `/cover-letters/{coverLetterId}/questions` | Implemented | REQ-004 | nullable 문항 WRITING 전체 replace와 `success` 응답 구현 |
 | API-012 | GET | `/cover-letters/{coverLetterId}` | Verified | REQ-003, REQ-004, REQ-005, REQ-006 | WRITING 복구와 상태 공통 상세, 실패 Job의 성공 문항 조회 구현·검증 |
 | API-013 | DELETE | `/cover-letters/{coverLetterId}` | Implemented | REQ-003 | `success` 응답과 진행 중 Job 취소 구현 |
-| API-014 | POST | `/cover-letters/{coverLetterId}/submit` | Implemented | REQ-004, REQ-005 | WRITING 최종 검증과 `displayStatus`, `jobId` 응답 구현 |
+| API-014 | POST | `/cover-letters/{coverLetterId}/submit` | Implemented | REQ-004, REQ-005 | WRITING 최종 검증과 `displayStatus`, `jobId` 응답 구현, 복수 409 Swagger example 적용 |
 | API-015 | GET | `/llm-jobs/{jobId}` | Verified | REQ-005, REQ-009, REQ-010 | 복구용 경량 Job 상태 응답 구현·검증 |
-| API-016 | GET | `/llm-jobs/{jobId}/stream` | Verified | REQ-005, REQ-006, REQ-009, REQ-010 | Job 상태, 첨삭 문항, 검증된 면접 피드백 delta와 재연결 replay 구현·검증 |
+| API-016 | GET | `/llm-jobs/{jobId}/stream` | Verified | REQ-005, REQ-006, REQ-009, REQ-010 | Job 상태, 첨삭 문항, 검증된 면접 피드백 delta와 재연결 replay 구현·검증, SSE 실패 Swagger 문서화 적용 |
 | API-017 | GET | `/cover-letters/{coverLetterId}/review-versions` | Implemented | REQ-006 | 성공한 첨삭 버전을 `createdAt` 오름차순으로 반환 |
 | API-018 | GET | `/cover-letters/{coverLetterId}/review-versions/{versionId}` | Verified | REQ-006 | API-012와 같은 공통 상세 응답으로 선택 버전 조회 구현·검증 |
 | API-019 | PUT | `/cover-letters/{coverLetterId}/review-versions/{versionId}/final-answers` | Implemented | REQ-006 | `versionId` 동시성 검증과 `success` 단일 응답 구현 |

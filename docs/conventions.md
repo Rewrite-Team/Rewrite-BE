@@ -54,9 +54,15 @@
 
 ## OpenAPI / Swagger
 
-- Markdown API 계약은 `docs/api/README.md`와 `docs/api/` 하위 도메인 문서에서 관리한다.
-- Swagger/OpenAPI는 구현된 API 확인용 문서로 사용한다.
-- OpenAPI annotation을 추가할 때는 controller 동작, DTO, error response와 일치시킨다.
+- Swagger UI를 개발자가 보는 핵심 API 문서로 사용하고, controller·DTO·`@RewriteApi`에서 코드 우선 OpenAPI 명세를 생성한다.
+- `@RewriteApi` 설명은 사용 목적, 사용 화면, 호출 시점, 주요 동작, 성공 후 처리, 오류 순서로 작성한다.
+- summary는 `API-009 · 기본 정보 저장` 형식, tag는 도메인 기준으로 작성한다.
+- `@ApiError`에는 실제 발생 가능한 오류 코드, 발생 조건과 프론트엔드 처리 방법만 기록한다. 같은 HTTP 상태의 복수 오류는 named example로 구분한다.
+- `VALIDATION_ERROR`의 대표 detail은 실제 서비스가 반환할 수 있는 field와 reason을 함께 기록한다. OAuth redirect 오류는 JSON `ErrorResponse`가 아닌 `@ApiRedirectError`로 구분한다.
+- 인증 API를 포함한 운영 profile OpenAPI는 활성 API 29개를 모두 포함해야 하고, API-028은 Deprecated path로 노출하지 않는다.
+- 공통 `401`, `403`, `500`과 API별 오류는 `ErrorResponse` schema를 사용하고, 비동기 Job 실패는 HTTP 오류와 분리한다.
+- `x-rewrite-*` 확장은 Swagger 설명과 Notion 동기화에 사용할 구조화된 메타데이터로 유지한다.
+- `docs/api/`는 API 상태, 라우팅과 복잡한 교차 API 흐름을 보완하며 Notion은 보조 동기화 문서로 사용한다.
 - Springdoc/OpenAPI 의존성 추가는 별도 이슈 또는 명시적인 사용자 요청으로 진행한다.
 
 ## Git

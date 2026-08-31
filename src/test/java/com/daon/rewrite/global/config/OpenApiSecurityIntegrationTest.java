@@ -1,6 +1,7 @@
 package com.daon.rewrite.global.config;
 
 import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -51,6 +52,37 @@ class OpenApiSecurityIntegrationTest {
                 .andExpect(jsonPath("$.paths['/auth/refresh'].post.security[0].csrfToken")
                         .isArray())
                 .andExpect(jsonPath("$.paths['/auth/csrf-token'].get.security")
+                        .doesNotExist());
+    }
+
+    @Test
+    void productionProfileDocumentsAllActiveApisAndOAuthRedirects() throws Exception {
+        mockMvc.perform(get("/v3/api-docs")
+                        .with(httpBasic("rewrite-tools", "test-password")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$..operationId", hasSize(29)))
+                .andExpect(jsonPath("$.paths['/auth/kakao/authorize'].get.operationId")
+                        .value("API-001"))
+                .andExpect(jsonPath("$.paths['/auth/kakao/authorize'].get.responses['302'].description")
+                        .value(org.hamcrest.Matchers.containsString("KAKAO_LOGIN_FAILED")))
+                .andExpect(jsonPath("$.paths['/auth/kakao/authorize'].get.responses['500']")
+                        .doesNotExist())
+                .andExpect(jsonPath("$.paths['/auth/kakao/authorize'].get.responses['302'].headers.Location")
+                        .exists())
+                .andExpect(jsonPath("$.paths['/auth/kakao/callback'].get.responses['302'].description")
+                        .value(org.hamcrest.Matchers.allOf(
+                                org.hamcrest.Matchers.containsString("KAKAO_LOGIN_CANCELED"),
+                                org.hamcrest.Matchers.containsString("KAKAO_LOGIN_FAILED")
+                        )))
+                .andExpect(jsonPath("$.paths['/auth/refresh'].post.responses['200'].headers['Set-Cookie']")
+                        .exists())
+                .andExpect(jsonPath("$.paths['/auth/refresh'].post.responses['200'].content['application/json'].schema.$ref")
+                        .value("#/components/schemas/SuccessResponse"))
+                .andExpect(jsonPath("$.paths['/auth/refresh'].post.responses['401'].headers['Set-Cookie']")
+                        .exists())
+                .andExpect(jsonPath("$.paths['/auth/logout'].post.responses['200'].headers['Set-Cookie']")
+                        .exists())
+                .andExpect(jsonPath("$.paths['/interviews/{interviewSessionId}/threads']")
                         .doesNotExist());
     }
 
