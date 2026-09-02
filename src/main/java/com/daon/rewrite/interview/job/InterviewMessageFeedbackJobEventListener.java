@@ -1,4 +1,4 @@
-package com.daon.rewrite.interview.service;
+package com.daon.rewrite.interview.job;
 
 import com.daon.rewrite.llmjob.entity.LlmJob;
 import com.daon.rewrite.llmjob.entity.LlmJobType;
@@ -12,10 +12,10 @@ import org.springframework.transaction.event.TransactionalEventListener;
 
 @Component
 @RequiredArgsConstructor
-class InterviewQuestionGenerationJobEventListener {
+class InterviewMessageFeedbackJobEventListener {
 
     private final LlmJobRepository llmJobRepository;
-    private final InterviewQuestionGenerationJobWorker worker;
+    private final InterviewMessageFeedbackJobWorker worker;
 
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
@@ -24,7 +24,7 @@ class InterviewQuestionGenerationJobEventListener {
     }
 
     private void dispatch(LlmJob job) {
-        if (job.getType().isInterviewQuestionGeneration()) {
+        if (job.getType() == LlmJobType.INTERVIEW_MESSAGE_FEEDBACK) {
             worker.execute(job.getId());
         }
     }
