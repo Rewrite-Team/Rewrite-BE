@@ -11,7 +11,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 
 @Component
 @RequiredArgsConstructor
-class FirstReviewJobEventListener {
+class ReviewJobEventListener {
 
     private final LlmJobRepository llmJobRepository;
     private final FirstReviewJobWorker firstReviewJobWorker;
