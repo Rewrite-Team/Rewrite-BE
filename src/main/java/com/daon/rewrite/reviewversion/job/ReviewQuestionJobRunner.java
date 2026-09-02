@@ -1,4 +1,4 @@
-package com.daon.rewrite.reviewversion.service;
+package com.daon.rewrite.reviewversion.job;
 
 import com.daon.rewrite.reviewversion.client.ReviewClient;
 import com.daon.rewrite.reviewversion.client.ReviewClientException;

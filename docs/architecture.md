@@ -28,7 +28,11 @@ src/main/java/com/daon/rewrite/
 - dto/
 - client/
 - config/
+- job/
 ```
+
+`job`은 해당 기능에 종속된 비동기 Job의 이벤트 처리, worker와 transaction orchestration을 둔다.
+여러 기능이 공유하는 Job 상태 모델, 저장소, 조회와 스트림 같은 공통 인프라는 `llmjob` 패키지에 둔다.
 
 전역 `controller`, `service`, `repository` 패키지는 만들지 않는다.
 

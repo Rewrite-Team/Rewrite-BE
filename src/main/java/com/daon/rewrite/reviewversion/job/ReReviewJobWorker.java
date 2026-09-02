@@ -1,6 +1,7 @@
-package com.daon.rewrite.reviewversion.service;
+package com.daon.rewrite.reviewversion.job;
 
 import com.daon.rewrite.reviewversion.client.ReviewClientException;
+import com.daon.rewrite.reviewversion.service.ReviewVersionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -10,9 +11,9 @@ import java.util.Optional;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class FirstReviewJobWorker {
+public class ReReviewJobWorker {
 
-    private final FirstReviewJobTransactionService transactionService;
+    private final ReReviewJobTransactionService transactionService;
     private final ReviewQuestionJobRunner jobRunner;
     private final ReviewVersionService reviewVersionService;
 
@@ -27,14 +28,14 @@ public class FirstReviewJobWorker {
                 transactionService.fail(jobId, failureReason.get());
                 return;
             }
-            reviewVersionService.completeFirstReview(jobId);
+            reviewVersionService.completeReReview(jobId);
         } catch (RuntimeException exception) {
             try {
                 transactionService.failUnexpected(jobId);
             } catch (RuntimeException failureException) {
-                log.error("최초 첨삭 실패 상태 저장에 실패했습니다. jobId={}", jobId, failureException);
+                log.error("재첨삭 실패 상태 저장에 실패했습니다. jobId={}", jobId, failureException);
             }
-            log.error("최초 첨삭 처리 중 예상하지 못한 오류가 발생했습니다. jobId={}", jobId, exception);
+            log.error("재첨삭 처리 중 예상하지 못한 오류가 발생했습니다. jobId={}", jobId, exception);
         }
     }
 }
