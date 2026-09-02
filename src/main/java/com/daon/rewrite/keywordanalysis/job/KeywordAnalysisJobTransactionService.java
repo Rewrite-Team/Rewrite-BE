@@ -1,4 +1,4 @@
-package com.daon.rewrite.keywordanalysis.service;
+package com.daon.rewrite.keywordanalysis.job;
 
 import com.daon.rewrite.coverletter.entity.CoverLetter;
 import com.daon.rewrite.global.exception.BusinessException;
