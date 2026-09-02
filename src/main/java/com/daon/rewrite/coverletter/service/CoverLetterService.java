@@ -183,48 +183,116 @@ public class CoverLetterService {
         coverLetter.touch(Instant.now(clock));
     }
 
+    /*
+    자기소개서 제출을 처리하고, 필요하면 최초 AI 첨삭 Job 생성
+
+    [성공 케이스 3가지]
+    상황                      상태          반환Job
+    최초 제출 또는 실패 후 재시도	 REVIEWING	  새 Job
+    최초 첨삭 중 중복 제출	     REVIEWING	  기존 Job
+    이미 최초 첨삭 완료	         REVIEWED	  null
+     */
     @Transactional
     public SubmitCoverLetterResult submit(String coverLetterId) {
+        // 현재 사용자 조회
         CurrentUser currentUser = currentUserProvider.currentUser();
+        // 자기소개서 조회 (coverLetterId + 현재 사용자 소유 + 삭제x)
         CoverLetter coverLetter = coverLetterRepository
                 .findActiveByIdAndOwnerIdForUpdate(coverLetterId, currentUser.id())
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
 
+        // 이미 진행 중인 LLM job(PENDING, PROCESSING) 조회
         LlmJob runningJob = llmJobService.findRunningCoverLetterJob(coverLetter.getId());
+
+        // 이미 Job이 진행 중이라면
         if (runningJob != null) {
+            // 동일한 최초 첨삭 Job이 이미 진행 중이라면, 새 Job을 만들지 않고 기존 Job 반환
+            // 버튼 중복 클릭, 네트워크 재시도에 대한 멱등 처리.
             if (coverLetter.getStatus() == CoverLetterStatus.REVIEWING
                     && runningJob.getType() == LlmJobType.COVER_LETTER_REVIEW) {
                 return new SubmitCoverLetterResult(coverLetter, runningJob);
             }
+            // 다른 종류의 Job 이 진행중이라면, 409 Conflict 반환
             throw new BusinessException(ErrorCode.LLM_JOB_ALREADY_RUNNING);
         }
+
+        // 이미 첨삭 결과가 있는 경우 이미 최초 첨삭이 완료된 것이기에 새 Job을 만들지 않는다.
         if (coverLetter.getLatestReviewedVersionId() != null) {
+            // 성공 버전이 있는데 REVIEW_FAILED 라면, 최초 첨삭 API 가 아니라 재첨삭 API를 사용해야 하므로 CONFLICT 반환
             if (coverLetter.getStatus() != CoverLetterStatus.REVIEWED) {
                 throw new BusinessException(ErrorCode.CONFLICT);
             }
             return new SubmitCoverLetterResult(coverLetter, null);
         }
+
+        // 자기소개서는 REVIEWING인데 진행 중 Job이 발견되지 않은 비정상적인 상태 조합 방어
         if (coverLetter.getStatus() == CoverLetterStatus.REVIEWING) {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR);
         }
 
+        // 저장된 문항을 등록 순서대로 조회
         List<CoverLetterQuestion> questions = coverLetterQuestionRepository
                 .findByCoverLetterIdOrderByQuestionOrderAsc(coverLetter.getId());
+        // 제출 필수값 최종 검증
         validateSubmit(coverLetter, questions);
 
         Instant now = Instant.now(clock);
+        /*
+         아래 상태의 LlmJob 저장
+         type: COVER_LETTER_REVIEW
+         status: PENDING
+         targetType: COVER_LETTER
+         targetId: 자기소개서 ID
+         progressCurrent: 0
+         progressTotal: 문항 수
+         maxAttempts: 2
+         */
         LlmJob job = llmJobRepository.save(LlmJob.pendingReview(
                 idGenerator.generate(LLM_JOB_ID_PREFIX),
                 coverLetter.getId(),
                 now,
                 questions.size()
         ));
+
+        /*
+         자소서 상태를 REVIEWING으로 변경
+         최초 제출이면 submittedAt 설정 및 updatedAt 갱신
+         */
         coverLetter.startReview(now);
+
+        // 비동기 첨삭을 시작하는 이벤트를 발행
+        /*
+        ReviewJobEventListener.java의 리스너가 FirstReviewJobWorker.execute(jobId)를 실행
+        AFTER_COMMIT: Job과 자기소개서 상태가 DB에 정상 커밋된 후
+        @Async: 별도 비동기 스레드에서 진행
+         */
         eventPublisher.publishEvent(new LlmJobCreatedEvent(job.getId()));
 
+        // AI 첨삭 완료를 기다리지 않고 REVIEWING과 jobId를 바로 반환
         return new SubmitCoverLetterResult(coverLetter, job);
     }
 
+    // 제출 필수값 최종 검증
+    // 기본 정보(제목, 회사명, 직무명, 우대사항), 문항 존재 여부,
+    // 각 문항의 질문·원본 답변 입력 여부와 최대 답변 글자 수 범위(100~5000자) 확인
+    // 오류가 여러 개라면 아래와같이 details에 모두 모아 반환
+    /**
+     * <pre>{@code
+     *   "error": {
+     *     "code": "VALIDATION_ERROR",
+     *     "details": [
+     *       {
+     *         "field": "preferences",
+     *         "reason": "채용 우대사항을 입력해야 합니다."
+     *       },
+     *       {
+     *         "field": "questions[0].originalAnswer",
+     *         "reason": "답변을 입력해야 합니다."
+     *       }
+     *     ]
+     *   }
+     * }</pre>
+     */
     private void validateSubmit(CoverLetter coverLetter, List<CoverLetterQuestion> questions) {
         List<ErrorResponse.ErrorDetail> details = new ArrayList<>();
         addMissingDetail("title", coverLetter.getTitle(), "자기소개서 제목을 입력해야 합니다.", details);
@@ -232,6 +300,7 @@ public class CoverLetterService {
         addMissingDetail("positionTitle", coverLetter.getPositionTitle(), "직무명을 입력해야 합니다.", details);
         addMissingDetail("preferences", coverLetter.getPreferences(), "채용 우대사항을 입력해야 합니다.", details);
 
+        // 질문 답변 자체가 없는 경우
         if (questions.isEmpty()) {
             details.add(new ErrorResponse.ErrorDetail(
                     "questions",
@@ -240,12 +309,14 @@ public class CoverLetterService {
         } else {
             for (int index = 0; index < questions.size(); index++) {
                 CoverLetterQuestion question = questions.get(index);
+                // 해당 index의 질문 유무 검사
                 addMissingDetail(
                         "questions[" + index + "].question",
                         question.getQuestion(),
                         "질문을 입력해야 합니다.",
                         details
                 );
+                // 최대 답변 글자 수의 허용 범위 검사
                 if (question.getMaxAnswerLength() == null
                         || question.getMaxAnswerLength() < MIN_MAX_ANSWER_LENGTH
                         || question.getMaxAnswerLength() > MAX_MAX_ANSWER_LENGTH) {
@@ -254,6 +325,7 @@ public class CoverLetterService {
                             "최대 답변 글자 수는 100자 이상 5000자 이하여야 합니다."
                     ));
                 }
+                // 답변 유무 검사
                 addMissingDetail(
                         "questions[" + index + "].originalAnswer",
                         question.getOriginalAnswer(),
@@ -263,11 +335,13 @@ public class CoverLetterService {
             }
         }
 
+        // 에러가 적어도 1개 있다면 BusinessException 을 던짐
         if (!details.isEmpty()) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, details);
         }
     }
 
+    // 누락된 필드가 있다면 ErrorDetail에 추가
     private void addMissingDetail(
             String field,
             String value,
