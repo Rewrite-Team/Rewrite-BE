@@ -47,23 +47,29 @@ class FirstReviewJobTransactionService {
 
     @Transactional
     public ReviewWork start(String jobId) {
+        // jobId에 연결된 LlmJob 과 CoverLetter를 조회하면서 PESSIMISTIC_WRITE를 획득
         CoverLetterJobLockService.LockedCoverLetterJob locked = coverLetterJobLockService.lock(jobId);
+        // Job type이 COVER_LETTER_REVIEW인지, Job targetType 이 COVER_LETTER 인지 확인
         LlmJob job = validateFirstReviewJob(locked.job());
+        // PENDING Job 만 처리
         if (job.getStatus() != LlmJobStatus.PENDING) {
             return null;
         }
 
         CoverLetter coverLetter = locked.coverLetter();
+        // 정상적인 상황에서 자소서 상태는 REVIEWING 이어야 함
         if (coverLetter.getStatus() != CoverLetterStatus.REVIEWING) {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR);
         }
 
+        // 자소서 문항을 questionOrder 오름차순으로 가져옴
         List<CoverLetterQuestion> questions = questionRepository
                 .findByCoverLetterIdOrderByQuestionOrderAsc(coverLetter.getId());
         if (questions.isEmpty()) {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR);
         }
 
+        // AI응답을 받기 전 임시 처리 결과 객체인 ReviewJobQuestionResult 을 각 문항마다 생성
         jobQuestionResultRepository.saveAll(questions.stream()
                 .map(question -> ReviewJobQuestionResult.processing(
                         idGenerator.generate(JOB_QUESTION_RESULT_ID_PREFIX),
@@ -72,6 +78,7 @@ class FirstReviewJobTransactionService {
                         question.getOriginalAnswer()
                 ))
                 .toList());
+        // Job 상태를 PENDING -> PROCESSING 으로 변경
         job.startProcessing(STARTED_MESSAGE);
         return new ReviewWork(new ReviewRequest(
                 coverLetter.getTitle(),
