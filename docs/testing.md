@@ -59,3 +59,7 @@ Jacoco가 설정되어 있으며, 테스트 후 `jacocoTestReport`가 실행된�
 build/reports/jacoco/test/html/index.html
 build/reports/jacoco/test/jacocoTestReport.xml
 ```
+
+## 코드 흐름 도구 검증
+
+`code-flow` 스킬과 뷰어 변경 시 Python 구조·소스 검증과 실제 브라우저 검증을 실행한다. 명령과 시각 확인 항목은 [스킬 검증 가이드](../.agents/skills/code-flow/references/validation.md)를 따른다. 이 검증은 Java 동작 테스트를 대체하지 않는다.
