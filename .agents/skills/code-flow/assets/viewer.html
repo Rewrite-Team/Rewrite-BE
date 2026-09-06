@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<title>@@TITLE@@</title>
+<style>@@STYLE@@</style>
+</head>
+<body>
+<main id="code-flow">
+  <header><h1 id="title"></h1><p id="description"></p><small id="snapshot"></small></header>
+  <div class="origin">시작점 <strong id="origin"></strong></div>
+  <div class="legend"><span>▥ 호출 유지 / 하위 호출 반환 대기</span><span>→ 호출 · ⇠ 반환</span><span>녹색 영역: 예상 TX 범위</span><span>alt: 경로 중 하나</span></div>
+  <div id="viewport" aria-label="호출 다이어그램 · 가로와 세로로 이동 가능"><div id="canvas"></div></div>
+  <nav aria-label="다이어그램 이동"><button id="home" type="button">← 시작점</button><label for="pan">가로 이동</label><input id="pan" type="range" min="0" max="0" value="0"><button id="right" type="button">오른쪽 →</button></nav>
+  <section class="selection" aria-live="polite"><strong id="selected"></strong><p id="explanation"></p><details><summary>선택한 호출·단계의 근거 코드</summary><pre id="code"></pre><div id="source"></div></details></section>
+  <footer><details><summary>생략 범위 · 미확정 사항 · 생성 기준</summary><div id="coverage"></div></details><p>소스에서 해석한 구조도입니다. 박스 길이는 실행 시간이 아닙니다. 비동기 연결은 원인 관계이며 스레드 간 시각 비교가 아닙니다.</p></footer>
+</main>
+<script id="flow-data" type="application/json">@@DATA@@</script>
+<script>@@SCRIPT@@</script>
+</body>
+</html>

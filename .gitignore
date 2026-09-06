@@ -36,3 +36,6 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### Code flow validation ###
+.agents/skills/code-flow/**/__pycache__/
