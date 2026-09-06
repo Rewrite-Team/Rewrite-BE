@@ -50,6 +50,16 @@ SPRING_PROFILES_ACTIVE=devtools
 
 위 설정으로 실행한 뒤 `http://localhost:8080/h2-console`로 접근한다. 운영 환경에서는 `devtools` profile을 활성화하지 않는다. Swagger UI는 API 번호, 사용 목적, 사용 화면, 호출 시점, 주요 동작과 오류 조건을 확인하는 핵심 API 문서다. 생성된 OpenAPI는 controller, DTO와 `@RewriteApi`를 기준으로 하며 Notion은 보조 동기화 문서로 사용한다.
 
+## 코드 흐름 탐색
+
+저장소 스킬 [code-flow](.agents/skills/code-flow/SKILL.md)로 Java 호출 흐름을 생성할 수 있습니다.
+
+```text
+$code-flow KeywordAnalysisController.startKeywordAnalysis 흐름 보여줘
+```
+
+AI가 소스를 읽어 호출 데이터를 작성하고, 공통 뷰어가 부모 호출 박스·트랜잭션·분기와 같은 화면에서 펼치는 비동기 흐름을 표시합니다. 결과는 `build/code-flow/`의 독립 HTML, Markdown, 소스 해시 스냅샷입니다. HTML은 서버 없이 열 수 있고 근거 코드 발췌가 포함됩니다. 사용·갱신 절차는 [Codex Workflow](docs/codex-workflow.md#코드-호출-흐름-시각화)를 참고하세요.
+
 ## Documentation
 
 - `AGENTS.md`: Codex가 반드시 따라야 하는 저장소 작업 규칙

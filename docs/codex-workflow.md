@@ -166,3 +166,18 @@ commit 메시지 승인도 issue, PR 초안 승인과 같은 게이트로 처리
 코드 확인 결과 CoverLetter 패키지는 아직 없습니다.
 따라서 자기소개서 기본 CRUD는 미구현 상태로 보는 것이 맞습니다.
 ```
+
+## 코드 호출 흐름 시각화
+
+[저장소 code-flow 스킬](../.agents/skills/code-flow/SKILL.md)은 진입 메서드부터 호출·반환, 대안 분기와 비동기 연결을 한 다이어그램으로 생성한다. AI가 현재 소스와 설정을 읽어 JSON을 작성하고 공통 Python 렌더러가 독립 HTML·Markdown·스냅샷을 내보낸다. Java 전체 정적 분석기나 실제 실행 trace가 아니며, API 계약의 기준 문서를 대체하지 않는다.
+
+- 호출 박스는 한 번의 메서드 실행을 나타낸다. 동기 부모는 하위 호출 반환까지 유지된다.
+- 비동기는 트리거 위치의 버튼으로 오른쪽에 펼친다. 요청 스택과 TX가 전파되는 것으로 표시하지 않는다.
+- 생성 파일은 기존 ignore 대상인 `build/code-flow/`에 둔다. HTML에는 소스 발췌가 포함된다.
+- 공유 전 또는 다시 사용할 때 `check`로 기록된 소스 파일의 변경·삭제를 확인한다. 변경 시 현재 코드를 다시 읽어 모델과 줄 번호를 갱신한 뒤 재생성한다. 새 파일이나 분석에서 누락한 의존성은 해시 검사로 찾을 수 없다.
+
+```bash
+python3 .agents/skills/code-flow/scripts/code_flow.py check --repo . --snapshot build/code-flow/api-020.snapshot.json
+```
+
+스킬 목록에 아직 나타나지 않으면 `.agents/skills/code-flow/SKILL.md`를 지정해 사용을 요청할 수 있다. 기존 예제를 서버 없이 내보내는 명령과 스킬 자체의 검증 절차는 [검증 가이드](../.agents/skills/code-flow/references/validation.md)에 있다. 예제는 해당 소스 기준의 해석 자료이며 현재 코드와 대조해서 사용한다.

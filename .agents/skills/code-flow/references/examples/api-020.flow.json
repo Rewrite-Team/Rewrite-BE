@@ -1,0 +1,471 @@
+{
+  "version": 1,
+  "title": "API-020 · 키워드 분석 시작",
+  "description": "Controller → Service → 커밋 후 비동기 분석. 한 화면에서 대안 경로와 호출의 유지 범위를 읽는다.",
+  "entry": "controller",
+  "sources": [
+    {
+      "id": "controller",
+      "path": "src/main/java/com/daon/rewrite/keywordanalysis/controller/KeywordAnalysisController.java",
+      "start": 20,
+      "end": 42
+    },
+    {
+      "id": "service",
+      "path": "src/main/java/com/daon/rewrite/keywordanalysis/service/KeywordAnalysisService.java",
+      "start": 50,
+      "end": 92
+    },
+    {
+      "id": "lock",
+      "path": "src/main/java/com/daon/rewrite/coverletter/repository/CoverLetterRepository.java",
+      "start": 23,
+      "end": 35
+    },
+    {
+      "id": "running",
+      "path": "src/main/java/com/daon/rewrite/llmjob/service/LlmJobService.java",
+      "start": 48,
+      "end": 57
+    },
+    {
+      "id": "listener",
+      "path": "src/main/java/com/daon/rewrite/keywordanalysis/service/KeywordAnalysisJobEventListener.java",
+      "start": 20,
+      "end": 29
+    },
+    {
+      "id": "worker",
+      "path": "src/main/java/com/daon/rewrite/keywordanalysis/service/KeywordAnalysisJobWorker.java",
+      "start": 20,
+      "end": 49
+    },
+    {
+      "id": "start",
+      "path": "src/main/java/com/daon/rewrite/keywordanalysis/service/KeywordAnalysisJobTransactionService.java",
+      "start": 60,
+      "end": 105
+    },
+    {
+      "id": "complete",
+      "path": "src/main/java/com/daon/rewrite/keywordanalysis/service/KeywordAnalysisJobTransactionService.java",
+      "start": 107,
+      "end": 147
+    },
+    {
+      "id": "fail",
+      "path": "src/main/java/com/daon/rewrite/keywordanalysis/service/KeywordAnalysisJobTransactionService.java",
+      "start": 149,
+      "end": 170
+    },
+    {
+      "id": "unexpected",
+      "path": "src/main/java/com/daon/rewrite/keywordanalysis/service/KeywordAnalysisJobTransactionService.java",
+      "start": 172,
+      "end": 190
+    },
+    {
+      "id": "client",
+      "path": "src/main/java/com/daon/rewrite/keywordanalysis/client/OpenAiKeywordAnalysisClient.java",
+      "start": 39,
+      "end": 55
+    },
+    {
+      "id": "dto",
+      "path": "src/main/java/com/daon/rewrite/keywordanalysis/dto/StartKeywordAnalysisResponse.java",
+      "start": 1,
+      "end": 17
+    },
+    {
+      "id": "async-config",
+      "path": "src/main/java/com/daon/rewrite/global/config/AsyncConfig.java",
+      "start": 1,
+      "end": 9
+    }
+  ],
+  "omitted": [
+    "인증·CSRF 필터, 생성자·getter, Spring 프록시 내부, Repository의 프레임워크 내부를 생략했다.",
+    "자기소개서 조회 실패의 NOT_FOUND는 Repository 반환 이후 Service에서 발생한다. 상세 예외 경로는 개요 노트로 축약했다.",
+    "Listener의 Job 조회·dispatch와 Worker의 실패 처리 private 메서드는 개요 안에 묶었다.",
+    "Job terminal 상태에 따른 조기 종료, 클라이언트 검증 내부, 실패 기록 자체의 예외·로그 처리는 근거 코드에서 확인한다.",
+    "SSE와 최종 결과 재조회는 API-016/API-021의 별도 요청이므로 이 호출 스택에 포함하지 않았다."
+  ],
+  "uncertain": [
+    "정적 소스 해석이며 T1/T2/T3의 실제 실행은 계측하지 않았다.",
+    "HTTP 응답과 비동기 Worker의 시작·완료 순서는 고정할 수 없다.",
+    "트랜잭션 범위는 주요 사용자 코드 경계다. 생략한 Repository 내부 트랜잭션의 부재를 뜻하지 않는다."
+  ],
+  "calls": [
+    {
+      "id": "controller",
+      "class": "KeywordAnalysisController",
+      "method": "startKeywordAnalysis(coverLetterId)",
+      "source": "controller",
+      "steps": [
+        {
+          "type": "call",
+          "target": "service",
+          "source": "controller"
+        },
+        {
+          "type": "call",
+          "target": "dto",
+          "source": "controller"
+        }
+      ],
+      "returns": "HTTP 200 · status=PROCESSING, jobId (예외는 공통 처리기로 전파)",
+      "note": "Service 호출이 끝날 때까지 Controller 호출이 유지된다."
+    },
+    {
+      "id": "service",
+      "class": "KeywordAnalysisService",
+      "method": "startMyKeywordAnalysis(coverLetterId)",
+      "source": "service",
+      "steps": [
+        {
+          "type": "note",
+          "text": "currentUser()로 사용자 확인",
+          "source": "service"
+        },
+        {
+          "type": "call",
+          "target": "lock",
+          "source": "service"
+        },
+        {
+          "type": "note",
+          "text": "대상이 없으면 NOT_FOUND → T1 롤백 → HTTP 404",
+          "source": "service"
+        },
+        {
+          "type": "branch",
+          "label": "성공한 첨삭 버전 존재 여부",
+          "source": "service",
+          "cases": [
+            {
+              "when": "latestReviewedVersionId == null",
+              "steps": [
+                {
+                  "type": "throw",
+                  "text": "CONFLICT → T1 롤백 → HTTP 409",
+                  "source": "service"
+                }
+              ]
+            },
+            {
+              "when": "성공한 첨삭 버전 있음",
+              "steps": [
+                {
+                  "type": "call",
+                  "target": "running",
+                  "source": "service"
+                },
+                {
+                  "type": "branch",
+                  "label": "진행 중 Job에 따른 세 경로 중 하나",
+                  "source": "service",
+                  "cases": [
+                    {
+                      "when": "동일 KEYWORD_ANALYSIS 진행 중",
+                      "steps": [
+                        {
+                          "type": "note",
+                          "text": "기존 KeywordAnalysis 조회",
+                          "source": "service"
+                        },
+                        {
+                          "type": "return",
+                          "text": "기존 Job 반환 · 새 이벤트 발행 없음",
+                          "source": "service"
+                        }
+                      ]
+                    },
+                    {
+                      "when": "다른 종류의 Job 진행 중",
+                      "steps": [
+                        {
+                          "type": "throw",
+                          "text": "LLM_JOB_ALREADY_RUNNING → T1 롤백 → HTTP 409",
+                          "source": "service"
+                        }
+                      ]
+                    },
+                    {
+                      "when": "진행 중 Job 없음",
+                      "steps": [
+                        {
+                          "type": "note",
+                          "text": "KeywordAnalysis 조회 → 기존 분석 재시작 또는 새 분석 저장 → PENDING Job 저장",
+                          "source": "service"
+                        },
+                        {
+                          "type": "note",
+                          "text": "publishEvent(LlmJobCreatedEvent(jobId)) · Service 본문 반환 뒤 프록시가 T1 커밋",
+                          "source": "service"
+                        },
+                        {
+                          "type": "async",
+                          "target": "listener",
+                          "source": "listener",
+                          "label": "LlmJobCreatedEvent → KeywordAnalysisJobEventListener",
+                          "trigger": "새 Job 경로 · T1 AFTER_COMMIT + @Async (호출 본문에서 즉시 실행 아님)"
+                        },
+                        {
+                          "type": "return",
+                          "text": "StartKeywordAnalysisResult · 새 Job",
+                          "source": "service"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "returns": "선택 경로의 결과 · 정상 반환 시 T1 커밋 / 예외 시 롤백",
+      "note": "비동기 연결의 trigger는 커밋 이후를 뜻한다. 녹색 영역은 이벤트 발행을 포함하지만 Worker를 포함하지 않는다.",
+      "tx": {
+        "id": "T1",
+        "label": "REQUIRED · Service 프록시의 요청 트랜잭션"
+      }
+    },
+    {
+      "id": "lock",
+      "class": "CoverLetterRepository",
+      "method": "findActiveByIdAndOwnerIdForUpdate(...)",
+      "source": "lock",
+      "steps": [],
+      "returns": "Optional<CoverLetter>",
+      "note": "T1의 데이터 접근 · PESSIMISTIC_WRITE"
+    },
+    {
+      "id": "running",
+      "class": "LlmJobService",
+      "method": "findRunningCoverLetterJob(coverLetterId)",
+      "source": "running",
+      "steps": [],
+      "returns": "LlmJob 또는 null",
+      "note": "같은 스레드의 T1 안에서 Repository 조회. 이 메서드 자체에는 @Transactional이 없다."
+    },
+    {
+      "id": "dto",
+      "class": "StartKeywordAnalysisResponse",
+      "method": "from(result)",
+      "source": "dto",
+      "steps": [],
+      "returns": "status, jobId",
+      "note": "트랜잭션이 끝난 뒤 DTO로 변환한다."
+    },
+    {
+      "id": "listener",
+      "class": "KeywordAnalysisJobEventListener",
+      "method": "handle(event) → dispatch(job)",
+      "source": "listener",
+      "steps": [
+        {
+          "type": "note",
+          "text": "Job 조회 · KEYWORD_ANALYSIS인 경우만 Worker 호출",
+          "source": "listener"
+        },
+        {
+          "type": "call",
+          "target": "worker",
+          "source": "listener"
+        }
+      ],
+      "returns": "void · 별도 스택 종료",
+      "note": "handle→dispatch는 동일 클래스의 두 호출을 묶은 개요다. 요청 스레드의 T1은 전파되지 않는다."
+    },
+    {
+      "id": "worker",
+      "class": "KeywordAnalysisJobWorker",
+      "method": "execute(jobId)",
+      "source": "worker",
+      "steps": [
+        {
+          "type": "branch",
+          "label": "try 경로 또는 catch 경로 · 오류 위치에 따라 선행 호출은 달라짐",
+          "source": "worker",
+          "cases": [
+            {
+              "when": "예외 없이 실행",
+              "steps": [
+                {
+                  "type": "call",
+                  "target": "start",
+                  "source": "worker"
+                },
+                {
+                  "type": "branch",
+                  "label": "입력 준비 결과",
+                  "source": "worker",
+                  "cases": [
+                    {
+                      "when": "start() == null",
+                      "steps": [
+                        {
+                          "type": "return",
+                          "text": "Worker 조기 종료 · 분석 호출 없음",
+                          "source": "worker"
+                        }
+                      ]
+                    },
+                    {
+                      "when": "Work 반환",
+                      "steps": [
+                        {
+                          "type": "call",
+                          "target": "client",
+                          "source": "worker"
+                        },
+                        {
+                          "type": "call",
+                          "target": "complete",
+                          "source": "worker"
+                        },
+                        {
+                          "type": "return",
+                          "text": "분석 저장 완료 · void",
+                          "source": "worker"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "when": "KeywordAnalysisClientException 포착",
+              "steps": [
+                {
+                  "type": "note",
+                  "text": "analyze()에서 오류 발생. 실패 전 부분 실행과 failByClientException() 내부 호출을 축약",
+                  "source": "worker"
+                },
+                {
+                  "type": "call",
+                  "target": "failure",
+                  "source": "worker"
+                },
+                {
+                  "type": "return",
+                  "text": "실패 기록 후 void",
+                  "source": "worker"
+                }
+              ]
+            },
+            {
+              "when": "그 외 RuntimeException 포착",
+              "steps": [
+                {
+                  "type": "note",
+                  "text": "start/analyze/complete 중 오류 발생. 실패 전 부분 실행과 failByUnexpectedException() 내부 호출을 축약",
+                  "source": "worker"
+                },
+                {
+                  "type": "call",
+                  "target": "unexpected",
+                  "source": "worker"
+                },
+                {
+                  "type": "return",
+                  "text": "실패 기록 후 void",
+                  "source": "worker"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "returns": "void · Listener로 반환",
+      "note": "try는 start, analyze, complete를 감싼다. catch 경로는 start 또는 complete에서 발생한 RuntimeException도 포함한다. 대안 구간의 높이는 실제 발생 순서를 나타내지 않는다."
+    },
+    {
+      "id": "start",
+      "class": "KeywordAnalysisJobTransactionService",
+      "method": "start(jobId)",
+      "source": "start",
+      "steps": [
+        {
+          "type": "note",
+          "text": "Job·자기소개서 잠금, 분석 입력 조회, PROCESSING 전환",
+          "source": "start"
+        }
+      ],
+      "returns": "T2 커밋 후 Work 또는 null; 오류 시 롤백 후 예외",
+      "note": "외부 T1과 별도이며 Worker에 기존 트랜잭션이 없어 REQUIRED가 새 트랜잭션을 만든다.",
+      "tx": {
+        "id": "T2",
+        "label": "REQUIRED · 분석 입력 준비"
+      }
+    },
+    {
+      "id": "client",
+      "class": "OpenAiKeywordAnalysisClient",
+      "method": "analyze(request)",
+      "source": "client",
+      "steps": [],
+      "returns": "키워드 결과 목록 / KeywordAnalysisClientException",
+      "note": "LLM 호출과 결과 검증. T2 커밋 이후이며 T3 시작 전이다."
+    },
+    {
+      "id": "complete",
+      "class": "KeywordAnalysisJobTransactionService",
+      "method": "complete(jobId, results)",
+      "source": "complete",
+      "steps": [
+        {
+          "type": "note",
+          "text": "기존 키워드 교체, 분석·Job COMPLETED",
+          "source": "complete"
+        }
+      ],
+      "returns": "T3 커밋 후 void; 오류 시 롤백 후 예외",
+      "note": "terminal 상태 조기 반환 등은 소스에서 확인한다.",
+      "tx": {
+        "id": "T3",
+        "label": "REQUIRED · 분석 결과 저장"
+      }
+    },
+    {
+      "id": "failure",
+      "class": "KeywordAnalysisJobTransactionService",
+      "method": "fail(jobId, reason)",
+      "source": "fail",
+      "steps": [
+        {
+          "type": "note",
+          "text": "Job·KeywordAnalysis FAILED 기록",
+          "source": "fail"
+        }
+      ],
+      "returns": "실패 기록 TX 커밋 후 void",
+      "note": "이미 커밋된 T1/T2를 되돌리지 않는다.",
+      "tx": {
+        "id": "TF",
+        "label": "REQUIRED · Client 실패 기록"
+      }
+    },
+    {
+      "id": "unexpected",
+      "class": "KeywordAnalysisJobTransactionService",
+      "method": "failUnexpected(jobId)",
+      "source": "unexpected",
+      "steps": [
+        {
+          "type": "note",
+          "text": "Job FAILED, PROCESSING 분석이 있으면 FAILED",
+          "source": "unexpected"
+        }
+      ],
+      "returns": "실패 기록 TX 커밋 후 void",
+      "note": "실패 기록 자체가 실패하면 Worker에서 로그를 남긴다.",
+      "tx": {
+        "id": "TU",
+        "label": "REQUIRED · 예상 밖 실패 기록"
+      }
+    }
+  ]
+}

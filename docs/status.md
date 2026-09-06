@@ -40,6 +40,7 @@ API 계약과 API별 상태는 `docs/api/README.md`와 `docs/api/` 하위 도메
 | [#84](https://github.com/Rewrite-Team/Rewrite-BE/issues/84) | AI 첨삭 실시간 조회 및 키워드 화면 API 계약 개편 | In Progress | 문서 계약 확정 후 구현 이슈를 작은 단위로 분리 |
 | [#86](https://github.com/Rewrite-Team/Rewrite-BE/issues/86) | AI 개발 하네스 및 검증 루프 고도화 | In Progress | 단순한 개발 원칙, 위험도 기반 독립 리뷰, 변경 영향 완결성과 Issue·Commit·PR 품질 기준 정리 |
 | [#102](https://github.com/Rewrite-Team/Rewrite-BE/issues/102) | Swagger UI API 계약 문서화 기반 구축 | Verified | 활성 API 29개 `@RewriteApi`, 오류 example과 OAuth redirect 문서화 적용. 전수 coverage·운영 프로필 OpenAPI 테스트, Swagger UI 시각 검증, 독립 리뷰, `./gradlew check` 통과 |
+| [#105](https://github.com/Rewrite-Team/Rewrite-BE/issues/105) | 코드 호출 흐름 시각화 스킬과 공통 뷰어 구축 | Verified | 2026-09-06: 저장소 스킬·공통 뷰어·API-003/020 예제 구현. Python 10개, 스킬 형식·소스 해시·Chrome 동작/시각 검증, 독립 사용 리뷰 및 수정 재검증 통과. `./gradlew test` 53개·`./gradlew check` 통과. 제품·API·TX 동작 변경 없음 |
 
 ## Current Recommended Next Work
 
