@@ -260,12 +260,12 @@ public class CoverLetterService {
          */
         coverLetter.startReview(now);
 
-        // 비동기 첨삭을 시작하는 이벤트를 발행
         /*
-        ReviewJobEventListener.java의 리스너가 FirstReviewJobWorker.execute(jobId)를 실행
-        AFTER_COMMIT: Job과 자기소개서 상태가 DB에 정상 커밋된 후
-        @Async: 별도 비동기 스레드에서 진행
+         * IMPROVE
+         *  현재 구조에서는 LlmJobCreatedEvent가 애플리케이션 메모리 안에서만 전달된다. 따라서 커밋 직후 종료되면 인메모리 이벤트가 유실될 수 있다.
+         *  서버 재시작 중 Job 유실 방지나 Worker 수평 확장이 필요해지는 시점에 "Outbox 패턴 + 메시지큐 + 독립 Worker" 구조로 전환 필요
          */
+        // 비동기 첨삭을 시작하는 이벤트 발행 (ReviewJobEventListener.java의 리스너가 FirstReviewJobWorker.execute(jobId) 실행)
         eventPublisher.publishEvent(new LlmJobCreatedEvent(job.getId()));
 
         // AI 첨삭 완료를 기다리지 않고 REVIEWING과 jobId를 바로 반환

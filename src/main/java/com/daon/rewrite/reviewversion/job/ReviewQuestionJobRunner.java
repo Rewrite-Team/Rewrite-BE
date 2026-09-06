@@ -23,9 +23,9 @@ class ReviewQuestionJobRunner {
     private final Executor executor;
 
     ReviewQuestionJobRunner(
-            ReviewClient reviewClient,
-            ReviewJobQuestionTransactionService transactionService,
-            @Qualifier("reviewQuestionExecutor") Executor executor
+            ReviewClient reviewClient,  // 실제 AI 첨삭 요청, 문항 하나를 처리해 ReviewResult 반환
+            ReviewJobQuestionTransactionService transactionService, // 성공한 문항 결과, 실패 상태, 재시도 횟수를 DB에 저장, 각 작업을 별도 트랜잭션으로 처리
+            @Qualifier("reviewQuestionExecutor") Executor executor  // 문항을 어느 스레드에서 실행할지 결정, reviewQuestionExecutor 라는 전용 스레드 풀을 사용
     ) {
         this.reviewClient = reviewClient;
         this.transactionService = transactionService;
@@ -36,7 +36,7 @@ class ReviewQuestionJobRunner {
         // 문항별 비동기 작업 생성
         List<CompletableFuture<Optional<ReviewClientException.Reason>>> futures = request.questions().stream()
                 .map(question -> CompletableFuture.supplyAsync(
-                        () -> reviewQuestion(jobId, request, question),
+                        () -> reviewQuestion(jobId, request, question),     // 각 작업은 reviewQuestion(...) 호출
                         executor
                 ))
                 .toList();
@@ -65,7 +65,9 @@ class ReviewQuestionJobRunner {
     ) {
         for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
             try {
+                // OpenAiReviewClient 에서 AI API 호출하며 첨삭 진행하고 ReviewResult 형식으로 결과를 정리하여 반환
                 ReviewResult result = reviewClient.reviewQuestion(request, question.questionId());
+                // FirstReviewJobTransactionService 에서 생성한 '각 문항마다 AI응답을 받기 전 임시 처리 결과 객체 ReviewJobQuestionResult' 를 완료 처리, job의 progress 업데이트
                 transactionService.completeQuestion(jobId, result);
                 return Optional.empty();
             } catch (ReviewClientException exception) {
