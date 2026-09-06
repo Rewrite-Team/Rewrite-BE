@@ -1,4 +1,4 @@
-package com.daon.rewrite.keywordanalysis.service;
+package com.daon.rewrite.keywordanalysis.job;
 
 import com.daon.rewrite.keywordanalysis.client.KeywordAnalysisClient;
 import com.daon.rewrite.keywordanalysis.client.KeywordAnalysisClientException;

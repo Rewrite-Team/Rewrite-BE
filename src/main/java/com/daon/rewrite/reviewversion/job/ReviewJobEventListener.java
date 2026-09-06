@@ -1,4 +1,4 @@
-package com.daon.rewrite.reviewversion.service;
+package com.daon.rewrite.reviewversion.job;
 
 import com.daon.rewrite.llmjob.entity.LlmJob;
 import com.daon.rewrite.llmjob.repository.LlmJobRepository;
@@ -11,12 +11,13 @@ import org.springframework.transaction.event.TransactionalEventListener;
 
 @Component
 @RequiredArgsConstructor
-class FirstReviewJobEventListener {
+class ReviewJobEventListener {
 
     private final LlmJobRepository llmJobRepository;
     private final FirstReviewJobWorker firstReviewJobWorker;
     private final ReReviewJobWorker reReviewJobWorker;
 
+    // 해당 이벤트를 호출한 지점의 transaction이 정상적으로 커밋된 후, 별도의 스레드에서 Job Worker 실행
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handle(LlmJobCreatedEvent event) {

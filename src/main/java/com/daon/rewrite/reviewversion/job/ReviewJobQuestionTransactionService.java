@@ -1,4 +1,4 @@
-package com.daon.rewrite.reviewversion.service;
+package com.daon.rewrite.reviewversion.job;
 
 import com.daon.rewrite.global.exception.BusinessException;
 import com.daon.rewrite.global.exception.ErrorCode;

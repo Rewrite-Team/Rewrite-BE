@@ -1,12 +1,9 @@
-package com.daon.rewrite.reviewversion.service;
+package com.daon.rewrite.reviewversion.job;
 
 import com.daon.rewrite.coverletter.entity.CoverLetter;
-import com.daon.rewrite.coverletter.entity.CoverLetterQuestion;
 import com.daon.rewrite.coverletter.entity.CoverLetterStatus;
-import com.daon.rewrite.coverletter.repository.CoverLetterQuestionRepository;
 import com.daon.rewrite.global.exception.BusinessException;
 import com.daon.rewrite.global.exception.ErrorCode;
-import com.daon.rewrite.global.util.IdGenerator;
 import com.daon.rewrite.llmjob.entity.LlmJob;
 import com.daon.rewrite.llmjob.entity.LlmJobStatus;
 import com.daon.rewrite.llmjob.entity.LlmJobTargetType;
@@ -15,6 +12,7 @@ import com.daon.rewrite.llmjob.service.CoverLetterJobLockService;
 import com.daon.rewrite.reviewversion.client.ReviewClientException;
 import com.daon.rewrite.reviewversion.client.ReviewQuestion;
 import com.daon.rewrite.reviewversion.client.ReviewRequest;
+import com.daon.rewrite.llmjob.entity.LlmJobRequestRefType;
 import com.daon.rewrite.reviewversion.entity.ReviewJobQuestionResult;
 import com.daon.rewrite.reviewversion.repository.ReviewJobQuestionResultRepository;
 import lombok.RequiredArgsConstructor;
@@ -27,51 +25,45 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-class FirstReviewJobTransactionService {
+class ReReviewJobTransactionService {
 
-    private static final String STARTED_MESSAGE = "첨삭을 시작합니다.";
-    private static final String FAILED_MESSAGE = "LLM 첨삭에 실패했습니다.";
+    private static final String STARTED_MESSAGE = "재첨삭을 시작합니다.";
+    private static final String FAILED_MESSAGE = "LLM 재첨삭에 실패했습니다.";
     private static final String PROVIDER_ERROR_CODE = "LLM_PROVIDER_ERROR";
     private static final String PROVIDER_ERROR_MESSAGE = "LLM 응답 생성에 실패했습니다.";
     private static final String OUTPUT_VALIDATION_ERROR_CODE = "LLM_OUTPUT_VALIDATION_FAILED";
     private static final String OUTPUT_VALIDATION_ERROR_MESSAGE = "LLM 출력 형식이 올바르지 않습니다.";
     private static final String UNEXPECTED_ERROR_CODE = "INTERNAL_ERROR";
-    private static final String UNEXPECTED_ERROR_MESSAGE = "첨삭 처리 중 오류가 발생했습니다.";
-    private static final String JOB_QUESTION_RESULT_ID_PREFIX = "rjqr";
+    private static final String UNEXPECTED_ERROR_MESSAGE = "재첨삭 처리 중 오류가 발생했습니다.";
 
     private final CoverLetterJobLockService coverLetterJobLockService;
-    private final CoverLetterQuestionRepository questionRepository;
-    private final ReviewJobQuestionResultRepository jobQuestionResultRepository;
-    private final IdGenerator idGenerator;
+    private final ReviewJobQuestionResultRepository questionResultRepository;
     private final Clock clock;
 
     @Transactional
     public ReviewWork start(String jobId) {
         CoverLetterJobLockService.LockedCoverLetterJob locked = coverLetterJobLockService.lock(jobId);
-        LlmJob job = validateFirstReviewJob(locked.job());
+        LlmJob job = validateReReviewJob(locked.job());
         if (job.getStatus() != LlmJobStatus.PENDING) {
             return null;
         }
 
         CoverLetter coverLetter = locked.coverLetter();
-        if (coverLetter.getStatus() != CoverLetterStatus.REVIEWING) {
+        if (coverLetter.getStatus() != CoverLetterStatus.REVIEWING
+                || coverLetter.getLatestReviewedVersionId() == null) {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR);
         }
 
-        List<CoverLetterQuestion> questions = questionRepository
-                .findByCoverLetterIdOrderByQuestionOrderAsc(coverLetter.getId());
-        if (questions.isEmpty()) {
+        if (job.getRequestRefType() != LlmJobRequestRefType.REVIEW_VERSION
+                || job.getRequestRefId() == null) {
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR);
+        }
+        List<ReviewJobQuestionResult> questionResults = questionResultRepository
+                .findByLlmJobIdOrderByQuestionOrderAsc(job.getId());
+        if (questionResults.isEmpty() || questionResults.size() != job.getProgressTotal()) {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR);
         }
 
-        jobQuestionResultRepository.saveAll(questions.stream()
-                .map(question -> ReviewJobQuestionResult.processing(
-                        idGenerator.generate(JOB_QUESTION_RESULT_ID_PREFIX),
-                        job,
-                        question,
-                        question.getOriginalAnswer()
-                ))
-                .toList());
         job.startProcessing(STARTED_MESSAGE);
         return new ReviewWork(new ReviewRequest(
                 coverLetter.getTitle(),
@@ -79,13 +71,14 @@ class FirstReviewJobTransactionService {
                 coverLetter.getPositionTitle(),
                 coverLetter.getJobPostingUrl(),
                 coverLetter.getPreferences(),
-                questions.stream()
-                        .map(question -> new ReviewQuestion(
-                                question.getId(),
-                                question.getQuestionOrder(),
-                                question.getQuestion(),
-                                question.getMaxAnswerLength(),
-                                question.getOriginalAnswer()
+                job.getRequestInstruction(),
+                questionResults.stream()
+                        .map(result -> new ReviewQuestion(
+                                result.getQuestion().getId(),
+                                result.getQuestionOrder(),
+                                result.getQuestionText(),
+                                result.getMaxAnswerLength(),
+                                result.getInputAnswer()
                         ))
                         .toList()
         ));
@@ -94,7 +87,7 @@ class FirstReviewJobTransactionService {
     @Transactional
     public void fail(String jobId, ReviewClientException.Reason reason) {
         CoverLetterJobLockService.LockedCoverLetterJob locked = coverLetterJobLockService.lock(jobId);
-        LlmJob job = validateFirstReviewJob(locked.job());
+        LlmJob job = validateReReviewJob(locked.job());
         if (job.getStatus().isTerminal()) {
             return;
         }
@@ -114,23 +107,25 @@ class FirstReviewJobTransactionService {
 
     @Transactional
     public void failUnexpected(String jobId) {
-        fail(jobId, UNEXPECTED_ERROR_CODE, UNEXPECTED_ERROR_MESSAGE);
-    }
-
-    private void fail(String jobId, String errorCode, String errorMessage) {
         CoverLetterJobLockService.LockedCoverLetterJob locked = coverLetterJobLockService.lock(jobId);
-        LlmJob job = validateFirstReviewJob(locked.job());
+        LlmJob job = validateReReviewJob(locked.job());
         if (job.getStatus().isTerminal()) {
             return;
         }
         CoverLetter coverLetter = locked.coverLetter();
         Instant now = Instant.now(clock);
-        job.markFailed(job.getProgressCurrent(), FAILED_MESSAGE, errorCode, errorMessage, now);
+        job.markFailed(
+                job.getProgressCurrent(),
+                FAILED_MESSAGE,
+                UNEXPECTED_ERROR_CODE,
+                UNEXPECTED_ERROR_MESSAGE,
+                now
+        );
         coverLetter.failReview(now);
     }
 
-    private LlmJob validateFirstReviewJob(LlmJob job) {
-        if (job.getType() != LlmJobType.COVER_LETTER_REVIEW
+    private LlmJob validateReReviewJob(LlmJob job) {
+        if (job.getType() != LlmJobType.COVER_LETTER_RE_REVIEW
                 || job.getTargetType() != LlmJobTargetType.COVER_LETTER) {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR);
         }

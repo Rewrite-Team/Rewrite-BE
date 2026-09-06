@@ -1,4 +1,4 @@
-package com.daon.rewrite.interview.service;
+package com.daon.rewrite.interview.job;
 
 import com.daon.rewrite.coverletter.entity.CoverLetter;
 import com.daon.rewrite.global.exception.BusinessException;

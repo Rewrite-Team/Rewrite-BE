@@ -1,4 +1,4 @@
-package com.daon.rewrite.keywordanalysis.service;
+package com.daon.rewrite.interview.job;
 
 import com.daon.rewrite.llmjob.entity.LlmJob;
 import com.daon.rewrite.llmjob.entity.LlmJobType;
@@ -12,10 +12,10 @@ import org.springframework.transaction.event.TransactionalEventListener;
 
 @Component
 @RequiredArgsConstructor
-class KeywordAnalysisJobEventListener {
+class InterviewQuestionGenerationJobEventListener {
 
     private final LlmJobRepository llmJobRepository;
-    private final KeywordAnalysisJobWorker worker;
+    private final InterviewQuestionGenerationJobWorker worker;
 
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
@@ -24,7 +24,7 @@ class KeywordAnalysisJobEventListener {
     }
 
     private void dispatch(LlmJob job) {
-        if (job.getType() == LlmJobType.KEYWORD_ANALYSIS) {
+        if (job.getType().isInterviewQuestionGeneration()) {
             worker.execute(job.getId());
         }
     }

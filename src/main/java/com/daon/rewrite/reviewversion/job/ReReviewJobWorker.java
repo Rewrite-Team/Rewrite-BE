@@ -1,6 +1,7 @@
-package com.daon.rewrite.reviewversion.service;
+package com.daon.rewrite.reviewversion.job;
 
 import com.daon.rewrite.reviewversion.client.ReviewClientException;
+import com.daon.rewrite.reviewversion.service.ReviewVersionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
