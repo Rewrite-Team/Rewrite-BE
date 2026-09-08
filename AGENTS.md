@@ -43,6 +43,9 @@
 - 큰 변경이나 완료 전 검증은 `./gradlew check` 또는 프로젝트에 정의된 동등한 검증 명령을 실행한다.
 - 새 동작이나 변경된 동작에는 테스트를 추가하거나 갱신한다.
 - 검증 명령을 실행하지 못했으면 최종 응답에 이유를 명확히 적는다.
+- Codex의 일반 구현·로컬 검증에서는 Docker Desktop 또는 Docker daemon을 시작하지 않고, `docker`, `docker compose`와 Testcontainers처럼 Docker를 사용하는 명령·테스트를 실행하지 않는다.
+- `./gradlew test` 또는 `./gradlew check`가 실행 중인 Docker에 연결해 Testcontainers 테스트를 시작할 수 있으면 Docker 비의존 테스트만 좁게 실행하고, 전체 검증을 생략한 이유와 남은 검증을 최종 응답에 기록한다.
+- Docker 사용은 사용자가 해당 작업에서 명시적으로 요청한 경우에만 허용한다. 이 제한은 일반 검증 명령보다 우선한다.
 
 ## API documentation rules
 
