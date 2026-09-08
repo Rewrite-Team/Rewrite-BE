@@ -11,7 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@Profile("!local & !test")
+@Profile({"prod", "auth-test"})
 @RequiredArgsConstructor
 public class OAuthStateService {
 

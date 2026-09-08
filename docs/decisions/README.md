@@ -123,3 +123,4 @@ API 계약: `../api/README.md`
 | Decision 098 | 면접 피드백은 검증된 전체 문장을 분할해 점진 전송한다 | `interviews.md` | REQ-010 | API-016, API-023, API-029 | Active |
 | Decision 099 | 면접 질문 목록은 최신 질문 우선 cursor 무한 스크롤로 조회한다 | `interviews.md` | REQ-010 | API-026 | Active |
 | Decision 100 | Swagger UI를 핵심 API 문서로 사용한다 | `common.md` | REQ-001, REQ-003 - REQ-010 | API-001 - API-030 | Active |
+| Decision 101 | 운영 DB는 PostgreSQL을 사용하고 H2는 로컬·테스트로 제한한다 | `persistence.md` | REQ-007 | 내부 persistence | Active |

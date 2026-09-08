@@ -15,7 +15,7 @@ import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 
 @Configuration
-@Profile("!local & !test")
+@Profile({"prod", "auth-test"})
 @EnableConfigurationProperties(InternalToolsProperties.class)
 public class InternalToolsSecurityConfig {
 

@@ -7,17 +7,24 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.sql.Connection;
 import java.util.Base64;
+import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.test.context.ActiveProfiles;
 
 @SpringBootTest(
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "spring.h2.console.enabled=true"
+        properties = {
+                "spring.h2.console.enabled=true",
+                "rewrite.internal-tools.username=rewrite-tools",
+                "rewrite.internal-tools.password=test-password"
+        }
 )
-@ActiveProfiles({"auth-test", "devtools"})
+@ActiveProfiles({"local", "test"})
 class H2ConsoleSecurityIntegrationTest {
 
     private static final String BASIC_AUTH = "Basic " + Base64.getEncoder().encodeToString(
@@ -27,7 +34,17 @@ class H2ConsoleSecurityIntegrationTest {
     @LocalServerPort
     private int port;
 
+    @Autowired
+    private DataSource dataSource;
+
     private final HttpClient httpClient = HttpClient.newHttpClient();
+
+    @Test
+    void usesIsolatedTestDatabase() throws Exception {
+        try (Connection connection = dataSource.getConnection()) {
+            assertThat(connection.getMetaData().getURL()).contains("jdbc:h2:mem:rewrite-test");
+        }
+    }
 
     @Test
     void h2ConsoleRequiresInternalToolsCredentials() throws Exception {

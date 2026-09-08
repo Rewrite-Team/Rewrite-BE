@@ -9,6 +9,8 @@ Rewrite 서비스의 Java Spring Boot 백엔드 프로젝트입니다.
 - Gradle
 - Spring WebMVC
 - Jakarta Validation
+- PostgreSQL
+- H2 (local/test)
 - Spring AI
 - JUnit 5
 
@@ -23,7 +25,36 @@ Run tests:
 Run the application:
 
 ```bash
-OPENAI_API_KEY=your-api-key ./gradlew bootRun
+SPRING_PROFILES_ACTIVE=local OPENAI_API_KEY=your-api-key ./gradlew bootRun
+```
+
+Run with PostgreSQL:
+
+```bash
+SPRING_PROFILES_ACTIVE=prod \
+DB_URL=jdbc:postgresql://localhost:5432/rewrite \
+DB_USERNAME=rewrite \
+DB_PASSWORD=your-password \
+OPENAI_API_KEY=your-api-key \
+./gradlew bootRun
+```
+
+`prod` profile은 PostgreSQL을 사용하고, `local` profile은 파일형 H2를 사용한다. 기존 H2 데이터는 PostgreSQL로 자동 이관되지 않는다. Flyway 도입은 후속 이슈에서 진행한다.
+
+### 실행 프로필
+
+| 지정한 profile | 함께 활성화되는 profile | DB | 인증 | H2 Console |
+|---|---|---|---|---|
+| `local` | `local`, `h2` | 파일형 H2 | 개발용 고정 사용자 | 활성화 |
+| `prod` | `prod` | PostgreSQL | 실제 카카오/JWT 인증 | 비활성화 |
+| `test` | `test` | 인메모리 H2 | 테스트용 설정 | 비활성화 |
+| `auth-test` | `auth-test` | 인메모리 H2 | 실제 인증 통합 테스트 설정 | 비활성화 |
+
+`local`은 `application.yaml`의 profile group 설정에 따라 `h2` profile을 함께 활성화한다. 실행 환경은 `SPRING_PROFILES_ACTIVE`로 지정한다.
+
+```bash
+SPRING_PROFILES_ACTIVE=local     # 일반 로컬 개발
+SPRING_PROFILES_ACTIVE=prod      # 운영 PostgreSQL 실행
 ```
 
 ## API 확인
@@ -33,7 +64,7 @@ OPENAI_API_KEY=your-api-key ./gradlew bootRun
 - Swagger UI: `http://localhost:8080/swagger-ui/index.html`
 - OpenAPI JSON: `http://localhost:8080/v3/api-docs`
 
-`local`, `test` profile에서는 별도 인증 없이 접근할 수 있다. 이 profile에서는 실제 인증 controller가 비활성화되므로 API-001~004, API-006을 제외한 24개 API를 확인한다. 인증 API를 포함한 활성 API 29개 전체 문서는 그 외 profile에서 내부 도구용 Basic Auth로 접근하며 다음 환경변수가 필요하다.
+`local`, `test` profile에서는 별도 인증 없이 접근할 수 있다. 이 profile에서는 실제 인증 controller가 비활성화되므로 API-001~004, API-006을 제외한 24개 API를 확인한다. 인증 API를 포함한 활성 API 29개 전체 문서는 `prod` profile에서 내부 도구용 Basic Auth로 접근하며 다음 환경변수가 필요하다.
 
 ```bash
 INTERNAL_TOOLS_USERNAME= {username}
@@ -42,13 +73,13 @@ INTERNAL_TOOLS_PASSWORD= {password}
 
 Basic Auth는 Swagger와 H2 Console 접근만 보호한다. Swagger에서 실제 Rewrite API를 호출할 때는 기존 카카오 로그인으로 발급한 인증 Cookie와, 상태 변경 요청인 경우 CSRF 토큰이 별도로 필요하다.
 
-H2 Console은 기본 프로필과 운영 환경에서 비활성화되어 있다. 실제 카카오/JWT 인증을 유지하는 `devtools` profile에서만 활성화할 수 있으며, Swagger와 동일한 내부 도구용 Basic Auth 계정을 사용한다.
+H2 Console은 `h2` profile에서 활성화되며, 내부 도구용 Basic Auth 계정을 사용한다. `local` profile은 profile group을 통해 `h2`를 함께 활성화한다. 기본 프로필과 운영 환경에서는 비활성화되어 있다.
 
 ```bash
-SPRING_PROFILES_ACTIVE=devtools
+SPRING_PROFILES_ACTIVE=local
 ```
 
-위 설정으로 실행한 뒤 `http://localhost:8080/h2-console`로 접근한다. 운영 환경에서는 `devtools` profile을 활성화하지 않는다. Swagger UI는 API 번호, 사용 목적, 사용 화면, 호출 시점, 주요 동작과 오류 조건을 확인하는 핵심 API 문서다. 생성된 OpenAPI는 controller, DTO와 `@RewriteApi`를 기준으로 하며 Notion은 보조 동기화 문서로 사용한다.
+위 설정으로 실행한 뒤 `http://localhost:8080/h2-console`로 접근한다. 운영 환경에서는 `prod` profile을 활성화한다. Swagger UI는 API 번호, 사용 목적, 사용 화면, 호출 시점, 주요 동작과 오류 조건을 확인하는 핵심 API 문서다. 생성된 OpenAPI는 controller, DTO와 `@RewriteApi`를 기준으로 하며 Notion은 보조 동기화 문서로 사용한다.
 
 ## 코드 흐름 탐색
 

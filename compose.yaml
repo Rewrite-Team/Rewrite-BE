@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: rewrite-postgres
+    environment:
+      POSTGRES_DB: rewrite
+      POSTGRES_USER: qwer
+      POSTGRES_PASSWORD: qwer
+    ports:
+      - "5432:5432"
+    volumes:
+      - rewrite-postgres-data:/var/lib/postgresql/data
+
+volumes:
+  rewrite-postgres-data:
+    name: rewrite-postgres-data

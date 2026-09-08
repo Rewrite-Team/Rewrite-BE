@@ -28,7 +28,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 @RestController
 @Slf4j
-@Profile("!local & !test")
+@Profile({"prod", "auth-test"})
 @RequestMapping("/auth/kakao")
 @RequiredArgsConstructor
 public class KakaoAuthController {

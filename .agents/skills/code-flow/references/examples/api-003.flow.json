@@ -40,7 +40,7 @@
     "발급 정상 흐름을 보여준다. GeneralSecurityException → IllegalStateException의 상세 전파는 sign() 코드에서 확인한다."
   ],
   "uncertain": [
-    "!local & !test 프로필의 활성 Controller 기준이며 실행 trace가 아니다."
+    "prod 또는 auth-test 프로필의 활성 Controller 기준이며 실행 trace가 아니다."
   ],
   "calls": [
     {
