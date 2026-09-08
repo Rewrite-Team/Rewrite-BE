@@ -234,12 +234,15 @@ API-008 자기소개서 초안 생성의 공개 API 계약은 유지하되, 현�
 - DB/JPA 전환은 기존 API 계약을 유지하면서 persistence 구현을 교체하는 별도 이슈로 진행한다.
 - 초기 DB/JPA 전환 범위는 JPA entity/repository, DB driver, 테스트 가능한 DB 설정, transaction 검증까지로 제한한다.
 - Flyway와 migration versioning은 초기 DB/JPA 전환 범위에 포함하지 않고, 스키마 변경 이력 관리가 필요한 시점에 별도 이슈로 검토한다.
+- 로컬 개발과 일반 테스트는 H2를 유지하고 운영 환경은 PostgreSQL을 사용한다.
+- 운영 DB 접속 정보는 환경 변수로 주입한다.
 
 ### Acceptance Criteria
 
 - 기존 API-008 응답 계약은 DB/JPA 전환 후에도 유지된다.
 - 선택한 DB 설정에서 애플리케이션 프로세스 재시작 후에도 저장 데이터가 보존된다.
 - repository 테스트와 transaction 검증이 추가된다.
+- 운영 profile이 PostgreSQL에 연결되고 실제 PostgreSQL 통합 테스트가 통과한다.
 - Flyway 의존성, migration 파일, migration 검증은 이번 전환의 완료 기준에 포함하지 않는다.
 - 기존 API 계약은 유지된다.
 

@@ -20,6 +20,8 @@
 
 - DB/JPA 도입 이후 repository와 transaction 동작을 검증한다.
 - DB/JPA 전환 전 in-memory repository 단계에서는 DB integration test를 만들지 않는다.
+- 실제 인증 컴포넌트의 통합 테스트는 `auth-test` profile에서 인메모리 H2와 테스트용 인증 설정을 사용한다.
+- `PostgreSqlIntegrationTest`는 Docker가 실행 중인 환경에서 실제 PostgreSQL의 schema 생성과 JSON 저장을 검증한다.
 - Flyway migration 검증은 Flyway 도입 이슈 이후에 추가한다.
 
 ## Required Verification

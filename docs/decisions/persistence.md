@@ -89,3 +89,16 @@ migration 검증
 미래 도메인 전체 스키마 선점
 API 계약 변경
 ```
+
+## Decision 101: 운영 DB는 PostgreSQL을 사용하고 H2는 로컬·테스트로 제한한다
+
+### 결정
+
+- `h2` profile은 기존 파일형 H2와 H2 Console 설정을 함께 제공하고, `local` profile이 profile group으로 이를 활성화한다.
+- `prod` profile은 환경 변수로 접속 정보를 받은 PostgreSQL을 사용한다.
+- 실제 PostgreSQL 통합 테스트로 schema 생성과 JSON 저장을 검증한다.
+- Flyway와 기존 H2 데이터 이관은 후속 이슈로 분리한다.
+
+### 근거
+
+운영 데이터를 애플리케이션 인스턴스의 로컬 파일과 분리하고, 현재 JPA 관계·transaction·JSON 매핑을 실제 운영 DB와 같은 환경에서 검증하기 위해 PostgreSQL을 선택한다. 공개 API 계약은 변경하지 않는다.
