@@ -12,7 +12,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 @Slf4j
 @Service
-@Profile("!local & !test")
+@Profile({"prod", "auth-test"})
 @RequiredArgsConstructor
 public class KakaoLoginService {
 

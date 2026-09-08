@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@Profile("!local & !test")
+@Profile({"prod", "auth-test"})
 @RequestMapping("/auth")
 @RequiredArgsConstructor
 public class TokenRefreshController {

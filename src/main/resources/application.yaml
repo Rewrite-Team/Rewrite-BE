@@ -2,15 +2,14 @@ spring:
   application:
     name: rewrite
 
+  profiles:
+    group:
+      local: h2  # local 프로필을 활성화하면 h2 프로필도 같이 활성화
+
   datasource:
-    url: jdbc:h2:file:./data/rewrite;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;AUTO_SERVER=TRUE
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
+    embedded-database-connection: none
 
   jpa:
-    hibernate:
-      ddl-auto: update
     open-in-view: false
     properties:
       hibernate:

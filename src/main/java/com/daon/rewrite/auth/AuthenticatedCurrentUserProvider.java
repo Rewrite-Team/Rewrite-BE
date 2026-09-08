@@ -11,7 +11,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
 @Component
-@Profile("!local & !test")  // 개발 로컬이나 테스트에서는 CurrentUserProvider 구현제를 사용
+@Profile({"prod", "auth-test"})  // 운영과 인증 통합 테스트에서 실제 인증 사용자 조회 구현체를 사용
 @RequiredArgsConstructor
 public class AuthenticatedCurrentUserProvider implements CurrentUserProvider {
 
