@@ -18,6 +18,9 @@ jobs:
     name: Backend Check # 워크플로우 안에서 실행되는 job 이름
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    outputs:
+      test_result: ${{ steps.summary.outputs.test_result }}
+      coverage_result: ${{ steps.summary.outputs.coverage_result }}
 
     steps:
       - name: Checkout
@@ -57,6 +60,7 @@ jobs:
           retention-days: 14
 
       - name: Write workflow summary
+        id: summary
         if: always()  # Gradle 검사가 실패하더라도 생성된 테스트·커버리지 결과를 Summary에 남김
         shell: python
         env:
@@ -124,3 +128,80 @@ jobs:
           # 다른 Action이 먼저 작성한 job summary를 보존하기 위해 append 모드로 기록한다.
           with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a", encoding="utf-8") as stream:
               stream.write("\n".join(summary_lines))
+
+          # PR 댓글 job이 코드를 다시 checkout하지 않고 동일한 결과를 사용할 수 있게 전달한다.
+          with Path(os.environ["GITHUB_OUTPUT"]).open("a", encoding="utf-8") as stream:
+              stream.write(f"test_result={test_result}\n")
+              stream.write(f"coverage_result={coverage_result}\n")
+
+  pr-report:
+    name: PR Report
+    runs-on: ubuntu-latest
+    needs: check
+    if: >-
+      always() &&
+      github.event_name == 'pull_request' &&
+      github.actor != 'dependabot[bot]' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      pull-requests: write
+
+    steps:
+      - name: Update PR CI report comment
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          CHECK_RESULT: ${{ needs.check.result }}
+          TEST_RESULT: ${{ needs.check.outputs.test_result }}
+          COVERAGE_RESULT: ${{ needs.check.outputs.coverage_result }}
+          WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        with:
+          script: |
+            // 이 식별자가 포함된 github-actions[bot] 댓글만 찾아 새 실행 결과로 갱신한다.
+            const marker = '<!-- backend-ci-report -->';
+
+            const resultLabel = (value) => ({
+              success: '✅ Passed',
+              failure: '❌ Failed',
+              cancelled: '⚪ Cancelled',
+              skipped: '⚪ Skipped',
+            })[value] ?? '⚪ Unknown';
+
+            const body = [
+              marker,
+              '## Backend CI Report',
+              '',
+              '| Item | Result |',
+              '| --- | --- |',
+              `| Backend Check | ${resultLabel(process.env.CHECK_RESULT)} |`,
+              `| Tests | ${process.env.TEST_RESULT || 'N/A'} |`,
+              `| JaCoCo line coverage | ${process.env.COVERAGE_RESULT || 'N/A'} |`,
+              '',
+              `[View workflow run](${process.env.WORKFLOW_URL})`,
+            ].join('\n');
+
+            // PR 댓글은 issue comment API를 사용하므로 전체 페이지를 조회해 기존 고정 댓글을 찾는다.
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              per_page: 100,
+            });
+            const existing = comments.find((comment) =>
+              comment.user?.login === 'github-actions[bot]' && comment.body?.includes(marker)
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
