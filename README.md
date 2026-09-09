@@ -103,6 +103,7 @@ AI가 소스를 읽어 호출 데이터를 작성하고, 공통 뷰어가 부모
 - `docs/architecture.md`: 패키지 구조와 계층 책임
 - `docs/conventions.md`: Java/Spring/API/예외 처리 규칙
 - `docs/testing.md`: 테스트 전략과 검증 명령
+- `docs/deployment.md`: OCI 서버·네트워크 구성과 수동 배포·복구 절차
 - `docs/codex-workflow.md`: Codex 품질 원칙 적용, 위험도 기반 리뷰, issue/commit/PR 절차와 OpenAPI·Notion 문서 동기화 절차
 
 ## Development
