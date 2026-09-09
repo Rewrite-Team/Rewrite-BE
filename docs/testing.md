@@ -57,7 +57,7 @@ GitHub Actions는 `dev` 대상 pull request에서 다음 검증을 실행한다.
 - `PR Report` job은 같은 결과를 `github-actions[bot]`의 고정 PR 댓글로 생성하거나 갱신한다.
 - 댓글 쓰기 권한은 `PR Report`에만 부여하며, 이 job은 PR 코드를 checkout하거나 실행하지 않고 외부 fork와 Dependabot PR에서는 건너뛴다.
 - 같은 pull request의 새 실행이 시작되면 진행 중인 이전 실행을 취소한다.
-- `Backend Check`를 `dev` 브랜치 병합 필수 상태 검사로 사용한다.
+- `Backend Check`는 PR Checks 영역에 표시하되 `dev` 브랜치 병합 필수 상태 검사로 설정하지 않는다.
 - Codecov 연동은 CI 범위에 포함하지 않는다.
 
 ## Expectations
