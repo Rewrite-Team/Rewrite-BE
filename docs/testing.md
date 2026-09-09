@@ -21,7 +21,6 @@
 - DB/JPA 도입 이후 repository와 transaction 동작을 검증한다.
 - DB/JPA 전환 전 in-memory repository 단계에서는 DB integration test를 만들지 않는다.
 - 실제 인증 컴포넌트의 통합 테스트는 `auth-test` profile에서 인메모리 H2와 테스트용 인증 설정을 사용한다.
-- `PostgreSqlIntegrationTest`는 Docker가 실행 중인 환경에서 실제 PostgreSQL의 schema 생성과 JSON 저장을 검증한다.
 - Flyway migration 검증은 Flyway 도입 이슈 이후에 추가한다.
 
 ## Required Verification
@@ -43,6 +42,23 @@
 ```bash
 ./gradlew test --tests '*CoverLetterServiceTest'
 ```
+
+## Continuous Integration
+
+GitHub Actions는 `dev` 대상 pull request에서 다음 검증을 실행한다.
+
+```bash
+./gradlew check
+```
+
+- Java 21 환경에서 전체 테스트와 검증 작업을 실행한다.
+- 테스트 HTML과 JaCoCo HTML/XML 결과를 workflow artifact로 14일 동안 보관한다.
+- Workflow Summary에서 Gradle 검사, 테스트, JaCoCo line coverage와 workflow 링크를 제공한다.
+- `PR Report` job은 같은 결과를 `github-actions[bot]`의 고정 PR 댓글로 생성하거나 갱신한다.
+- 댓글 쓰기 권한은 `PR Report`에만 부여하며, 이 job은 PR 코드를 checkout하거나 실행하지 않고 외부 fork와 Dependabot PR에서는 건너뛴다.
+- 같은 pull request의 새 실행이 시작되면 진행 중인 이전 실행을 취소한다.
+- `Backend Check`는 PR Checks 영역에 표시하되 `dev` 브랜치 병합 필수 상태 검사로 설정하지 않는다.
+- Codecov 연동은 CI 범위에 포함하지 않는다.
 
 ## Expectations
 

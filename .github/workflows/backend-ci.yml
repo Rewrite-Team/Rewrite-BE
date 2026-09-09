@@ -1,0 +1,207 @@
+name: Backend CI  # GitHub Actions 화면에 표시할 전체 워크플로우 이름
+
+on:
+  pull_request:
+    branches:
+      - dev # dev를 대상으로 하는 PR에서 실행, 열린 PR에 커밋을 추가로 push 하면 PR이 갱신되면서 CI도 다시 실행됨
+
+# GitHub Actions 는 실행할 때 임시 GITHUB_TOKEN을 받는다. 해당 토큰을 사용하면 설정에 따라 저장소를 읽거나 수정할 수 있다.
+permissions:
+  contents: read  # 저장소 내용 읽기 허용
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}   # PR 번호가 있으면 PR 번호 사용, 없으면 Git 브랜치 ref 사용
+  cancel-in-progress: true  # PR에 커밋을 연속으로 push 하는 상황에서 첫번째 CI는 오래된 코드를 검증하고 있으므로 계속 실행할 필요 없음. 따라서 첫 번째 실행을 취소하고 최신 실행만 유지
+
+jobs:
+  check:
+    name: Backend Check # 워크플로우 안에서 실행되는 job 이름
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      test_result: ${{ steps.summary.outputs.test_result }}
+      coverage_result: ${{ steps.summary.outputs.coverage_result }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6  # 현재 검증할 커밋을 임시 컴퓨터로 가져옴(checkout)
+        with:
+          persist-credentials: false  # checkout 과정에서 사용한 GitHub 인증 정보를 Git 설정에 남기지 않음
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0   # Gradle실행환경을 준비하고, Gradle이 다운로드한 의존성 등을 캐시하여 이후 CI 실행 시간을 줄임
+
+      - name: Run checks
+        id: checks
+        run: ./gradlew check
+
+      - name: Upload test report
+        if: always()  # Run checks 가 실패하더라도 리포트 업로드 시도
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1 # GitHub Actions에서 테스트 결과 파일을 업로드하는 공식 Action
+        with:
+          name: backend-test-report   # GitHub Actions 실행 결과에서 다운로드할 artifact 이름
+          path: build/reports/tests/test  # 업로드할 디렉터리
+          if-no-files-found: warn   # 업로드 대상 파일이 없을 때 업로드 step 자체를 실패시키지 않고 경고
+          retention-days: 14    # artifact를 GitHub에 14일간 보관
+
+      - name: Upload JaCoCo report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: backend-jacoco-report   # artifact 이름
+          path: build/reports/jacoco/test
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Write workflow summary
+        id: summary
+        if: always()  # Gradle 검사가 실패하더라도 생성된 테스트·커버리지 결과를 Summary에 남김
+        shell: python
+        env:
+          CHECK_RESULT: ${{ steps.checks.outcome }}
+          WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          import glob
+          import os
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+
+          # Run checks step의 실제 종료 상태를 사람이 바로 읽을 수 있는 표시로 변환한다.
+          result_label = {
+              "success": "✅ Passed",
+              "failure": "❌ Failed",
+              "cancelled": "⚪ Cancelled",
+              "skipped": "⚪ Skipped",
+          }.get(os.environ.get("CHECK_RESULT"), "⚪ Unknown")
+
+          # Gradle이 테스트 클래스별로 생성한 JUnit XML을 합산한다.
+          tests = {"total": 0, "failures": 0, "errors": 0, "skipped": 0}
+          for report_path in glob.glob("build/test-results/test/TEST-*.xml"):
+              suite = ET.parse(report_path).getroot()
+              tests["total"] += int(suite.get("tests", "0"))
+              for key in ("failures", "errors", "skipped"):
+                  tests[key] += int(suite.get(key, "0"))
+
+          if tests["total"]:
+              failed = tests["failures"] + tests["errors"]
+              passed = tests["total"] - failed - tests["skipped"]
+              test_result = (
+                  f"{passed} passed / {failed} failed / "
+                  f"{tests['skipped']} skipped / {tests['total']} total"
+              )
+          else:
+              test_result = "N/A"
+
+          # JaCoCo XML 루트의 전체 LINE counter를 기준으로 line coverage를 계산한다.
+          coverage_result = "N/A"
+          coverage_report = Path("build/reports/jacoco/test/jacocoTestReport.xml")
+          if coverage_report.exists():
+              root = ET.parse(coverage_report).getroot()
+              counter = next(
+                  (item for item in root.findall("counter") if item.get("type") == "LINE"),
+                  None,
+              )
+              if counter is not None:
+                  covered = int(counter.get("covered", "0"))
+                  missed = int(counter.get("missed", "0"))
+                  total = covered + missed
+                  if total:
+                      coverage_result = f"{covered / total * 100:.2f}% ({covered}/{total} lines)"
+
+          summary_lines = [
+              "## Backend CI Summary",
+              "",
+              "| Item | Result |",
+              "| --- | --- |",
+              f"| Gradle check | {result_label} |",
+              f"| Tests | {test_result} |",
+              f"| JaCoCo line coverage | {coverage_result} |",
+              f"| Workflow | [View run]({os.environ['WORKFLOW_URL']}) |",
+              "",
+          ]
+          # 다른 Action이 먼저 작성한 job summary를 보존하기 위해 append 모드로 기록한다.
+          with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a", encoding="utf-8") as stream:
+              stream.write("\n".join(summary_lines))
+
+          # PR 댓글 job이 코드를 다시 checkout하지 않고 동일한 결과를 사용할 수 있게 전달한다.
+          with Path(os.environ["GITHUB_OUTPUT"]).open("a", encoding="utf-8") as stream:
+              stream.write(f"test_result={test_result}\n")
+              stream.write(f"coverage_result={coverage_result}\n")
+
+  pr-report:
+    name: PR Report
+    runs-on: ubuntu-latest
+    needs: check
+    if: >-
+      always() &&
+      github.event_name == 'pull_request' &&
+      github.actor != 'dependabot[bot]' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      pull-requests: write
+
+    steps:
+      - name: Update PR CI report comment
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          CHECK_RESULT: ${{ needs.check.result }}
+          TEST_RESULT: ${{ needs.check.outputs.test_result }}
+          COVERAGE_RESULT: ${{ needs.check.outputs.coverage_result }}
+          WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        with:
+          script: |
+            // 이 식별자가 포함된 github-actions[bot] 댓글만 찾아 새 실행 결과로 갱신한다.
+            const marker = '<!-- backend-ci-report -->';
+
+            const resultLabel = (value) => ({
+              success: '✅ Passed',
+              failure: '❌ Failed',
+              cancelled: '⚪ Cancelled',
+              skipped: '⚪ Skipped',
+            })[value] ?? '⚪ Unknown';
+
+            const body = [
+              marker,
+              '## Backend CI Report',
+              '',
+              '| Item | Result |',
+              '| --- | --- |',
+              `| Backend Check | ${resultLabel(process.env.CHECK_RESULT)} |`,
+              `| Tests | ${process.env.TEST_RESULT || 'N/A'} |`,
+              `| JaCoCo line coverage | ${process.env.COVERAGE_RESULT || 'N/A'} |`,
+              '',
+              `[View workflow run](${process.env.WORKFLOW_URL})`,
+            ].join('\n');
+
+            // PR 댓글은 issue comment API를 사용하므로 전체 페이지를 조회해 기존 고정 댓글을 찾는다.
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              per_page: 100,
+            });
+            const existing = comments.find((comment) =>
+              comment.user?.login === 'github-actions[bot]' && comment.body?.includes(marker)
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
