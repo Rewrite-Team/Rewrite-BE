@@ -24,6 +24,7 @@ Codex는 모든 문서를 매번 읽지 않는다. 먼저 이 문서를 보고 �
 | `architecture.md` | 패키지 구조와 계층 책임 | 새 패키지/계층 추가 |
 | `conventions.md` | Java/Spring/API/예외 처리 규칙 | 코드 작성/리뷰 |
 | `testing.md` | 테스트 전략과 검증 명령 | 테스트 추가/수정 |
+| `deployment.md` | OCI 서버·네트워크 구성과 수동 배포·복구 절차 | 배포 환경 구성, 수동 배포, 운영 점검 |
 | [code-flow 스킬](../.agents/skills/code-flow/SKILL.md) | 소스 근거 기반 호출 흐름 HTML·Markdown 생성 | 메서드/API 호출, TX·비동기 흐름 탐색 |
 | `codex-workflow.md` | Codex 품질 원칙 적용, 위험도 기반 리뷰와 issue/PR/commit/progress 절차 | 코드 작업, GitHub issue/PR/commit 생성, 진행 점검 |
 
