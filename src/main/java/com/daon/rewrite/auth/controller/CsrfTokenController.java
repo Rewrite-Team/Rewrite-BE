@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@Profile({"prod", "auth-test"})
+@Profile("auth-real")
 @RequiredArgsConstructor
 public class CsrfTokenController {
 

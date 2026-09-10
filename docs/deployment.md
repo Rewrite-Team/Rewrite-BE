@@ -2,7 +2,7 @@
 
 이 문서는 Oracle Cloud Infrastructure(OCI)에 Rewrite 백엔드를 수동 배포하고 점검하는 절차를 정리한다. GitHub Actions CD 자동화는 [#113](https://github.com/Rewrite-Team/Rewrite-BE/issues/113)의 범위이며 이 문서에서는 다루지 않는다.
 
-관련 기준은 `REQ-007`과 [Decision 101](decisions/persistence.md#decision-101-운영-db는-postgresql을-사용하고-h2는-로컬테스트로-제한한다)이다. 제품 기능과 공개 API 계약은 변경하지 않는다.
+관련 기준은 `REQ-007`과 [Decision 101](decisions/persistence.md#decision-101-실행-프로필은-db와-인증-세부-프로필을-조합한다)이다. 제품 기능과 공개 API 계약은 변경하지 않는다.
 
 ## 현재 배포 기준
 
@@ -20,7 +20,7 @@
 | 도메인 | `playmcpfinder.store` |
 | 애플리케이션 주소 | `127.0.0.1:8080` |
 
-이 shape는 메모리가 1 GB이므로 애플리케이션 JVM heap을 384 MB로 제한하고 2 GB swap을 사용한다. 별도 애플리케이션 사용자는 만들지 않고 `ubuntu`로 실행하되 systemd의 권한 제한 옵션을 적용한다.
+이 shape는 메모리가 1 GB이므로 애플리케이션 JVM heap을 384 MB로 제한하고 2 GB swap을 사용한다. 별도 애플리케이션 사용자는 만들지 않고 `ubuntu`로 실행하되 systemd의 권한 제한 옵션을 적용한다. `prod`는 사용자-facing 실행 profile이며 `db-postgres`, `auth-real`, `internal-tools-secured` 세부 profile을 함께 활성화한다.
 
 ```text
 Internet

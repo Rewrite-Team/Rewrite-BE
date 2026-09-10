@@ -7,7 +7,7 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
 
 @Configuration
-@Profile({"local", "test"})
+@Profile("auth-dev")
 public class DevSecurityConfig {
 
     @Bean

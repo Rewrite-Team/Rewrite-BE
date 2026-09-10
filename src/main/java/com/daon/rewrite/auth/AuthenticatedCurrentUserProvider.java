@@ -11,7 +11,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
 @Component
-@Profile({"prod", "auth-test"})  // 운영과 인증 통합 테스트에서 실제 인증 사용자 조회 구현체를 사용
+@Profile("auth-real")
 @RequiredArgsConstructor
 public class AuthenticatedCurrentUserProvider implements CurrentUserProvider {
 

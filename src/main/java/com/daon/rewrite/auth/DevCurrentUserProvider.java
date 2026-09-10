@@ -6,7 +6,7 @@ import org.springframework.stereotype.Component;
 import java.time.Instant;
 
 @Component
-@Profile({"local", "test"})  // Spring profile 이 local 또는 test 일 때만 Spring Bean 으로 등록
+@Profile("auth-dev")
 public class DevCurrentUserProvider implements CurrentUserProvider {
 
     @Override

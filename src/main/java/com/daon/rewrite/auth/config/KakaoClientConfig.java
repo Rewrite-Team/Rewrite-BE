@@ -9,7 +9,7 @@ import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
 @Configuration
-@Profile({"prod", "auth-test"})
+@Profile("auth-real")
 public class KakaoClientConfig {
 
     @Bean

@@ -28,7 +28,19 @@ Run the application:
 SPRING_PROFILES_ACTIVE=local OPENAI_API_KEY=your-api-key ./gradlew bootRun
 ```
 
-Run with PostgreSQL:
+Run locally with Docker PostgreSQL and development authentication:
+
+```bash
+docker compose up -d --wait postgres
+SPRING_PROFILES_ACTIVE=local-postgres \
+DB_URL=jdbc:postgresql://127.0.0.1:5432/rewrite \
+DB_USERNAME=qwer \
+DB_PASSWORD=qwer \
+OPENAI_API_KEY=your-api-key \
+./gradlew bootRun
+```
+
+Run the production profile with PostgreSQL and real authentication:
 
 ```bash
 SPRING_PROFILES_ACTIVE=prod \
@@ -39,23 +51,34 @@ OPENAI_API_KEY=your-api-key \
 ./gradlew bootRun
 ```
 
-`prod` profile은 PostgreSQL을 사용하고, `local` profile은 파일형 H2를 사용한다. 기존 H2 데이터는 PostgreSQL로 자동 이관되지 않는다. Flyway 도입은 후속 이슈에서 진행한다.
+`local`은 파일형 H2를, `local-postgres`는 노트북의 Docker PostgreSQL을 사용하며 둘 다 개발용 고정 사용자로 인증을 대체한다. `prod`는 PostgreSQL과 실제 카카오/JWT 인증을 사용한다. 기존 H2 데이터는 PostgreSQL로 자동 이관되지 않는다. Flyway 도입은 후속 이슈에서 진행한다.
 
 ### 실행 프로필
 
-| 지정한 profile | 함께 활성화되는 profile | DB | 인증 | H2 Console |
-|---|---|---|---|---|
-| `local` | `local`, `h2` | 파일형 H2 | 개발용 고정 사용자 | 활성화 |
-| `prod` | `prod` | PostgreSQL | 실제 카카오/JWT 인증 | 비활성화 |
-| `test` | `test` | 인메모리 H2 | 테스트용 설정 | 비활성화 |
-| `auth-test` | `auth-test` | 인메모리 H2 | 실제 인증 통합 테스트 설정 | 비활성화 |
+| 지정한 실행 profile | 함께 활성화되는 세부 profile | DB | 인증 | Swagger | H2 Console |
+|---|---|---|---|---|---|
+| `local` | `db-h2`, `auth-dev` | 파일형 H2 | 개발용 고정 사용자 | 인증 없음 | 활성화, Basic Auth |
+| `local-postgres` | `db-postgres`, `auth-dev` | Docker PostgreSQL | 개발용 고정 사용자 | 인증 없음 | 비활성화 |
+| `prod` | `db-postgres`, `auth-real`, `internal-tools-secured` | PostgreSQL | 실제 카카오/JWT 인증 | Basic Auth | 비활성화 |
+| `test` | `auth-dev` | 인메모리 H2 | 개발용 고정 사용자 | 인증 없음 | 비활성화 |
+| `auth-test` | `auth-real`, `internal-tools-secured` | 인메모리 H2 | 실제 인증 통합 테스트 설정 | Basic Auth | 비활성화 |
 
-`local`은 `application.yaml`의 profile group 설정에 따라 `h2` profile을 함께 활성화한다. 실행 환경은 `SPRING_PROFILES_ACTIVE`로 지정한다.
+사용자는 실행 목적을 나타내는 profile 하나만 `SPRING_PROFILES_ACTIVE`로 지정한다. `application.yaml`의 profile group이 DB, 인증과 내부 도구 보호 세부 profile을 조합한다. `test`와 `auth-test`의 인메모리 H2 접속 정보는 각각의 테스트 전용 설정에서 제공한다.
 
 ```bash
-SPRING_PROFILES_ACTIVE=local     # 일반 로컬 개발
-SPRING_PROFILES_ACTIVE=prod      # 운영 PostgreSQL 실행
+SPRING_PROFILES_ACTIVE=local             # 파일형 H2 로컬 개발
+SPRING_PROFILES_ACTIVE=local-postgres    # Docker PostgreSQL 로컬 개발
+SPRING_PROFILES_ACTIVE=prod              # 운영 PostgreSQL과 실제 인증
 ```
+
+`local-postgres`와 `prod`는 모두 `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`를 필수로 받는다. 로컬에서는 `compose.yaml`에 선언된 접속 정보를 위 예시처럼 명시한다. PostgreSQL 환경 변수는 데이터 디렉터리를 처음 초기화할 때만 계정을 생성하므로, 기존 `rewrite-postgres-data` volume이 과거 계정으로 초기화되어 있다면 실행 환경변수만 바꿔도 계정이 변경되지 않는다.
+
+```bash
+docker compose down       # 컨테이너만 내리고 데이터 volume은 보존
+docker compose down -v    # 로컬 PostgreSQL 데이터를 삭제하고 완전히 초기화
+```
+
+`down -v`는 기존 로컬 데이터를 제거하려는 경우에만 사용한다.
 
 ## API 확인
 
@@ -64,7 +87,7 @@ SPRING_PROFILES_ACTIVE=prod      # 운영 PostgreSQL 실행
 - Swagger UI: `http://localhost:8080/swagger-ui/index.html`
 - OpenAPI JSON: `http://localhost:8080/v3/api-docs`
 
-`local`, `test` profile에서는 별도 인증 없이 접근할 수 있다. 이 profile에서는 실제 인증 controller가 비활성화되므로 API-001~004, API-006을 제외한 24개 API를 확인한다. 인증 API를 포함한 활성 API 29개 전체 문서는 `prod` profile에서 내부 도구용 Basic Auth로 접근하며 다음 환경변수가 필요하다.
+`local`, `local-postgres`, `test` profile에서는 별도 인증 없이 접근할 수 있다. 이 profile에서는 실제 인증 controller가 비활성화되므로 API-001~004, API-006을 제외한 24개 API를 확인한다. 인증 API를 포함한 활성 API 29개 전체 문서는 `prod` profile에서 내부 도구용 Basic Auth로 접근하며 다음 환경변수가 필요하다.
 
 ```bash
 INTERNAL_TOOLS_USERNAME= {username}
@@ -73,7 +96,7 @@ INTERNAL_TOOLS_PASSWORD= {password}
 
 Basic Auth는 Swagger와 H2 Console 접근만 보호한다. Swagger에서 실제 Rewrite API를 호출할 때는 기존 카카오 로그인으로 발급한 인증 Cookie와, 상태 변경 요청인 경우 CSRF 토큰이 별도로 필요하다.
 
-H2 Console은 `h2` profile에서 활성화되며, 내부 도구용 Basic Auth 계정을 사용한다. `local` profile은 profile group을 통해 `h2`를 함께 활성화한다. 기본 프로필과 운영 환경에서는 비활성화되어 있다.
+H2 Console은 `db-h2` profile에서 활성화되며, 내부 도구용 Basic Auth 계정을 사용한다. `local` profile은 profile group을 통해 `db-h2`를 함께 활성화한다. 기본 프로필, `local-postgres`와 운영 환경에서는 비활성화되어 있다.
 
 ```bash
 SPRING_PROFILES_ACTIVE=local

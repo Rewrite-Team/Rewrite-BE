@@ -13,7 +13,7 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
 @Component
-@Profile({"prod", "auth-test"})
+@Profile("auth-real")
 public class RestKakaoClient implements KakaoClient {
 
     private final RestClient restClient;
