@@ -36,7 +36,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 @Configuration
-@Profile({"prod", "auth-test"})
+@Profile("auth-real")
 @EnableConfigurationProperties(AuthProperties.class)
 public class AuthSecurityConfig {
 

@@ -43,6 +43,7 @@ API 계약과 API별 상태는 `docs/api/README.md`와 `docs/api/` 하위 도메
 | [#105](https://github.com/Rewrite-Team/Rewrite-BE/issues/105) | 코드 호출 흐름 시각화 스킬과 공통 뷰어 구축 | Verified | 2026-09-06: 저장소 스킬·공통 뷰어·API-003/020 예제 구현. Python 10개, 스킬 형식·소스 해시·Chrome 동작/시각 검증, 독립 사용 리뷰 및 수정 재검증 통과. `./gradlew test` 53개·`./gradlew check` 통과. 제품·API·TX 동작 변경 없음 |
 | [#110](https://github.com/Rewrite-Team/Rewrite-BE/issues/110) | 백엔드 CI 파이프라인 구축 | Verified | [PR #111](https://github.com/Rewrite-Team/Rewrite-BE/pull/111)의 `Backend Check`·Workflow Summary·PR Report 통과와 사용자 확인 완료. 병합 필수 상태 검사는 설정하지 않으며 Codecov와 CD는 제외 |
 | [#112](https://github.com/Rewrite-Team/Rewrite-BE/issues/112) | OCI Free Tier 백엔드 배포 환경 구성 | Implemented | 춘천 리전 E2.1.Micro에 `prod` 수동 배포, HTTPS reverse proxy, 외부 포트와 재부팅 복구를 사용자 확인. 실제 SSE 이벤트와 PostgreSQL 백업·복구 검증은 사용자 결정으로 미수행 |
+| [#115](https://github.com/Rewrite-Team/Rewrite-BE/issues/115) | 실행 환경 세부 프로필과 로컬 PostgreSQL 개발 구성 분리 | In Progress | 세부 profile, `local-postgres`, Compose 설정과 비-Docker 검증을 구현하고 `./gradlew check` 통과. 실제 PostgreSQL 기동·데이터 보존 수동 검증은 사용자 요청에 따라 미수행 |
 
 ## Current Recommended Next Work
 

@@ -15,7 +15,7 @@ import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 
 @Configuration
-@Profile("h2")
+@Profile("db-h2")
 @EnableConfigurationProperties(InternalToolsProperties.class)
 public class H2ConsoleSecurityConfig {
 

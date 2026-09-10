@@ -14,7 +14,7 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
 @Service
-@Profile({"prod", "auth-test"})
+@Profile("auth-real")
 @RequiredArgsConstructor
 public class CsrfTokenService {
 

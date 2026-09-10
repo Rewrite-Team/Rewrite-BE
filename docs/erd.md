@@ -13,7 +13,7 @@ API 계약은 `docs/api/README.md`와 도메인별 API 문서를 기준으로 �
 - API 응답 DTO는 Asia/Seoul 기준 `LocalDateTime`으로 변환한다.
 - 이 ERD는 MVP persistence의 논리 구조 기준이며, 실제 DB column type과 index 세부사항은 구현 이슈에서 확정한다.
 - Flyway migration 파일은 현 시점 범위에 포함하지 않는다.
-- 로컬 개발과 일반 테스트는 H2를 사용하고 운영 환경은 PostgreSQL을 사용한다.
+- 기본 로컬 개발과 일반 테스트는 H2를 사용하고, `local-postgres`와 운영 환경은 PostgreSQL을 사용한다.
 - 첨삭 진행 결과는 필드별 partial text가 아니라 완성된 문항 단위 임시 결과로 영속 저장한다.
 
 ## Relationship Overview

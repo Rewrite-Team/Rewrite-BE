@@ -3,8 +3,33 @@ spring:
     name: rewrite
 
   profiles:
+    # 세부 프로필 역할
+    # - db-h2: 로컬 파일 H2 데이터베이스와 H2 Console을 사용한다.
+    # - db-postgres: PostgreSQL 접속 환경변수, 드라이버와 공통 JPA 설정을 사용한다.
+    # - auth-dev: 인증을 생략하고 고정된 개발 사용자로 요청을 처리한다.
+    # - auth-real: JWT와 Kakao OAuth 기반의 실제 인증 기능을 활성화한다.
+    # - internal-tools-secured: Swagger UI와 OpenAPI 문서를 Basic Auth로 보호한다.
     group:
-      local: h2  # local 프로필을 활성화하면 h2 프로필도 같이 활성화
+      # 기본 로컬 개발 환경: Docker 없이 H2와 개발용 인증을 사용한다.
+      local:
+        - db-h2
+        - auth-dev
+      # 로컬 PostgreSQL 개발 환경: Docker PostgreSQL과 개발용 인증을 사용한다.
+      local-postgres:
+        - db-postgres
+        - auth-dev
+      # 운영 환경: PostgreSQL, 실제 사용자 인증, 내부 도구 보호를 모두 활성화한다.
+      prod:
+        - db-postgres
+        - auth-real
+        - internal-tools-secured
+      # 일반 자동화 테스트 환경: 테스트 전용 H2 설정과 개발용 인증을 사용한다.
+      test:
+        - auth-dev
+      # 실제 인증 흐름 통합 테스트 환경: 실제 인증과 내부 도구 보호를 검증한다.
+      auth-test:
+        - auth-real
+        - internal-tools-secured
 
   datasource:
     embedded-database-connection: none

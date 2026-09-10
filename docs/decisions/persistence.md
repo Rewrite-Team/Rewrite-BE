@@ -90,15 +90,25 @@ migration 검증
 API 계약 변경
 ```
 
-## Decision 101: 운영 DB는 PostgreSQL을 사용하고 H2는 로컬·테스트로 제한한다
+## Decision 101: 실행 프로필은 DB와 인증 세부 프로필을 조합한다
 
 ### 결정
 
-- `h2` profile은 기존 파일형 H2와 H2 Console 설정을 함께 제공하고, `local` profile이 profile group으로 이를 활성화한다.
-- `prod` profile은 환경 변수로 접속 정보를 받은 PostgreSQL을 사용한다.
-- 실제 PostgreSQL 통합 테스트로 schema 생성과 JSON 저장을 검증한다.
+- 사용자가 지정하는 실행 profile과 DB·인증·내부 도구 보안 책임을 가진 세부 profile을 분리한다.
+- 실행 profile은 profile group으로 다음 세부 profile을 활성화한다.
+  - `local`: `db-h2`, `auth-dev`
+  - `local-postgres`: `db-postgres`, `auth-dev`
+  - `prod`: `db-postgres`, `auth-real`, `internal-tools-secured`
+  - `test`: `auth-dev`; 인메모리 H2 접속 정보는 테스트 전용 설정을 사용한다.
+  - `auth-test`: `auth-real`, `internal-tools-secured`; 인메모리 H2 접속 정보는 테스트 전용 설정을 사용한다.
+- `db-h2`는 파일형 H2와 H2 Console 설정을 제공하고 `db-postgres`는 PostgreSQL driver, JPA schema 갱신 설정과 환경변수 기반 접속 정보를 제공한다.
+- `local-postgres`와 `prod`는 모두 `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`를 필수로 받으며 코드에 접속 정보 기본값을 두지 않는다.
+- `local-postgres`는 실제 API 인증을 생략하고 개발용 고정 사용자를 사용하며, `prod`는 실제 카카오/JWT 인증과 Swagger 내부 도구 보호를 사용한다.
+- 실제 PostgreSQL의 schema 생성, JSON 저장과 재시작 후 데이터 보존은 `local-postgres` 수동 검증으로 확인하고 일반 Gradle 테스트는 Docker에 의존하지 않는다.
 - Flyway와 기존 H2 데이터 이관은 후속 이슈로 분리한다.
 
 ### 근거
 
-운영 데이터를 애플리케이션 인스턴스의 로컬 파일과 분리하고, 현재 JPA 관계·transaction·JSON 매핑을 실제 운영 DB와 같은 환경에서 검증하기 위해 PostgreSQL을 선택한다. 공개 API 계약은 변경하지 않는다.
+운영 데이터를 애플리케이션 인스턴스의 로컬 파일과 분리하고, 현재 JPA 관계·transaction·JSON 매핑을 실제 운영 DB와 같은 환경에서 검증하기 위해 PostgreSQL을 선택한다. 로컬에서도 PostgreSQL 동작을 반복해서 확인할 수 있어야 하지만, 그 과정에서 카카오 로그인, JWT Cookie와 CSRF 토큰을 매번 준비하면 개발 피드백이 느려진다.
+
+실행 목적과 구성 책임을 분리하면 사용자는 하나의 실행 profile만 선택하면서도 DB와 인증 조합을 명시적으로 확인할 수 있다. 일반 테스트는 Docker에 의존하지 않고 인메모리 H2를 유지하며, 운영 인증과 내부 도구 보호 동작도 기존과 동일하게 유지한다. 공개 API 계약은 변경하지 않는다.

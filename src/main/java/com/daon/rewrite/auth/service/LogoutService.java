@@ -9,7 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@Profile({"prod", "auth-test"})
+@Profile("auth-real")
 @RequiredArgsConstructor
 public class LogoutService {
 

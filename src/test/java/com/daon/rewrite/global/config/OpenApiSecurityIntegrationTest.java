@@ -15,9 +15,25 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
-@SpringBootTest
+@SpringBootTest(properties = {
+        "spring.datasource.url=jdbc:h2:mem:rewrite-prod-profile-test;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1",
+        "spring.datasource.driver-class-name=org.h2.Driver",
+        "spring.datasource.username=sa",
+        "spring.datasource.password=",
+        "spring.jpa.hibernate.ddl-auto=create-drop",
+        "spring.ai.openai.api-key=test-key",
+        "rewrite.internal-tools.username=rewrite-tools",
+        "rewrite.internal-tools.password=test-password",
+        "rewrite.auth.jwt-secret-base64=MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE=",
+        "rewrite.auth.frontend-origin=https://rewrite.example.com",
+        "rewrite.auth.frontend-success-url=https://rewrite.example.com",
+        "rewrite.auth.frontend-login-url=https://rewrite.example.com/login",
+        "rewrite.auth.kakao.client-id=test-client",
+        "rewrite.auth.kakao.client-secret=test-secret",
+        "rewrite.auth.kakao.redirect-uri=https://api.rewrite.example.com/auth/kakao/callback"
+})
 @AutoConfigureMockMvc
-@ActiveProfiles("auth-test")
+@ActiveProfiles("prod")
 class OpenApiSecurityIntegrationTest {
 
     @Autowired
