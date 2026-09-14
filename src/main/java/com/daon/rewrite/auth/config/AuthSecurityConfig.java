@@ -47,6 +47,11 @@ public class AuthSecurityConfig {
             "/auth/refresh",
             "/auth/logout"
     );
+    private static final String[] PUBLIC_DOCUMENTATION_PATHS = {
+            "/swagger-ui/**",
+            "/swagger-ui.html",
+            "/v3/api-docs/**"
+    };
 
     @Bean
     @Order(3)
@@ -63,6 +68,7 @@ public class AuthSecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // 로그인 상태를 HttpSession에 저장하지 않음. 각 요청은 매번 access_token 쿠키의 JWT를 검증하여 독집적으로 인증됨
                 .authorizeHttpRequests(authorize -> authorize   // 인가 필터와 URL 별 접근 규칙을 구성
                         .requestMatchers(PUBLIC_AUTH_PATHS.toArray(String[]::new)).permitAll() // 로그인 시작, OAuth callback, CSRF 토큰 발급처럼 인증 없이 호출할 API를 지정
+                        .requestMatchers(PUBLIC_DOCUMENTATION_PATHS).permitAll()
                         .anyRequest().authenticated() // 나머지 API는 유효한 access token이 있어야 한다.
                 )
 
@@ -165,11 +171,11 @@ public class AuthSecurityConfig {
             예시 요청 URI : /api/cover-letters
             Context path: /api
             계산 결과: /cover-letters
-            공개 API 이면 쿠키 무시
+            공개 API 또는 API 문서 경로이면 쿠키 무시
              */
             String path = request.getRequestURI().substring(request.getContextPath().length());
-            if (PUBLIC_AUTH_PATHS.contains(path)) {
-                return null;    // PUBLIC_AUTH_PATHS 경로에서는 resolver 가 access_token Cookie 값을 반환하지 않음
+            if (isPublicPath(path)) {
+                return null;
             }
             /*
             HTTP 요청의 Cookie 헤더를 Tomcat 이 Cookie[] 형태로 변환해 제공
@@ -192,6 +198,14 @@ public class AuthSecurityConfig {
                     .findFirst()    // 첫 유효한 값을 반환
                     .orElse(null);  // 없으면  null 반환
         };
+    }
+
+    private static boolean isPublicPath(String path) {
+        return PUBLIC_AUTH_PATHS.contains(path)
+                || path.equals("/swagger-ui.html")
+                || path.startsWith("/swagger-ui/")
+                || path.equals("/v3/api-docs")
+                || path.startsWith("/v3/api-docs/");
     }
 
     /*

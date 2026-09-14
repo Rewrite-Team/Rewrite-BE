@@ -20,7 +20,7 @@
 | 도메인 | `playmcpfinder.store` |
 | 애플리케이션 주소 | `127.0.0.1:8080` |
 
-이 shape는 메모리가 1 GB이므로 애플리케이션 JVM heap을 384 MB로 제한하고 2 GB swap을 사용한다. 별도 애플리케이션 사용자는 만들지 않고 `ubuntu`로 실행하되 systemd의 권한 제한 옵션을 적용한다. `prod`는 사용자-facing 실행 profile이며 `db-postgres`, `auth-real`, `internal-tools-secured` 세부 profile을 함께 활성화한다.
+이 shape는 메모리가 1 GB이므로 애플리케이션 JVM heap을 384 MB로 제한하고 2 GB swap을 사용한다. 별도 애플리케이션 사용자는 만들지 않고 `ubuntu`로 실행하되 systemd의 권한 제한 옵션을 적용한다. `prod`는 사용자-facing 실행 profile이며 `db-postgres`, `auth-real` 세부 profile을 함께 활성화한다.
 
 ```text
 Internet
@@ -164,15 +164,12 @@ FRONTEND_LOGIN_URL=http://localhost:3000/login
 KAKAO_CLIENT_ID='replace-me'
 KAKAO_CLIENT_SECRET='replace-me'
 KAKAO_REDIRECT_URI=https://playmcpfinder.store/auth/kakao/callback
-INTERNAL_TOOLS_USERNAME='replace-me'
-INTERNAL_TOOLS_PASSWORD='replace-me'
 ```
 
-프론트엔드가 배포되면 `FRONTEND_ORIGIN`, `FRONTEND_SUCCESS_URL`, `FRONTEND_LOGIN_URL`을 실제 HTTPS 프론트엔드 URL로 교체한다. JWT secret과 내부 도구 비밀번호는 각각 별도로 생성한다.
+프론트엔드가 배포되면 `FRONTEND_ORIGIN`, `FRONTEND_SUCCESS_URL`, `FRONTEND_LOGIN_URL`을 실제 HTTPS 프론트엔드 URL로 교체한다. JWT secret은 별도로 생성한다.
 
 ```bash
 openssl rand -base64 64 | tr -d '\n'; echo
-openssl rand -base64 32 | tr -d '\n'; echo
 chmod 600 /home/ubuntu/rewrite/config/rewrite.env
 ```
 

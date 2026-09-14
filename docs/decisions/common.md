@@ -217,6 +217,8 @@ completedAt
 
 controller와 DTO가 path, request와 response를 정의하고 `@RewriteApi`가 코드에서 추론할 수 없는 사용 맥락과 오류 조건을 정의한다. 생성된 OpenAPI 명세는 두 정보를 통합한다. Notion `Rewrite API (자동 동기화)`는 OpenAPI와 저장소 문서를 기준으로 갱신하는 보조 문서로 사용한다.
 
+Swagger UI와 OpenAPI 문서는 실행 profile과 관계없이 별도 Basic Auth 없이 조회할 수 있다. Swagger에서 실제 API를 호출할 때는 각 API의 기존 Cookie 인증과 CSRF 정책을 그대로 적용한다.
+
 API 설명은 다음 순서로 통일한다.
 
 1. 사용 목적
@@ -244,3 +246,4 @@ controller·DTO와 분리된 API 문서만 사용하면 구현 변경이 문서�
   - controller annotation이 길어질 수 있다.
   - 복잡한 화면 흐름과 설계 배경은 Swagger와 저장소 보완 문서를 함께 확인해야 한다.
   - 복잡한 화면 흐름과 설계 배경은 OpenAPI만으로 충분히 표현하기 어렵다.
+  - 운영 환경의 Swagger UI와 OpenAPI 명세가 외부에 공개된다.
