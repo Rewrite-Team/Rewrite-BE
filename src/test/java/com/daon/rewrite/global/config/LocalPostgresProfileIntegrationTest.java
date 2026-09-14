@@ -50,11 +50,10 @@ class LocalPostgresProfileIntegrationTest {
     void localPostgresComposesPostgresDatabaseAndDevelopmentAuthenticationProfiles() {
         assertThat(environment.getActiveProfiles())
                 .contains("local-postgres", "db-postgres", "auth-dev")
-                .doesNotContain("db-h2", "auth-real", "internal-tools-secured");
+                .doesNotContain("db-h2", "auth-real");
         assertThat(currentUserProvider).isInstanceOf(DevCurrentUserProvider.class);
         assertThat(securityFilterChains).containsOnlyKeys("devSecurityFilterChain");
         assertThat(applicationContext.getBeansOfType(AuthSecurityConfig.class)).isEmpty();
-        assertThat(applicationContext.getBeansOfType(InternalToolsSecurityConfig.class)).isEmpty();
         assertThat(applicationContext.getBeansOfType(H2ConsoleSecurityConfig.class)).isEmpty();
     }
 

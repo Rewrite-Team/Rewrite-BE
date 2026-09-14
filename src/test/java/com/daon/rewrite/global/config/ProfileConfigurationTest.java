@@ -21,7 +21,7 @@ class ProfileConfigurationTest {
 
                     assertThat(environment.getActiveProfiles())
                             .contains("local", "db-h2", "auth-dev")
-                            .doesNotContain("db-postgres", "auth-real", "internal-tools-secured");
+                            .doesNotContain("db-postgres", "auth-real");
                     assertThat(environment.getProperty("spring.datasource.url"))
                             .startsWith("jdbc:h2:file:./data/rewrite");
                     assertThat(environment.getProperty("spring.datasource.driver-class-name"))
@@ -47,7 +47,7 @@ class ProfileConfigurationTest {
 
                     assertThat(environment.getActiveProfiles())
                             .contains("local-postgres", "db-postgres", "auth-dev")
-                            .doesNotContain("db-h2", "auth-real", "internal-tools-secured");
+                            .doesNotContain("db-h2", "auth-real");
                     assertThat(environment.getProperty("spring.datasource.url"))
                             .isEqualTo("jdbc:postgresql://127.0.0.1:5432/rewrite");
                     assertThat(environment.getProperty("spring.datasource.driver-class-name"))
@@ -64,7 +64,7 @@ class ProfileConfigurationTest {
     }
 
     @Test
-    void prodLoadsPostgresAndProtectedAuthenticationConfiguration() {
+    void prodLoadsPostgresAndRealAuthenticationConfiguration() {
         contextRunner
                 .withPropertyValues(
                         "spring.profiles.active=prod",
@@ -76,7 +76,7 @@ class ProfileConfigurationTest {
                     Environment environment = context.getEnvironment();
 
                     assertThat(environment.getActiveProfiles())
-                            .contains("prod", "db-postgres", "auth-real", "internal-tools-secured")
+                            .contains("prod", "db-postgres", "auth-real")
                             .doesNotContain("db-h2", "auth-dev");
                     assertThat(environment.getProperty("spring.datasource.url"))
                             .isEqualTo("jdbc:postgresql://127.0.0.1:5432/rewrite");

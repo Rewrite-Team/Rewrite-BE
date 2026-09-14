@@ -59,11 +59,11 @@ OPENAI_API_KEY=your-api-key \
 |---|---|---|---|---|---|
 | `local` | `db-h2`, `auth-dev` | 파일형 H2 | 개발용 고정 사용자 | 인증 없음 | 활성화, Basic Auth |
 | `local-postgres` | `db-postgres`, `auth-dev` | Docker PostgreSQL | 개발용 고정 사용자 | 인증 없음 | 비활성화 |
-| `prod` | `db-postgres`, `auth-real`, `internal-tools-secured` | PostgreSQL | 실제 카카오/JWT 인증 | Basic Auth | 비활성화 |
+| `prod` | `db-postgres`, `auth-real` | PostgreSQL | 실제 카카오/JWT 인증 | 인증 없음 | 비활성화 |
 | `test` | `auth-dev` | 인메모리 H2 | 개발용 고정 사용자 | 인증 없음 | 비활성화 |
-| `auth-test` | `auth-real`, `internal-tools-secured` | 인메모리 H2 | 실제 인증 통합 테스트 설정 | Basic Auth | 비활성화 |
+| `auth-test` | `auth-real` | 인메모리 H2 | 실제 인증 통합 테스트 설정 | 인증 없음 | 비활성화 |
 
-사용자는 실행 목적을 나타내는 profile 하나만 `SPRING_PROFILES_ACTIVE`로 지정한다. `application.yaml`의 profile group이 DB, 인증과 내부 도구 보호 세부 profile을 조합한다. `test`와 `auth-test`의 인메모리 H2 접속 정보는 각각의 테스트 전용 설정에서 제공한다.
+사용자는 실행 목적을 나타내는 profile 하나만 `SPRING_PROFILES_ACTIVE`로 지정한다. `application.yaml`의 profile group이 DB와 인증 세부 profile을 조합한다. `test`와 `auth-test`의 인메모리 H2 접속 정보는 각각의 테스트 전용 설정에서 제공한다.
 
 ```bash
 SPRING_PROFILES_ACTIVE=local             # 파일형 H2 로컬 개발
@@ -87,16 +87,9 @@ docker compose down -v    # 로컬 PostgreSQL 데이터를 삭제하고 완전�
 - Swagger UI: `http://localhost:8080/swagger-ui/index.html`
 - OpenAPI JSON: `http://localhost:8080/v3/api-docs`
 
-`local`, `local-postgres`, `test` profile에서는 별도 인증 없이 접근할 수 있다. 이 profile에서는 실제 인증 controller가 비활성화되므로 API-001~004, API-006을 제외한 24개 API를 확인한다. 인증 API를 포함한 활성 API 29개 전체 문서는 `prod` profile에서 내부 도구용 Basic Auth로 접근하며 다음 환경변수가 필요하다.
+모든 profile에서 Swagger UI와 OpenAPI JSON은 별도 인증 없이 접근할 수 있다. `local`, `local-postgres`, `test`에서는 실제 인증 controller가 비활성화되므로 API-001~004, API-006을 제외한 24개 API를 확인하고, `prod`, `auth-test`에서는 인증 API를 포함한 활성 API 29개 전체 문서를 확인한다. Swagger에서 실제 Rewrite API를 호출할 때는 기존 카카오 로그인으로 발급한 인증 Cookie와, 상태 변경 요청인 경우 CSRF 토큰이 별도로 필요하다.
 
-```bash
-INTERNAL_TOOLS_USERNAME= {username}
-INTERNAL_TOOLS_PASSWORD= {password}
-```
-
-Basic Auth는 Swagger와 H2 Console 접근만 보호한다. Swagger에서 실제 Rewrite API를 호출할 때는 기존 카카오 로그인으로 발급한 인증 Cookie와, 상태 변경 요청인 경우 CSRF 토큰이 별도로 필요하다.
-
-H2 Console은 `db-h2` profile에서 활성화되며, 내부 도구용 Basic Auth 계정을 사용한다. `local` profile은 profile group을 통해 `db-h2`를 함께 활성화한다. 기본 프로필, `local-postgres`와 운영 환경에서는 비활성화되어 있다.
+H2 Console은 `db-h2` profile에서 활성화되며 `INTERNAL_TOOLS_USERNAME`, `INTERNAL_TOOLS_PASSWORD` 환경변수로 설정한 Basic Auth 계정을 사용한다. 값을 지정하지 않으면 로컬 기본값 `0000`을 사용한다. `local` profile은 profile group을 통해 `db-h2`를 함께 활성화한다. 기본 프로필, `local-postgres`와 운영 환경에서는 비활성화되어 있다.
 
 ```bash
 SPRING_PROFILES_ACTIVE=local

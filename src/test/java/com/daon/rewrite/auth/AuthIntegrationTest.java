@@ -274,6 +274,28 @@ class AuthIntegrationTest {
     }
 
     @Test
+    void swaggerAndOpenApiRemainPublicWithExpiredAccessCookie() throws Exception {
+        Instant now = Instant.now();
+        String expiredAccessToken = encodeToken(
+                "rewrite",
+                List.of("rewrite-web"),
+                "access",
+                now.minusSeconds(600),
+                now.minusSeconds(300)
+        );
+
+        for (String path : List.of(
+                "/swagger-ui/index.html",
+                "/v3/api-docs",
+                "/v3/api-docs/swagger-config"
+        )) {
+            mockMvc.perform(get(path)
+                            .cookie(new Cookie("access_token", expiredAccessToken)))
+                    .andExpect(status().isOk());
+        }
+    }
+
+    @Test
     void stateChangingMethodsRequireValidCsrfToken() throws Exception {
         User user = userRepository.save(User.create(
                 "user_csrf",

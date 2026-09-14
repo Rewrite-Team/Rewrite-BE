@@ -2,12 +2,11 @@ package com.daon.rewrite.global.config;
 
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.hasSize;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -22,8 +21,6 @@ import org.springframework.test.web.servlet.MockMvc;
         "spring.datasource.password=",
         "spring.jpa.hibernate.ddl-auto=create-drop",
         "spring.ai.openai.api-key=test-key",
-        "rewrite.internal-tools.username=rewrite-tools",
-        "rewrite.internal-tools.password=test-password",
         "rewrite.auth.jwt-secret-base64=MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE=",
         "rewrite.auth.frontend-origin=https://rewrite.example.com",
         "rewrite.auth.frontend-success-url=https://rewrite.example.com",
@@ -40,21 +37,17 @@ class OpenApiSecurityIntegrationTest {
     private MockMvc mockMvc;
 
     @Test
-    void openApiEndpointsRequireBasicAuthenticationOutsideLocalAndTestProfiles() throws Exception {
+    void openApiEndpointsArePublicInProductionProfileRegardlessOfAccessCookie() throws Exception {
         for (String path : new String[]{"/v3/api-docs", "/swagger-ui/index.html"}) {
-                    mockMvc.perform(get(path))
-                    .andExpect(status().isUnauthorized())
-                    .andExpect(header().string(
-                            "WWW-Authenticate",
-                            "Basic realm=\"rewrite-internal-tools\""
-                    ));
+            mockMvc.perform(get(path)
+                            .cookie(new Cookie("access_token", "invalid-token")))
+                    .andExpect(status().isOk());
         }
     }
 
     @Test
-    void openApiDocumentAcceptsInternalToolsCredentials() throws Exception {
-        mockMvc.perform(get("/v3/api-docs")
-                .with(httpBasic("rewrite-tools", "test-password")))
+    void publicOpenApiDocumentIncludesAuthenticationContracts() throws Exception {
+        mockMvc.perform(get("/v3/api-docs"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.info.title").value("Rewrite API"))
                 .andExpect(jsonPath("$.paths['/auth/kakao/authorize']").exists())
@@ -73,8 +66,7 @@ class OpenApiSecurityIntegrationTest {
 
     @Test
     void productionProfileDocumentsAllActiveApisAndOAuthRedirects() throws Exception {
-        mockMvc.perform(get("/v3/api-docs")
-                        .with(httpBasic("rewrite-tools", "test-password")))
+        mockMvc.perform(get("/v3/api-docs"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$..operationId", hasSize(29)))
                 .andExpect(jsonPath("$.paths['/auth/kakao/authorize'].get.operationId")
@@ -104,8 +96,7 @@ class OpenApiSecurityIntegrationTest {
 
     @Test
     void openApiDocumentProvidesRequestExamplesAndConstraints() throws Exception {
-        mockMvc.perform(get("/v3/api-docs")
-                        .with(httpBasic("rewrite-tools", "test-password")))
+        mockMvc.perform(get("/v3/api-docs"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.components.schemas.SaveBasicInfoRequest.properties.title.example")
                         .value("2026 상반기 Rewrite 백엔드 개발자 자기소개서"))
@@ -162,9 +153,8 @@ class OpenApiSecurityIntegrationTest {
     }
 
     @Test
-    void internalToolsCredentialsDoNotAuthenticateApplicationApi() throws Exception {
-        mockMvc.perform(get("/user/me")
-                        .with(httpBasic("rewrite-tools", "test-password")))
+    void publicDocumentationAccessDoesNotOpenApplicationApi() throws Exception {
+        mockMvc.perform(get("/user/me"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
     }
