@@ -1,10 +1,12 @@
 package com.daon.rewrite.auth.service;
 
+import com.daon.rewrite.auth.config.FrontendTarget;
 import com.daon.rewrite.auth.entity.OAuthLoginState;
 import com.daon.rewrite.auth.repository.OAuthLoginStateRepository;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
@@ -21,11 +23,11 @@ public class OAuthStateService {
     private final Clock clock;
 
     @Transactional
-    public OAuthStateIssue issue() {
+    public OAuthStateIssue issue(FrontendTarget frontendTarget) {
         // expiresAt <= 현재시간 인 OAuthLoginState 데이터 삭제
         // 별도 스케줄러 없이 로그인 요청 시점에 오래된 데이터를 정리하는 lazy cleanup 방식
         repository.deleteByExpiresAtLessThanEqual(Instant.now(clock));
-        String state = SecureTokenSupport.randomToken();
+        String state = SecureTokenSupport.randomToken() + "." + frontendTarget.value();
         String browserNonce = SecureTokenSupport.randomToken();
         repository.save(OAuthLoginState.create(
                 SecureTokenSupport.sha256(state),
@@ -48,11 +50,11 @@ public class OAuthStateService {
     요청 B -> false 반환
      */
     @Transactional
-    public boolean consume(String state, String browserNonce) {
+    public Optional<FrontendTarget> consume(String state, String browserNonce) {
         // state 와 browserNonce가 모두 존재하는지 확인
         if (state == null || state.isBlank() || browserNonce == null || browserNonce.isBlank()) {
             // DB 조회 없이 바로 실패 처리
-            return false;
+            return Optional.empty();
         }
 
         Instant now = Instant.now(clock);
@@ -60,10 +62,20 @@ public class OAuthStateService {
                 // state 존재 && nonce일치 && 만료되지 않음 일 경우 기존 값 반환
                 .filter(loginState -> loginState.canConsume(SecureTokenSupport.sha256(browserNonce), now))
                 // 검증에 성공했으므로 해당 DB 레코드 삭제(consume_소비 처리)
-                .map(loginState -> {
+                .flatMap(loginState -> {
                     repository.delete(loginState);
-                    return true;
-                })
-                .orElse(false);
+                    return frontendTarget(state);
+                });
+    }
+
+    private static Optional<FrontendTarget> frontendTarget(String state) {
+        int separatorIndex = state.lastIndexOf('.');
+        if (separatorIndex < 0) {
+            return Optional.of(FrontendTarget.PRODUCTION);
+        }
+        if (separatorIndex == state.length() - 1) {
+            return Optional.empty();
+        }
+        return FrontendTarget.from(state.substring(separatorIndex + 1));
     }
 }

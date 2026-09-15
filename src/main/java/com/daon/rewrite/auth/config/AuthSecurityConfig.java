@@ -5,6 +5,7 @@ import com.daon.rewrite.global.exception.ErrorCode;
 import jakarta.servlet.http.Cookie;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import javax.crypto.SecretKey;
@@ -122,7 +123,10 @@ public class AuthSecurityConfig {
     @Bean
     CorsConfigurationSource corsConfigurationSource(AuthProperties properties) {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of(properties.frontendOrigin()));  // AuthProperties 에 설정된 프론트 주소만 허용
+        configuration.setAllowedOrigins(List.copyOf(new LinkedHashSet<>(List.of(
+                properties.frontendOrigin(),
+                properties.localFrontendOrigin()
+        ))));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));   // 허용할 HTTP 메서드 지정
         configuration.setAllowedHeaders(List.of("Content-Type", "X-CSRF-Token"));   // 브라우저가 보낼 수 있는 요청 헤더를 지정
         configuration.setAllowCredentials(true);    // CORS 요청에 인증 정보(credentials)를 포함하도록 허용하는 설정 -> 프론트에서 access_token 쿠키를 포함하여 요청하면(credentials: "include") 서버에서 허용

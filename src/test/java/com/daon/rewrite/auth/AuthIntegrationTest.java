@@ -5,6 +5,8 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
@@ -15,8 +17,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.daon.rewrite.auth.client.KakaoUser;
-import com.daon.rewrite.auth.entity.User;
+import com.daon.rewrite.auth.config.FrontendTarget;
+import com.daon.rewrite.auth.entity.OAuthLoginState;
 import com.daon.rewrite.auth.entity.RefreshToken;
+import com.daon.rewrite.auth.entity.User;
 import com.daon.rewrite.auth.repository.OAuthLoginStateRepository;
 import com.daon.rewrite.auth.repository.RefreshTokenRepository;
 import com.daon.rewrite.auth.repository.UserRepository;
@@ -31,10 +35,14 @@ import com.daon.rewrite.auth.service.OAuthStateIssue;
 import com.daon.rewrite.auth.service.OAuthStateService;
 import jakarta.servlet.http.Cookie;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.HexFormat;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -105,7 +113,7 @@ class AuthIntegrationTest {
 
     @Test
     void authorizeRedirectsWithBrowserNonceCookie() throws Exception {
-        when(kakaoLoginService.authorize()).thenReturn(new KakaoAuthorizeResult(
+        when(kakaoLoginService.authorize(FrontendTarget.PRODUCTION)).thenReturn(new KakaoAuthorizeResult(
                 URI.create("https://kauth.kakao.com/oauth/authorize?state=state"),
                 "browser-nonce"
         ));
@@ -123,9 +131,36 @@ class AuthIntegrationTest {
     }
 
     @Test
+    void authorizeAcceptsOnlyKnownFrontendTargets() throws Exception {
+        when(kakaoLoginService.authorize(FrontendTarget.LOCAL)).thenReturn(new KakaoAuthorizeResult(
+                URI.create("https://kauth.kakao.com/oauth/authorize?state=state.local"),
+                "browser-nonce"
+        ));
+
+        mockMvc.perform(get("/auth/kakao/authorize").queryParam("target", "local"))
+                .andExpect(status().isFound())
+                .andExpect(header().string(
+                        "Location",
+                        "https://kauth.kakao.com/oauth/authorize?state=state.local"
+                ));
+
+        mockMvc.perform(get("/auth/kakao/authorize").queryParam("target", "unknown"))
+                .andExpect(status().isFound())
+                .andExpect(header().string(
+                        "Location",
+                        "https://rewrite.example.com/login?error=KAKAO_LOGIN_FAILED"
+                ));
+
+        verify(kakaoLoginService, never()).authorize(FrontendTarget.PRODUCTION);
+    }
+
+    @Test
     void successfulCallbackSetsAuthCookiesAndClearsNonce() throws Exception {
         when(kakaoLoginService.callback(eq("code"), eq(null), eq("state"), eq("browser-nonce")))
-                .thenReturn(KakaoLoginResult.success(new AuthTokenPair("access", "refresh")));
+                .thenReturn(KakaoLoginResult.success(
+                        new AuthTokenPair("access", "refresh"),
+                        FrontendTarget.PRODUCTION
+                ));
 
         var result = mockMvc.perform(get("/auth/kakao/callback")
                 .queryParam("code", "code")
@@ -135,22 +170,38 @@ class AuthIntegrationTest {
                         new Cookie("access_token", "invalid.jwt.token")
                 ))
                 .andExpect(status().isFound())
-                .andExpect(header().string("Location", "https://rewrite.example.com"))
+                .andExpect(header().string("Location", "https://rewrite.example.com/writing"))
                 .andReturn();
 
         assertThat(result.getResponse().getHeaders(HttpHeaders.SET_COOKIE))
                 .anyMatch(value -> hasCookieAttributes(
-                        value, "access_token=access;", "Path=/", "Max-Age=1800"))
+                        value, "access_token=access;", "Path=/", "Max-Age=1800", "SameSite=None"))
                 .anyMatch(value -> hasCookieAttributes(
-                        value, "refresh_token=refresh;", "Path=/auth", "Max-Age=1209600"))
+                        value, "refresh_token=refresh;", "Path=/auth", "Max-Age=1209600", "SameSite=None"))
                 .anyMatch(value -> hasCookieAttributes(
-                        value, "oauth_login_nonce=;", "Path=/auth/kakao", "Max-Age=0"));
+                        value, "oauth_login_nonce=;", "Path=/auth/kakao", "Max-Age=0", "SameSite=Lax"));
+    }
+
+    @Test
+    void localCallbackRedirectsToLocalFrontend() throws Exception {
+        when(kakaoLoginService.callback(eq("code"), eq(null), eq("state"), eq("browser-nonce")))
+                .thenReturn(KakaoLoginResult.success(
+                        new AuthTokenPair("access", "refresh"),
+                        FrontendTarget.LOCAL
+                ));
+
+        mockMvc.perform(get("/auth/kakao/callback")
+                        .queryParam("code", "code")
+                        .queryParam("state", "state")
+                        .cookie(new Cookie("oauth_login_nonce", "browser-nonce")))
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", "http://localhost:3000/writing"));
     }
 
     @Test
     void failedCallbackDoesNotSetAuthCookies() throws Exception {
         when(kakaoLoginService.callback(any(), any(), any(), any()))
-                .thenReturn(KakaoLoginResult.failed());
+                .thenReturn(KakaoLoginResult.failed(FrontendTarget.PRODUCTION));
 
         var result = mockMvc.perform(get("/auth/kakao/callback")
                         .queryParam("state", "invalid"))
@@ -167,31 +218,74 @@ class AuthIntegrationTest {
     }
 
     @Test
-    void oauthStateCanBeConsumedOnlyOnceByIssuingBrowser() {
-        OAuthStateIssue issue = oauthStateService.issue();
+    void localCallbackFailureRedirectsToLocalLogin() throws Exception {
+        when(kakaoLoginService.callback(any(), any(), any(), any()))
+                .thenReturn(KakaoLoginResult.failed(FrontendTarget.LOCAL));
 
-        assertThat(oauthStateService.consume(issue.state(), "other-browser")).isFalse();
-        assertThat(oauthStateService.consume(issue.state(), issue.browserNonce())).isTrue();
-        assertThat(oauthStateService.consume(issue.state(), issue.browserNonce())).isFalse();
+        mockMvc.perform(get("/auth/kakao/callback").queryParam("state", "invalid"))
+                .andExpect(status().isFound())
+                .andExpect(header().string(
+                        "Location",
+                        "http://localhost:3000/login?error=KAKAO_LOGIN_FAILED"
+                ));
+    }
+
+    @Test
+    void oauthStateCanBeConsumedOnlyOnceByIssuingBrowser() {
+        OAuthStateIssue issue = oauthStateService.issue(FrontendTarget.LOCAL);
+
+        assertThat(oauthStateService.consume(issue.state(), "other-browser")).isEmpty();
+        assertThat(oauthStateService.consume(issue.state(), issue.browserNonce()))
+                .contains(FrontendTarget.LOCAL);
+        assertThat(oauthStateService.consume(issue.state(), issue.browserNonce())).isEmpty();
+    }
+
+    @Test
+    void oauthStateRejectsTamperedFrontendTarget() {
+        OAuthStateIssue issue = oauthStateService.issue(FrontendTarget.LOCAL);
+        String tamperedState = issue.state().replace(".local", ".production");
+
+        assertThat(oauthStateService.consume(tamperedState, issue.browserNonce())).isEmpty();
+        assertThat(oauthStateService.consume(issue.state(), issue.browserNonce()))
+                .contains(FrontendTarget.LOCAL);
+    }
+
+    @Test
+    void legacyOAuthStateWithoutTargetUsesProduction() throws Exception {
+        String state = "legacy-state";
+        String browserNonce = "legacy-browser-nonce";
+        oauthLoginStateRepository.save(OAuthLoginState.create(
+                HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                        .digest(state.getBytes(StandardCharsets.UTF_8))),
+                HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                        .digest(browserNonce.getBytes(StandardCharsets.UTF_8))),
+                Instant.now().plusSeconds(300)
+        ));
+
+        assertThat(oauthStateService.consume(state, browserNonce))
+                .contains(FrontendTarget.PRODUCTION);
     }
 
     @Test
     void concurrentCallbacksConsumeOAuthStateExactlyOnce() throws Exception {
-        OAuthStateIssue issue = oauthStateService.issue();
+        OAuthStateIssue issue = oauthStateService.issue(FrontendTarget.PRODUCTION);
         CountDownLatch start = new CountDownLatch(1);
         try (var executor = Executors.newFixedThreadPool(2)) {
-            Future<Boolean> first = executor.submit(() -> {
+            Future<Optional<FrontendTarget>> first = executor.submit(() -> {
                 start.await();
                 return oauthStateService.consume(issue.state(), issue.browserNonce());
             });
-            Future<Boolean> second = executor.submit(() -> {
+            Future<Optional<FrontendTarget>> second = executor.submit(() -> {
                 start.await();
                 return oauthStateService.consume(issue.state(), issue.browserNonce());
             });
 
             start.countDown();
             assertThat(List.of(first.get(), second.get()))
-                    .containsExactlyInAnyOrder(true, false);
+                    .containsExactlyInAnyOrder(
+                            Optional.of(FrontendTarget.PRODUCTION),
+                            Optional.empty()
+                    );
         }
     }
 
@@ -653,28 +747,48 @@ class AuthIntegrationTest {
     }
 
     @Test
-    void corsAllowsConfiguredFrontendWithCredentials() throws Exception {
+    void corsAllowsConfiguredFrontendsWithCredentials() throws Exception {
+        for (String origin : List.of("https://rewrite.example.com", "http://localhost:3000")) {
+            mockMvc.perform(options("/user/me")
+                            .header(HttpHeaders.ORIGIN, origin)
+                            .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "GET"))
+                    .andExpect(status().isOk())
+                    .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, origin))
+                    .andExpect(header().string(
+                            HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS,
+                            "true"
+                    ));
+        }
+
         mockMvc.perform(options("/user/me")
-                        .header(HttpHeaders.ORIGIN, "https://rewrite.example.com")
+                        .header(HttpHeaders.ORIGIN, "https://attacker.example.com")
                         .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "GET"))
-                .andExpect(status().isOk())
-                .andExpect(header().string(
-                        HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN,
-                        "https://rewrite.example.com"
-                ))
-                .andExpect(header().string(
-                        HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS,
-                        "true"
-                ));
+                .andExpect(status().isForbidden())
+                .andExpect(header().doesNotExist(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN));
     }
 
-    private static boolean hasCookieAttributes(String value, String prefix, String path, String maxAge) {
+    private static boolean hasCookieAttributes(
+            String value,
+            String prefix,
+            String path,
+            String maxAge
+    ) {
+        return hasCookieAttributes(value, prefix, path, maxAge, "SameSite=None");
+    }
+
+    private static boolean hasCookieAttributes(
+            String value,
+            String prefix,
+            String path,
+            String maxAge,
+            String sameSite
+    ) {
         return value.startsWith(prefix)
                 && value.contains(path)
                 && value.contains(maxAge)
                 && value.contains("Secure")
                 && value.contains("HttpOnly")
-                && value.contains("SameSite=Lax");
+                && value.contains(sameSite);
     }
 
     private int refreshStatusAfter(CountDownLatch start, String refreshToken, String csrfToken)

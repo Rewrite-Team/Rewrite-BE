@@ -15,8 +15,19 @@ public record AuthProperties(
         @NotBlank String frontendOrigin,
         @NotBlank String frontendSuccessUrl,
         @NotBlank String frontendLoginUrl,
+        @NotBlank String localFrontendOrigin,
+        @NotBlank String localFrontendSuccessUrl,
+        @NotBlank String localFrontendLoginUrl,
         @NotNull @Valid Kakao kakao
 ) {
+
+    public String frontendSuccessUrl(FrontendTarget target) {
+        return target == FrontendTarget.LOCAL ? localFrontendSuccessUrl : frontendSuccessUrl;
+    }
+
+    public String frontendLoginUrl(FrontendTarget target) {
+        return target == FrontendTarget.LOCAL ? localFrontendLoginUrl : frontendLoginUrl;
+    }
 
     public record Kakao(
             @NotBlank String clientId,

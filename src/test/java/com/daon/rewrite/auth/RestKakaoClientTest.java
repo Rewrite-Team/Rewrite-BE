@@ -31,6 +31,7 @@ class RestKakaoClientTest {
         server = MockRestServiceServer.bindTo(builder).build();
         AuthProperties properties = new AuthProperties(
                 "rewrite", "rewrite-web", "unused", "https://front", "https://front", "https://front/login",
+                "http://localhost:3000", "http://localhost:3000/writing", "http://localhost:3000/login",
                 new AuthProperties.Kakao(
                         "client-id", "client-secret", "https://api/auth/kakao/callback",
                         "https://kauth.kakao.com/oauth/authorize",

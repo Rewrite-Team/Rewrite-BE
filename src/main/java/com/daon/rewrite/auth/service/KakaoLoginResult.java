@@ -1,19 +1,22 @@
 package com.daon.rewrite.auth.service;
 
+import com.daon.rewrite.auth.config.FrontendTarget;
+
 public record KakaoLoginResult(
         KakaoLoginStatus status,
-        AuthTokenPair tokens
+        AuthTokenPair tokens,
+        FrontendTarget frontendTarget
 ) {
 
-    public static KakaoLoginResult success(AuthTokenPair tokens) {
-        return new KakaoLoginResult(KakaoLoginStatus.SUCCESS, tokens);
+    public static KakaoLoginResult success(AuthTokenPair tokens, FrontendTarget frontendTarget) {
+        return new KakaoLoginResult(KakaoLoginStatus.SUCCESS, tokens, frontendTarget);
     }
 
-    public static KakaoLoginResult canceled() {
-        return new KakaoLoginResult(KakaoLoginStatus.CANCELED, null);
+    public static KakaoLoginResult canceled(FrontendTarget frontendTarget) {
+        return new KakaoLoginResult(KakaoLoginStatus.CANCELED, null, frontendTarget);
     }
 
-    public static KakaoLoginResult failed() {
-        return new KakaoLoginResult(KakaoLoginStatus.FAILED, null);
+    public static KakaoLoginResult failed(FrontendTarget frontendTarget) {
+        return new KakaoLoginResult(KakaoLoginStatus.FAILED, null, frontendTarget);
     }
 }
