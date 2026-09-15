@@ -5,7 +5,7 @@
 ### 카카오 로그인 시작
 
 ```http
-GET /auth/kakao/authorize
+GET /auth/kakao/authorize?target={target}
 ```
 
 Description:
@@ -13,6 +13,8 @@ Description:
 ```text
 사용자를 카카오 OAuth 인증 페이지로 리다이렉트한다.
 ```
+
+`target`은 `local`, `production`만 허용하며 생략하면 `production`을 사용한다. 로컬 프론트엔드는 `target=local`, 운영 프론트엔드는 `target=production`으로 호출한다. 임의 URL은 받지 않는다.
 
 Response:
 
@@ -22,13 +24,13 @@ Set-Cookie: oauth_login_nonce=...; HttpOnly; Secure; SameSite=Lax; Path=/auth/ka
 Location: https://kauth.kakao.com/oauth/authorize?client_id=...&redirect_uri=...&response_type=code&state=...
 ```
 
-`oauth_login_nonce`는 로그인 시작 브라우저와 OAuth `state`를 결합하기 위한 5분 수명의 임시 Cookie다. JavaScript에서 읽지 않으며 callback 성공·취소·실패 시 만료한다.
+`oauth_login_nonce`는 로그인 시작 브라우저와 OAuth `state`를 결합하기 위한 5분 수명의 임시 Cookie다. JavaScript에서 읽지 않으며 callback 성공·취소·실패 시 만료한다. 선택한 `target`은 state 원문에 결합되고 전체 state의 해시만 서버에 저장되므로 callback에서 목적지를 변조할 수 없다.
 
 로그인 시작 처리에 실패하면 JSON 오류를 반환하지 않고 프론트엔드 로그인 화면으로 리다이렉트한다.
 
 ```http
 302 Found
-Location: https://rewrite.example.com/login?error=KAKAO_LOGIN_FAILED
+Location: https://rewrite-coverletters.site/login?error=KAKAO_LOGIN_FAILED
 ```
 
 프론트엔드는 `KAKAO_LOGIN_FAILED`이면 로그인 실패 안내를 표시하고 로그인 버튼을 다시 활성화한다. 자동 재시도는 하지 않으며, 알 수 없는 `error` 값도 같은 일반 로그인 실패 안내로 처리한다. 백엔드 오류 메시지나 내부 설정 정보는 사용자에게 노출하지 않는다.
@@ -60,10 +62,10 @@ Success Response:
 
 ```http
 302 Found
-Set-Cookie: access_token=...; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=1800
-Set-Cookie: refresh_token=...; HttpOnly; Secure; SameSite=Lax; Path=/auth; Max-Age=1209600
+Set-Cookie: access_token=...; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=1800
+Set-Cookie: refresh_token=...; HttpOnly; Secure; SameSite=None; Path=/auth; Max-Age=1209600
 Set-Cookie: oauth_login_nonce=; HttpOnly; Secure; SameSite=Lax; Path=/auth/kakao; Max-Age=0
-Location: https://rewrite.example.com
+Location: https://rewrite-coverletters.site/writing
 ```
 
 Failure Response:
@@ -71,7 +73,7 @@ Failure Response:
 ```http
 302 Found
 Set-Cookie: oauth_login_nonce=; HttpOnly; Secure; SameSite=Lax; Path=/auth/kakao; Max-Age=0
-Location: https://rewrite.example.com/login?error=KAKAO_LOGIN_FAILED
+Location: https://rewrite-coverletters.site/login?error=KAKAO_LOGIN_FAILED
 ```
 
 사용자가 카카오 로그인 또는 동의를 취소한 경우:
@@ -79,10 +81,19 @@ Location: https://rewrite.example.com/login?error=KAKAO_LOGIN_FAILED
 ```http
 302 Found
 Set-Cookie: oauth_login_nonce=; HttpOnly; Secure; SameSite=Lax; Path=/auth/kakao; Max-Age=0
-Location: https://rewrite.example.com/login?error=KAKAO_LOGIN_CANCELED
+Location: https://rewrite-coverletters.site/login?error=KAKAO_LOGIN_CANCELED
 ```
 
 `KAKAO_LOGIN_CANCELED`이면 프론트엔드는 “카카오 로그인이 취소되었습니다.”를 표시한다. state·nonce 누락/불일치/만료/재사용, authorization code 교환 실패, 카카오 사용자 조회 또는 사용자 저장 실패는 `KAKAO_LOGIN_FAILED`로 처리한다. 두 경우 모두 로그인 버튼을 다시 활성화하고 자동 재시도하지 않는다. 알 수 없는 오류 코드는 일반 로그인 실패로 처리하며, 카카오 `error_description`, state 검증 원인과 백엔드 오류 메시지는 노출하지 않는다.
+
+로그인 결과 목적지는 검증된 state에 결합된 `target`으로 선택한다.
+
+| target | 성공 | 실패·취소 |
+|---|---|---|
+| `local` | `http://localhost:3000/writing` | `http://localhost:3000/login?error={code}` |
+| `production` | `https://rewrite-coverletters.site/writing` | `https://rewrite-coverletters.site/login?error={code}` |
+
+운영 백엔드 callback URI는 `https://api.rewrite-coverletters.site/auth/kakao/callback` 하나를 사용한다. 두 프론트엔드는 API 요청에 `credentials: include`를 사용한다. localhost에서 운영 API로 보내는 인증 Cookie는 브라우저에서 서드파티 Cookie로 취급될 수 있으므로 차단된 개발 브라우저에서는 `api.rewrite-coverletters.site` Cookie 허용이 필요하다.
 
 ### CSRF 토큰 조회
 
@@ -124,8 +135,8 @@ Request body는 없다. access token은 필요하지 않고 `refresh_token` Cook
 Response Header:
 
 ```http
-Set-Cookie: access_token=...; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=1800
-Set-Cookie: refresh_token=...; HttpOnly; Secure; SameSite=Lax; Path=/auth; Max-Age=1209600
+Set-Cookie: access_token=...; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=1800
+Set-Cookie: refresh_token=...; HttpOnly; Secure; SameSite=None; Path=/auth; Max-Age=1209600
 ```
 
 Response:
@@ -187,8 +198,8 @@ POST /auth/logout
 Response Header:
 
 ```http
-Set-Cookie: access_token=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0
-Set-Cookie: refresh_token=; HttpOnly; Secure; SameSite=Lax; Path=/auth; Max-Age=0
+Set-Cookie: access_token=; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=0
+Set-Cookie: refresh_token=; HttpOnly; Secure; SameSite=None; Path=/auth; Max-Age=0
 ```
 
 Response:

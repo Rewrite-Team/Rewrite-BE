@@ -85,7 +85,7 @@ class RewriteApiCoverageTest {
 
     @Test
     void oauthApisDescribeRedirectOutcomesWithoutJsonInternalError() throws Exception {
-        RewriteApi authorize = KakaoAuthController.class.getDeclaredMethod("authorize")
+        RewriteApi authorize = KakaoAuthController.class.getDeclaredMethod("authorize", String.class)
                 .getAnnotation(RewriteApi.class);
         RewriteApi callback = KakaoAuthController.class.getDeclaredMethod(
                 "callback", String.class, String.class, String.class, String.class

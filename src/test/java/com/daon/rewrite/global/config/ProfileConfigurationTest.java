@@ -30,6 +30,20 @@ class ProfileConfigurationTest {
                             .isEqualTo("update");
                     assertThat(environment.getProperty("spring.h2.console.enabled", Boolean.class))
                             .isTrue();
+                    assertThat(environment.getProperty("rewrite.auth.frontend-origin"))
+                            .isEqualTo("http://localhost:3000");
+                    assertThat(environment.getProperty("rewrite.auth.frontend-success-url"))
+                            .isEqualTo("http://localhost:3000/writing");
+                    assertThat(environment.getProperty("rewrite.auth.frontend-login-url"))
+                            .isEqualTo("http://localhost:3000/login");
+                    assertThat(environment.getProperty("rewrite.auth.local-frontend-origin"))
+                            .isEqualTo("http://localhost:3000");
+                    assertThat(environment.getProperty("rewrite.auth.local-frontend-success-url"))
+                            .isEqualTo("http://localhost:3000/writing");
+                    assertThat(environment.getProperty("rewrite.auth.local-frontend-login-url"))
+                            .isEqualTo("http://localhost:3000/login");
+                    assertThat(environment.getProperty("rewrite.auth.kakao.redirect-uri"))
+                            .isEqualTo("http://localhost:8080/auth/kakao/callback");
                 });
     }
 
@@ -70,7 +84,14 @@ class ProfileConfigurationTest {
                         "spring.profiles.active=prod",
                         "DB_URL=jdbc:postgresql://127.0.0.1:5432/rewrite",
                         "DB_USERNAME=rewrite_app",
-                        "DB_PASSWORD=test-password"
+                        "DB_PASSWORD=test-password",
+                        "FRONTEND_ORIGIN=https://rewrite-coverletters.site",
+                        "FRONTEND_SUCCESS_URL=https://rewrite-coverletters.site/writing",
+                        "FRONTEND_LOGIN_URL=https://rewrite-coverletters.site/login",
+                        "LOCAL_FRONTEND_ORIGIN=http://localhost:3000",
+                        "LOCAL_FRONTEND_SUCCESS_URL=http://localhost:3000/writing",
+                        "LOCAL_FRONTEND_LOGIN_URL=http://localhost:3000/login",
+                        "KAKAO_REDIRECT_URI=https://api.rewrite-coverletters.site/auth/kakao/callback"
                 )
                 .run(context -> {
                     Environment environment = context.getEnvironment();
@@ -90,6 +111,20 @@ class ProfileConfigurationTest {
                             .isEqualTo("update");
                     assertThat(environment.getProperty("spring.h2.console.enabled", Boolean.class))
                             .isFalse();
+                    assertThat(environment.getProperty("rewrite.auth.frontend-origin"))
+                            .isEqualTo("https://rewrite-coverletters.site");
+                    assertThat(environment.getProperty("rewrite.auth.frontend-success-url"))
+                            .isEqualTo("https://rewrite-coverletters.site/writing");
+                    assertThat(environment.getProperty("rewrite.auth.frontend-login-url"))
+                            .isEqualTo("https://rewrite-coverletters.site/login");
+                    assertThat(environment.getProperty("rewrite.auth.local-frontend-origin"))
+                            .isEqualTo("http://localhost:3000");
+                    assertThat(environment.getProperty("rewrite.auth.local-frontend-success-url"))
+                            .isEqualTo("http://localhost:3000/writing");
+                    assertThat(environment.getProperty("rewrite.auth.local-frontend-login-url"))
+                            .isEqualTo("http://localhost:3000/login");
+                    assertThat(environment.getProperty("rewrite.auth.kakao.redirect-uri"))
+                            .isEqualTo("https://api.rewrite-coverletters.site/auth/kakao/callback");
                 });
     }
 }

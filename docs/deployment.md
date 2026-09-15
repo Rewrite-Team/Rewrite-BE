@@ -2,9 +2,9 @@
 
 이 문서는 Oracle Cloud Infrastructure(OCI)에 Rewrite 백엔드를 수동 배포하고 점검하는 절차를 정리한다. GitHub Actions CD 자동화는 [#113](https://github.com/Rewrite-Team/Rewrite-BE/issues/113)의 범위이며 이 문서에서는 다루지 않는다.
 
-관련 기준은 `REQ-007`과 [Decision 101](decisions/persistence.md#decision-101-실행-프로필은-db와-인증-세부-프로필을-조합한다)이다. 제품 기능과 공개 API 계약은 변경하지 않는다.
+관련 기준은 `REQ-007`, `REQ-008`, [Decision 009](decisions/auth.md#decision-009-카카오-oauth-callback은-백엔드가-직접-처리한다)와 [Decision 101](decisions/persistence.md#decision-101-실행-프로필은-db와-인증-세부-프로필을-조합한다)이다. 배포 환경 변경이 API path나 schema를 바꾸지는 않지만, OAuth callback과 로그인 완료 redirect의 공개 URL은 환경 설정과 함께 관리한다.
 
-## 현재 배포 기준
+## #119 전환 후 배포 기준
 
 | 항목 | 값 |
 |---|---|
@@ -17,7 +17,7 @@
 | Java | OpenJDK 21 |
 | 데이터베이스 | PostgreSQL 17, 같은 인스턴스의 loopback에서만 연결 |
 | Reverse proxy | Nginx |
-| 도메인 | `playmcpfinder.store` |
+| 도메인 | `api.rewrite-coverletters.site` |
 | 애플리케이션 주소 | `127.0.0.1:8080` |
 
 이 shape는 메모리가 1 GB이므로 애플리케이션 JVM heap을 384 MB로 제한하고 2 GB swap을 사용한다. 별도 애플리케이션 사용자는 만들지 않고 `ubuntu`로 실행하되 systemd의 권한 제한 옵션을 적용한다. `prod`는 사용자-facing 실행 profile이며 `db-postgres`, `auth-real` 세부 profile을 함께 활성화한다.
@@ -140,9 +140,9 @@ chmod 700 /home/ubuntu/rewrite/config
 
 ```bash
 scp build/libs/rewrite-0.0.1-SNAPSHOT.jar \
-  ubuntu@playmcpfinder.store:/home/ubuntu/rewrite/releases/rewrite-<commit-sha>.jar
+  ubuntu@api.rewrite-coverletters.site:/home/ubuntu/rewrite/releases/rewrite-<commit-sha>.jar
 
-ssh ubuntu@playmcpfinder.store \
+ssh ubuntu@api.rewrite-coverletters.site \
   'ln -sfn /home/ubuntu/rewrite/releases/rewrite-<commit-sha>.jar /home/ubuntu/rewrite/current.jar'
 ```
 
@@ -158,15 +158,18 @@ DB_USERNAME=rewrite_app
 DB_PASSWORD='replace-me'
 OPENAI_API_KEY='replace-me'
 AUTH_JWT_SECRET_BASE64='replace-me'
-FRONTEND_ORIGIN=http://localhost:3000
-FRONTEND_SUCCESS_URL=http://localhost:3000
-FRONTEND_LOGIN_URL=http://localhost:3000/login
+FRONTEND_ORIGIN=https://rewrite-coverletters.site
+FRONTEND_SUCCESS_URL=https://rewrite-coverletters.site/writing
+FRONTEND_LOGIN_URL=https://rewrite-coverletters.site/login
+LOCAL_FRONTEND_ORIGIN=http://localhost:3000
+LOCAL_FRONTEND_SUCCESS_URL=http://localhost:3000/writing
+LOCAL_FRONTEND_LOGIN_URL=http://localhost:3000/login
 KAKAO_CLIENT_ID='replace-me'
 KAKAO_CLIENT_SECRET='replace-me'
-KAKAO_REDIRECT_URI=https://playmcpfinder.store/auth/kakao/callback
+KAKAO_REDIRECT_URI=https://api.rewrite-coverletters.site/auth/kakao/callback
 ```
 
-프론트엔드가 배포되면 `FRONTEND_ORIGIN`, `FRONTEND_SUCCESS_URL`, `FRONTEND_LOGIN_URL`을 실제 HTTPS 프론트엔드 URL로 교체한다. JWT secret은 별도로 생성한다.
+운영 백엔드는 `FRONTEND_*`를 운영 목적지로, `LOCAL_FRONTEND_*`를 로컬 개발 목적지로 사용한다. 로컬 프론트엔드는 API-001을 `target=local`로 호출하고 모든 API 요청에 `credentials: include`를 지정한다. 서드파티 Cookie가 차단된 개발 브라우저에서는 `api.rewrite-coverletters.site`의 Cookie를 허용해야 한다. 로컬 백엔드의 `auth-real` 실행은 기본값만으로 localhost callback과 프론트엔드를 사용한다. JWT secret은 환경별로 별도로 생성한다.
 
 ```bash
 openssl rand -base64 64 | tr -d '\n'; echo
@@ -225,7 +228,7 @@ sudo ss -lntp | grep ':8080'
 
 ## Nginx와 TLS
 
-Nginx의 `server_name`을 `playmcpfinder.store`로 설정한 뒤 HTTPS server의 `location /`에 다음 proxy 설정을 둔다.
+Nginx의 `server_name`을 `api.rewrite-coverletters.site`로 설정한 뒤 HTTPS server의 `location /`에 다음 proxy 설정을 둔다.
 
 ```nginx
 location / {
@@ -257,7 +260,7 @@ Certbot으로 인증서를 발급하고 HTTP 요청을 HTTPS로 redirect한다.
 
 ```bash
 sudo apt-get install -y certbot python3-certbot-nginx
-sudo certbot --nginx -d playmcpfinder.store
+sudo certbot --nginx -d api.rewrite-coverletters.site
 sudo certbot renew --dry-run
 ```
 
@@ -273,7 +276,7 @@ ln -sfn /home/ubuntu/rewrite/releases/rewrite-<new-commit-sha>.jar \
 sudo systemctl restart rewrite
 sudo systemctl is-active rewrite
 sudo journalctl -u rewrite -n 100 --no-pager
-curl -i --max-time 10 https://playmcpfinder.store/
+curl -i --max-time 10 https://api.rewrite-coverletters.site/
 ```
 
 배포가 실패하면 직전 JAR로 symlink를 되돌리고 다시 시작한다.
@@ -309,9 +312,9 @@ sudo -u postgres pg_restore \
 
 ## 검증 기록
 
-2026-09-10에 다음 항목을 수동 검증했다.
+2026-09-10에 임시 도메인 `playmcpfinder.store`를 사용해 다음 기반 환경을 수동 검증했다.
 
-- Reserved Public IP와 `playmcpfinder.store` A record 연결
+- Reserved Public IP와 임시 도메인 A record 연결
 - 관리자 노트북의 SSH 공개키 접속
 - JDK 21 `amd64`, PostgreSQL, Nginx와 Rewrite 서비스 실행
 - Rewrite의 `prod` profile 활성화와 `127.0.0.1:8080` binding
@@ -321,3 +324,18 @@ sudo -u postgres pg_restore \
 - Nginx의 SSE용 buffering 비활성화 설정과 설정 문법
 
 실제 SSE 이벤트 전달과 PostgreSQL 백업·복구는 사용자의 결정에 따라 검증하지 않았다.
+
+2026-09-15에 `api.rewrite-coverletters.site` 전환과 다음 항목을 수동 검증했다.
+
+- DNS와 Nginx의 HTTP→HTTPS redirect
+- `api.rewrite-coverletters.site`를 포함하는 TLS 인증서
+- 카카오 디벨로퍼스 운영 callback URI 등록
+- 운영 환경변수의 프론트엔드 Origin, `/writing` 성공 URL과 운영 callback URI
+- Swagger UI와 `/v3/api-docs`의 무인증 접근
+- API-001 인가 시작 응답의 운영 callback URI
+- target 생략 시 production state와 운영 실패 URL 선택
+- `target=local` state와 localhost 실패 URL 선택
+- localhost·운영 프론트엔드 Origin의 credential CORS preflight와 미허용 Origin 거부
+- 인증 Cookie 만료 응답의 `SameSite=None; Secure; HttpOnly`
+
+운영 로그인 실패 URL은 `https://rewrite-coverletters.site/login`, 로컬 로그인 실패 URL은 `http://localhost:3000/login`으로 설정했다. 합성 state를 사용한 취소 callback까지 검증했으며, 실제 카카오 로그인 성공과 localhost에서의 API-005 Cookie 인증은 프론트엔드 연동 후 브라우저의 서드파티 Cookie 허용 조건과 함께 검증한다.

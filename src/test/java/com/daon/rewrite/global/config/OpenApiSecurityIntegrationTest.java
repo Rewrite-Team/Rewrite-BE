@@ -23,8 +23,11 @@ import org.springframework.test.web.servlet.MockMvc;
         "spring.ai.openai.api-key=test-key",
         "rewrite.auth.jwt-secret-base64=MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE=",
         "rewrite.auth.frontend-origin=https://rewrite.example.com",
-        "rewrite.auth.frontend-success-url=https://rewrite.example.com",
+        "rewrite.auth.frontend-success-url=https://rewrite.example.com/writing",
         "rewrite.auth.frontend-login-url=https://rewrite.example.com/login",
+        "rewrite.auth.local-frontend-origin=http://localhost:3000",
+        "rewrite.auth.local-frontend-success-url=http://localhost:3000/writing",
+        "rewrite.auth.local-frontend-login-url=http://localhost:3000/login",
         "rewrite.auth.kakao.client-id=test-client",
         "rewrite.auth.kakao.client-secret=test-secret",
         "rewrite.auth.kakao.redirect-uri=https://api.rewrite.example.com/auth/kakao/callback"
@@ -71,6 +74,12 @@ class OpenApiSecurityIntegrationTest {
                 .andExpect(jsonPath("$..operationId", hasSize(29)))
                 .andExpect(jsonPath("$.paths['/auth/kakao/authorize'].get.operationId")
                         .value("API-001"))
+                .andExpect(jsonPath("$.paths['/auth/kakao/authorize'].get.parameters[0].name")
+                        .value("target"))
+                .andExpect(jsonPath("$.paths['/auth/kakao/authorize'].get.parameters[0].schema.default")
+                        .value("production"))
+                .andExpect(jsonPath("$.paths['/auth/kakao/authorize'].get.parameters[0].schema.enum",
+                        containsInAnyOrder("local", "production")))
                 .andExpect(jsonPath("$.paths['/auth/kakao/authorize'].get.responses['302'].description")
                         .value(org.hamcrest.Matchers.containsString("KAKAO_LOGIN_FAILED")))
                 .andExpect(jsonPath("$.paths['/auth/kakao/authorize'].get.responses['500']")

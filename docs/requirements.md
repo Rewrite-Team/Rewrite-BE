@@ -256,12 +256,15 @@ API-008 자기소개서 초안 생성의 공개 API 계약은 유지하되, 현�
 ### User Flow
 
 - 사용자는 카카오 로그인으로 로그인한다.
+- 로그인 성공 후 실행 환경에 설정된 자기소개서 작성 화면으로 이동한다.
 - 로그인 후 사용자의 닉네임과 프로필 사진을 화면 우측 상단에 표시할 수 있다.
 - 클라이언트는 인증이 필요한 요청에 cookie를 포함한다.
 
 ### Rules
 
 - 백엔드는 카카오 OAuth callback을 직접 처리한다.
+- 로그인 시작의 `target`은 `local`, `production`만 허용하고 OAuth state에 결합해 callback에서 검증한다. 성공 목적지는 각각 `http://localhost:3000/writing`, `https://rewrite-coverletters.site/writing`으로 제한한다.
+- 운영 백엔드는 `http://localhost:3000`과 `https://rewrite-coverletters.site` Origin을 credential CORS 대상으로 허용한다. access token과 refresh token Cookie는 `SameSite=None; Secure; HttpOnly`, OAuth nonce는 `SameSite=Lax; Secure; HttpOnly`를 사용한다.
 - 카카오 로그인 시작 또는 callback 처리 실패는 프론트엔드 로그인 화면으로 `KAKAO_LOGIN_FAILED`를 포함해 리다이렉트하고, 사용자가 카카오 로그인이나 동의를 취소하면 `KAKAO_LOGIN_CANCELED`를 사용한다.
 - access token은 30분, refresh token은 14일 동안 유효하다.
 - refresh token rotation을 사용한다.
@@ -273,6 +276,8 @@ API-008 자기소개서 초안 생성의 공개 API 계약은 유지하되, 현�
 ### Acceptance Criteria
 
 - 로그인 시작, OAuth callback, CSRF 토큰 조회, 토큰 갱신, 내 정보 조회, 로그아웃 API가 계약대로 동작한다.
+- 로그인 성공 시 실행 환경의 자기소개서 작성 화면으로 리다이렉트한다.
+- 하나의 운영 백엔드에서 `target`에 따라 로컬 또는 운영 프론트엔드로 리다이렉트하며, 허용되지 않은 target과 Origin을 거부한다.
 - 인증이 필요한 리소스는 현재 사용자의 소유자인지 검증한다.
 
 ## REQ-009: 키워드 분석

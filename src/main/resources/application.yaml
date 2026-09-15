@@ -61,8 +61,11 @@ rewrite:
     audience: rewrite-web
     jwt-secret-base64: ${AUTH_JWT_SECRET_BASE64:}
     frontend-origin: ${FRONTEND_ORIGIN:http://localhost:3000}
-    frontend-success-url: ${FRONTEND_SUCCESS_URL:http://localhost:3000}
+    frontend-success-url: ${FRONTEND_SUCCESS_URL:http://localhost:3000/writing}
     frontend-login-url: ${FRONTEND_LOGIN_URL:http://localhost:3000/login}
+    local-frontend-origin: ${LOCAL_FRONTEND_ORIGIN:http://localhost:3000}
+    local-frontend-success-url: ${LOCAL_FRONTEND_SUCCESS_URL:http://localhost:3000/writing}
+    local-frontend-login-url: ${LOCAL_FRONTEND_LOGIN_URL:http://localhost:3000/login}
     kakao:
       client-id: ${KAKAO_CLIENT_ID:}
       client-secret: ${KAKAO_CLIENT_SECRET:}

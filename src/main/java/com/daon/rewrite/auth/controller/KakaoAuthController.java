@@ -1,7 +1,8 @@
 package com.daon.rewrite.auth.controller;
 
-import com.daon.rewrite.auth.config.AuthProperties;
 import com.daon.rewrite.auth.config.AuthCookieFactory;
+import com.daon.rewrite.auth.config.AuthProperties;
+import com.daon.rewrite.auth.config.FrontendTarget;
 import com.daon.rewrite.auth.service.AuthTokenPair;
 import com.daon.rewrite.auth.service.KakaoAuthorizeResult;
 import com.daon.rewrite.auth.service.KakaoLoginResult;
@@ -10,6 +11,7 @@ import com.daon.rewrite.global.openapi.ApiRedirectError;
 import com.daon.rewrite.global.openapi.RewriteApi;
 import java.net.URI;
 import io.swagger.v3.oas.annotations.headers.Header;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import lombok.RequiredArgsConstructor;
@@ -55,7 +57,7 @@ public class KakaoAuthController {
             purpose = "카카오 OAuth 인가를 시작하고 요청 브라우저 검증용 nonce Cookie를 발급한다.",
             screens = "로그인",
             trigger = "사용자가 카카오 로그인 버튼을 누를 때 브라우저를 이 endpoint로 이동시킨다.",
-            behavior = "JSON 호출이 아니라 302 redirect 흐름이다. oauth_login_nonce Cookie는 HttpOnly로 발급하며 프론트엔드가 읽지 않는다.",
+            behavior = "JSON 호출이 아니라 302 redirect 흐름이다. target은 local 또는 production만 허용하고 OAuth state에 결합한다. oauth_login_nonce Cookie는 HttpOnly로 발급하며 프론트엔드가 읽지 않는다.",
             success = "302 Location의 카카오 인가 화면으로 이동하고 로그인 버튼 중복 클릭을 막는다.",
             successStatus = 302,
             authenticated = false,
@@ -66,16 +68,29 @@ public class KakaoAuthController {
                     action = "로그인 화면에서 일반 실패 안내를 표시하고 버튼을 다시 활성화하며 자동 재시도하지 않는다."
             )
     )
-    public ResponseEntity<Void> authorize() {
+    public ResponseEntity<Void> authorize(
+            @Parameter(
+                    description = "로그인 완료 후 이동할 프론트엔드 환경",
+                    schema = @Schema(allowableValues = {"local", "production"}, defaultValue = "production")
+            )
+            @RequestParam(defaultValue = "production") String target
+    ) {
+        FrontendTarget frontendTarget = FrontendTarget.from(target).orElse(null);
+        if (frontendTarget == null) {
+            return redirect(
+                    loginFailureUri(FrontendTarget.PRODUCTION, "KAKAO_LOGIN_FAILED"),
+                    clearOauthNonceCookie()
+            );
+        }
         try {
-            KakaoAuthorizeResult result = loginService.authorize();
+            KakaoAuthorizeResult result = loginService.authorize(frontendTarget);
             return ResponseEntity.status(HttpStatus.FOUND)  // 302 Found 지정. 브라우저는 302 응답을 받으면 Location 헤더 주소로 이동
                     .location(result.authorizeUri())
                     .header(HttpHeaders.SET_COOKIE, oauthNonceCookie(result.browserNonce(), 300).toString())    // OAuth 요청을 시작한 브라우저와 callback을 받은 브라우저가 같은지 검증하기 위한 nonce 쿠키를 설정
                     .build();   // 비어있는 body
         } catch (RuntimeException e) {
             log.warn("Kakao login authorization failed", e);
-            return redirect(loginFailureUri("KAKAO_LOGIN_FAILED"), clearOauthNonceCookie());
+            return redirect(loginFailureUri(frontendTarget, "KAKAO_LOGIN_FAILED"), clearOauthNonceCookie());
         }
     }
 
@@ -96,7 +111,7 @@ public class KakaoAuthController {
             purpose = "카카오 인가 결과를 검증하고 성공 시 Rewrite 인증 Cookie를 발급한다.",
             screens = "로그인",
             trigger = "카카오가 로그인·동의 처리 후 브라우저를 callback으로 돌려보낼 때 호출된다.",
-            behavior = "프론트엔드가 직접 호출하지 않는 브라우저 redirect endpoint다. state와 nonce를 일회성으로 검증하고 모든 결과에서 nonce Cookie를 만료한다.",
+            behavior = "프론트엔드가 직접 호출하지 않는 브라우저 redirect endpoint다. state와 nonce를 일회성으로 검증하고 state에 결합된 local 또는 production 목적지를 선택하며 모든 결과에서 nonce Cookie를 만료한다.",
             success = "302로 앱에 이동하며 access_token과 refresh_token HttpOnly Cookie를 발급한다.",
             successStatus = 302,
             authenticated = false,
@@ -122,15 +137,21 @@ public class KakaoAuthController {
     ) {
         KakaoLoginResult result = loginService.callback(code, error, state, browserNonce);
         return switch (result.status()) {
-            case SUCCESS -> success(result.tokens());
-            case CANCELED -> redirect(loginFailureUri("KAKAO_LOGIN_CANCELED"), clearOauthNonceCookie());
-            case FAILED -> redirect(loginFailureUri("KAKAO_LOGIN_FAILED"), clearOauthNonceCookie());
+            case SUCCESS -> success(result.tokens(), result.frontendTarget());
+            case CANCELED -> redirect(
+                    loginFailureUri(result.frontendTarget(), "KAKAO_LOGIN_CANCELED"),
+                    clearOauthNonceCookie()
+            );
+            case FAILED -> redirect(
+                    loginFailureUri(result.frontendTarget(), "KAKAO_LOGIN_FAILED"),
+                    clearOauthNonceCookie()
+            );
         };
     }
 
-    private ResponseEntity<Void> success(AuthTokenPair tokens) {
+    private ResponseEntity<Void> success(AuthTokenPair tokens, FrontendTarget frontendTarget) {
         return ResponseEntity.status(HttpStatus.FOUND)
-                .location(URI.create(properties.frontendSuccessUrl()))
+                .location(URI.create(properties.frontendSuccessUrl(frontendTarget)))
                 .header(HttpHeaders.SET_COOKIE, AuthCookieFactory.accessToken(tokens.accessToken()).toString())
                 .header(HttpHeaders.SET_COOKIE, AuthCookieFactory.refreshToken(tokens.refreshToken()).toString())
                 .header(HttpHeaders.SET_COOKIE, clearOauthNonceCookie().toString())
@@ -144,8 +165,8 @@ public class KakaoAuthController {
                 .build();
     }
 
-    private URI loginFailureUri(String errorCode) {
-        return UriComponentsBuilder.fromUriString(properties.frontendLoginUrl())
+    private URI loginFailureUri(FrontendTarget frontendTarget, String errorCode) {
+        return UriComponentsBuilder.fromUriString(properties.frontendLoginUrl(frontendTarget))
                 .queryParam("error", errorCode)
                 .build()
                 .encode()

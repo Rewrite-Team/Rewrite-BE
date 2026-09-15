@@ -11,8 +11,8 @@
 응답 헤더:
 
 ```http
-Set-Cookie: access_token=...; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=...
-Set-Cookie: refresh_token=...; HttpOnly; Secure; SameSite=Lax; Path=/auth; Max-Age=...
+Set-Cookie: access_token=...; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=...
+Set-Cookie: refresh_token=...; HttpOnly; Secure; SameSite=None; Path=/auth; Max-Age=...
 ```
 
 프론트엔드 요청 전제:
@@ -65,12 +65,12 @@ Rewrite는 현재 PRD 기준으로 브라우저 기반 웹 제품이다. 웹 서
 
 프론트엔드는 사용자를 백엔드의 로그인 시작 URL로 이동시키고, 백엔드는 카카오 인증 URL로 리다이렉트한다. 카카오 인증 완료 후 카카오는 백엔드 callback URL로 `code`를 전달한다. 백엔드는 code를 access token으로 교환하고, 카카오 사용자 정보를 조회한 뒤 Rewrite 서비스용 인증 cookie를 설정하고 프론트엔드로 리다이렉트한다.
 
-로그인 시작 시 백엔드는 256-bit OAuth `state`와 별도의 256-bit 브라우저 nonce를 생성한다. 원문은 각각 카카오 redirect query와 5분 수명의 `oauth_login_nonce` HttpOnly Cookie로 전달하고, 서버에는 두 값의 해시와 만료 시각만 저장한다. callback은 state와 브라우저 nonce가 모두 일치할 때만 state를 원자적으로 한 번 소비한다. 이를 통해 state URL이 다른 브라우저에서 재생되는 로그인 CSRF를 차단한다.
+로그인 시작 시 백엔드는 허용된 `local`, `production` target을 256-bit OAuth `state` 원문에 결합하고 별도의 256-bit 브라우저 nonce를 생성한다. state와 nonce 원문은 각각 카카오 redirect query와 5분 수명의 `oauth_login_nonce` HttpOnly Cookie로 전달하고, 서버에는 두 값의 해시와 만료 시각만 저장한다. callback은 state와 브라우저 nonce가 모두 일치할 때만 state를 원자적으로 한 번 소비하고, 검증된 state에서 target을 복원한다. 이를 통해 목적지 변조와 state URL의 다른 브라우저 재생을 차단한다.
 
 API 형태:
 
 ```http
-GET /auth/kakao/authorize
+GET /auth/kakao/authorize?target=local|production
 GET /auth/kakao/callback?code=...&state=...
 ```
 
@@ -84,27 +84,29 @@ Location: https://kauth.kakao.com/oauth/authorize?...&state=...
 callback 성공 시 응답:
 
 ```http
-Set-Cookie: access_token=...; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=...
-Set-Cookie: refresh_token=...; HttpOnly; Secure; SameSite=Lax; Path=/auth; Max-Age=...
+Set-Cookie: access_token=...; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=...
+Set-Cookie: refresh_token=...; HttpOnly; Secure; SameSite=None; Path=/auth; Max-Age=...
 Set-Cookie: oauth_login_nonce=; HttpOnly; Secure; SameSite=Lax; Path=/auth/kakao; Max-Age=0
-Location: https://rewrite.example.com
+Location: https://rewrite-coverletters.site/writing
 ```
 
 로그인 시작 또는 callback 처리 실패 시 응답:
 
 ```http
 HTTP/1.1 302 Found
-Location: https://rewrite.example.com/login?error=KAKAO_LOGIN_FAILED
+Location: https://rewrite-coverletters.site/login?error=KAKAO_LOGIN_FAILED
 ```
 
 사용자가 카카오 로그인 또는 동의를 취소하면 카카오는 `error=access_denied` callback을 호출하고, 백엔드는 다음과 같이 변환한다.
 
 ```http
 HTTP/1.1 302 Found
-Location: https://rewrite.example.com/login?error=KAKAO_LOGIN_CANCELED
+Location: https://rewrite-coverletters.site/login?error=KAKAO_LOGIN_CANCELED
 ```
 
 OAuth 브라우저 이동 흐름에서는 JSON `ErrorResponse` 대신 프론트엔드 로그인 화면으로 리다이렉트하고 `error` query로 실패 코드를 전달한다. 프론트엔드는 `KAKAO_LOGIN_CANCELED`에 취소 안내를, `KAKAO_LOGIN_FAILED`와 알 수 없는 오류 코드에 일반 로그인 실패 안내를 표시한다. 모든 실패에서 로그인 버튼을 다시 활성화하고 자동 재시도하지 않는다. 카카오 `error_description`, state 검증 원인, 내부 오류 메시지와 설정 정보는 노출하지 않는다.
+
+`target`은 임의 URL이 아니라 `local`, `production` enum만 허용하고, 생략 시 기존 운영 동작을 보존하도록 `production`을 사용한다. 로그인 결과는 검증된 state에 결합된 target에 따라 로컬 `http://localhost:3000` 또는 운영 `https://rewrite-coverletters.site`로 이동한다. 운영 백엔드는 두 프론트엔드가 공유하고 카카오 callback URI는 `https://api.rewrite-coverletters.site/auth/kakao/callback` 하나를 사용한다.
 
 ### PRD 근거
 
@@ -139,11 +141,11 @@ Rewrite는 인증 토큰을 HttpOnly Cookie로 전달하기로 결정했다. 토
 
 
 
-## Decision 018: Cookie 인증은 SameSite=Lax와 CSRF 토큰을 함께 사용한다
+## Decision 018: 인증 Cookie는 SameSite=None과 CSRF 토큰을 함께 사용한다
 
 ### 결정
 
-HttpOnly Cookie 기반 인증의 CSRF 방어는 `SameSite=Lax`와 CSRF 토큰을 함께 사용한다.
+운영 백엔드를 `http://localhost:3000`과 운영 프론트엔드가 함께 사용하도록 access token과 refresh token Cookie는 `SameSite=None; Secure; HttpOnly`로 발급하고 CSRF 토큰 검증을 함께 사용한다. OAuth 로그인 브라우저 결합에만 사용하는 `oauth_login_nonce`는 top-level callback에 충분한 `SameSite=Lax`를 유지한다.
 
 서버는 CSRF 토큰 조회 API를 제공하고, 프론트엔드는 상태 변경 요청에 `X-CSRF-Token` 헤더를 포함한다.
 
@@ -180,34 +182,36 @@ X-CSRF-Token: csrf-token-value
 
 ### 고려한 대안
 
-1. `SameSite=Lax`만 사용
-   - 구현이 단순하다.
-   - 하지만 Cookie 기반 인증에서 상태 변경 요청에 대한 명시적 CSRF 검증이 없다.
+1. 모든 Cookie에 `SameSite=Lax` 사용
+   - 운영 프론트엔드와 API 사이의 same-site 인증에는 적합하다.
+   - localhost 프론트엔드의 운영 API 요청에는 인증 Cookie가 포함되지 않는다.
 
-2. `SameSite=Lax` + CSRF 토큰
-   - 상태 변경 요청에 `X-CSRF-Token`을 요구한다.
-   - Cookie 기반 인증에서 더 명확한 CSRF 방어를 제공한다.
+2. 인증 Cookie에 `SameSite=None` + CSRF 토큰
+   - localhost의 cross-site API 요청에 인증 Cookie를 포함할 수 있다.
+   - 상태 변경 요청에 `X-CSRF-Token`을 요구하고 CORS Origin을 정확히 제한한다.
 
-3. `SameSite=Strict`
-   - 더 강한 cookie 전송 제한을 제공한다.
-   - OAuth redirect나 외부 진입 UX에서 문제가 생길 수 있다.
+3. localhost 전용 BFF 또는 별도 개발 백엔드
+   - 브라우저의 서드파티 Cookie 정책을 피할 수 있다.
+   - 별도 프록시·세션 또는 배포 환경을 운영해야 한다.
 
 ### 선택 이유
 
-Rewrite는 HttpOnly Cookie 기반 인증을 사용한다. Cookie는 브라우저가 자동으로 요청에 포함하므로, 상태 변경 API에는 CSRF 토큰을 요구하는 것이 실무적으로 더 안전하다.
+Rewrite는 HttpOnly Cookie 기반 인증을 유지하면서 하나의 운영 백엔드를 로컬·운영 프론트엔드가 공유한다. localhost는 운영 API와 cross-site 관계이므로 인증 Cookie만 `SameSite=None`을 사용하고, 허용 Origin 두 개와 `credentials: include`, CSRF 토큰 검증을 함께 적용한다.
 
 ### 트레이드오프
 
 - 장점
   - Cookie 기반 인증의 CSRF 위험을 줄인다.
   - 상태 변경 요청에 대한 보안 경계가 명확하다.
-  - `SameSite=Lax`를 유지해 OAuth redirect와 일반 진입 UX를 해치지 않는다.
+  - localhost 프론트엔드에서도 운영 API 인증을 테스트할 수 있다.
+  - OAuth nonce는 `SameSite=Lax`로 제한한다.
 
 - 단점
   - CSRF 토큰 조회 API와 프론트엔드 헤더 첨부 로직이 필요하다.
   - 토큰 만료나 갱신 실패에 대한 클라이언트 처리가 필요하다.
   - 상태 변경 요청의 단일 재시도와 반복 실패 방지 로직이 필요하다.
   - API 테스트 시 `X-CSRF-Token` 헤더를 함께 준비해야 한다.
+  - 브라우저가 서드파티 Cookie를 차단하면 localhost 인증 테스트가 동작하지 않으며 개발 브라우저에서 별도 허용이 필요하다.
 
 
 
@@ -233,8 +237,8 @@ POST /auth/refresh
 응답 헤더:
 
 ```http
-Set-Cookie: access_token=...; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=1800
-Set-Cookie: refresh_token=...; HttpOnly; Secure; SameSite=Lax; Path=/auth; Max-Age=1209600
+Set-Cookie: access_token=...; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=1800
+Set-Cookie: refresh_token=...; HttpOnly; Secure; SameSite=None; Path=/auth; Max-Age=1209600
 ```
 
 토큰 갱신과 로그아웃은 프론트엔드의 동일한 인증 요청 흐름에서 직렬화한다. 로그아웃 의사가 설정되면 새 토큰 갱신을 시작하지 않고, 이미 진행 중인 갱신의 응답과 Cookie 반영이 끝난 뒤 최신 Cookie로 로그아웃을 호출한다. 로그아웃을 시작한 뒤에는 갱신을 기다리던 인증 요청도 재시도하지 않는다.
