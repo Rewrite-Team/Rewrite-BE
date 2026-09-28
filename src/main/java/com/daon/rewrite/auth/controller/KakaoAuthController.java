@@ -52,8 +52,9 @@ public class KakaoAuthController {
     )
     @RewriteApi(
             id = "API-001",
+            operationId = "startKakaoLogin",
             summary = "카카오 로그인 시작",
-            tag = "인증",
+            tag = "Auth",
             purpose = "카카오 OAuth 인가를 시작하고 요청 브라우저 검증용 nonce Cookie를 발급한다.",
             screens = "로그인",
             trigger = "사용자가 카카오 로그인 버튼을 누를 때 브라우저를 이 endpoint로 이동시킨다.",
@@ -106,8 +107,9 @@ public class KakaoAuthController {
     )
     @RewriteApi(
             id = "API-002",
+            operationId = "handleKakaoCallback",
             summary = "카카오 OAuth callback",
-            tag = "인증",
+            tag = "Auth",
             purpose = "카카오 인가 결과를 검증하고 성공 시 Rewrite 인증 Cookie를 발급한다.",
             screens = "로그인",
             trigger = "카카오가 로그인·동의 처리 후 브라우저를 callback으로 돌려보낼 때 호출된다.",

@@ -3,13 +3,17 @@ package com.daon.rewrite.keywordanalysis.dto;
 import com.daon.rewrite.coverletter.entity.CoverLetter;
 import com.daon.rewrite.keywordanalysis.entity.KeywordAnalysisKeyword;
 import com.daon.rewrite.keywordanalysis.service.LatestKeywordAnalysisResult;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.List;
 
+@Schema(requiredProperties = {"coverLetter", "sourceReviewVersion", "status", "jobId", "keywords"})
 public record LatestKeywordAnalysisResponse(
         CoverLetterResponse coverLetter,
+        @Schema(nullable = true)
         ReviewVersionResponse sourceReviewVersion,
         String status,
+        @Schema(nullable = true)
         String jobId,
         List<KeywordResponse> keywords
 ) {
@@ -40,10 +44,14 @@ public record LatestKeywordAnalysisResponse(
         );
     }
 
+    @Schema(name = "KeywordAnalysisCoverLetterResponse", requiredProperties = {"id", "title", "companyName", "positionTitle"})
     public record CoverLetterResponse(
             String id,
+            @Schema(nullable = true)
             String title,
+            @Schema(nullable = true)
             String companyName,
+            @Schema(nullable = true)
             String positionTitle
     ) {
         private static CoverLetterResponse from(CoverLetter coverLetter) {
@@ -56,9 +64,11 @@ public record LatestKeywordAnalysisResponse(
         }
     }
 
+    @Schema(name = "KeywordAnalysisReviewVersionResponse", requiredProperties = {"id", "version"})
     public record ReviewVersionResponse(String id, String version) {
     }
 
+    @Schema(requiredProperties = {"keyword", "importance"})
     private record KeywordResponse(
             String keyword,
             int importance

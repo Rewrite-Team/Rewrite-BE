@@ -56,7 +56,8 @@
 
 - Swagger UI를 개발자가 보는 핵심 API 문서로 사용하고, controller·DTO·`@RewriteApi`에서 코드 우선 OpenAPI 명세를 생성한다.
 - `@RewriteApi` 설명은 사용 목적, 사용 화면, 호출 시점, 주요 동작, 성공 후 처리, 오류 순서로 작성한다.
-- summary는 `API-009 · 기본 정보 저장` 형식, tag는 도메인 기준으로 작성한다.
+- summary는 `API-009 · 기본 정보 저장` 형식으로 작성한다. API ID는 `x-rewrite-api-id`에도 유지하고, `operationId`는 고유한 의미 기반 camelCase 이름을 사용한다. tag는 공백 없는 영문 도메인 이름으로 작성한다.
+- 응답 스키마는 실제 JSON에 항상 존재하는 속성을 `required`로 표시한다. 값이 `null`일 수 있는 속성은 required와 nullable을 함께 표시한다.
 - `@ApiError`에는 실제 발생 가능한 오류 코드, 발생 조건과 프론트엔드 처리 방법만 기록한다. 같은 HTTP 상태의 복수 오류는 named example로 구분한다.
 - `VALIDATION_ERROR`의 대표 detail은 실제 서비스가 반환할 수 있는 field와 reason을 함께 기록한다. OAuth redirect 오류는 JSON `ErrorResponse`가 아닌 `@ApiRedirectError`로 구분한다.
 - 인증 API를 포함한 운영 profile OpenAPI는 활성 API 29개를 모두 포함해야 하고, API-028은 Deprecated path로 노출하지 않는다.

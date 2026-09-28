@@ -18,8 +18,9 @@ public class UserController {
     @GetMapping("/me")
     @RewriteApi(
             id = "API-005",
+            operationId = "getCurrentUser",
             summary = "내 정보 조회",
-            tag = "인증",
+            tag = "Auth",
             purpose = "현재 access token으로 로그인한 사용자의 앱 사용자 정보를 조회한다.",
             screens = "로그인",
             trigger = "앱 초기 진입이나 인증 상태 복구 후 사용자 상태를 구성할 때 호출한다.",

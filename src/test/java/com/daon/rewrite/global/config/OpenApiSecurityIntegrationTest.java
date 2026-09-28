@@ -1,12 +1,19 @@
 package com.daon.rewrite.global.config;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.Cookie;
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.HashSet;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -38,6 +45,8 @@ class OpenApiSecurityIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
     void openApiEndpointsArePublicInProductionProfileRegardlessOfAccessCookie() throws Exception {
@@ -73,7 +82,7 @@ class OpenApiSecurityIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$..operationId", hasSize(29)))
                 .andExpect(jsonPath("$.paths['/auth/kakao/authorize'].get.operationId")
-                        .value("API-001"))
+                        .value("startKakaoLogin"))
                 .andExpect(jsonPath("$.paths['/auth/kakao/authorize'].get.parameters[0].name")
                         .value("target"))
                 .andExpect(jsonPath("$.paths['/auth/kakao/authorize'].get.parameters[0].schema.default")
@@ -101,6 +110,31 @@ class OpenApiSecurityIntegrationTest {
                         .exists())
                 .andExpect(jsonPath("$.paths['/interviews/{interviewSessionId}/threads']")
                         .doesNotExist());
+    }
+
+    @Test
+    void productionOpenApiUsesDistinctClientNamesAndEnglishTags() throws Exception {
+        JsonNode document = objectMapper.readTree(mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsByteArray());
+        Set<String> operationIds = new HashSet<>();
+        Set<String> apiIds = new HashSet<>();
+        Set<String> tags = new HashSet<>();
+
+        document.path("paths").elements().forEachRemaining(path -> path.elements().forEachRemaining(operation -> {
+            String operationId = operation.path("operationId").asText();
+            assertThat(operationId).matches("[a-z][A-Za-z0-9]*");
+            assertThat(operationIds.add(operationId)).as("duplicate operationId %s", operationId).isTrue();
+            String apiId = operation.path("x-rewrite-api-id").asText();
+            assertThat(apiId).matches("API-\\d{3}");
+            assertThat(apiIds.add(apiId)).as("duplicate API ID %s", apiId).isTrue();
+            tags.add(operation.path("tags").get(0).asText());
+        }));
+
+        assertThat(operationIds).hasSize(29);
+        assertThat(apiIds).hasSize(29).doesNotContain("API-028");
+        assertThat(tags).containsExactlyInAnyOrder(
+                "Auth", "CoverLetters", "ReviewVersions", "LLMJobs", "KeywordAnalysis", "Interviews");
     }
 
     @Test
@@ -166,6 +200,104 @@ class OpenApiSecurityIntegrationTest {
         mockMvc.perform(get("/user/me"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
+    }
+
+    @Test
+    void generatedJsonResponsesMarkEveryReturnedFieldRequiredAndNullableFieldsExplicitly() throws Exception {
+        JsonNode document = objectMapper.readTree(mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsByteArray());
+        JsonNode components = document.path("components").path("schemas");
+        Deque<JsonNode> pending = new ArrayDeque<>();
+        Set<String> responseSchemas = new HashSet<>();
+
+        document.path("paths").elements().forEachRemaining(path ->
+                path.elements().forEachRemaining(operation ->
+                        operation.path("responses").elements().forEachRemaining(response ->
+                                response.path("content").elements().forEachRemaining(mediaType -> {
+                                    if (mediaType.has("schema")) {
+                                        pending.add(mediaType.path("schema"));
+                                    }
+                                }))));
+
+        while (!pending.isEmpty()) {
+            JsonNode schema = pending.removeFirst();
+            if (schema.has("$ref")) {
+                assertThat(isNullable(schema)).as("nullable $ref must use oneOf").isFalse();
+                String reference = schema.path("$ref").asText();
+                assertThat(reference).startsWith("#/components/schemas/");
+                String name = reference.substring("#/components/schemas/".length());
+                if (responseSchemas.add(name)) {
+                    assertThat(components.has(name)).as("missing schema %s", name).isTrue();
+                    pending.add(components.path(name));
+                }
+            }
+            if (schema.has("properties")) {
+                Set<String> properties = new HashSet<>();
+                schema.path("properties").fieldNames().forEachRemaining(properties::add);
+                Set<String> required = new HashSet<>();
+                schema.path("required").forEach(item -> required.add(item.asText()));
+                assertThat(required).as("response schema required fields").containsExactlyInAnyOrderElementsOf(properties);
+                schema.path("properties").elements().forEachRemaining(pending::add);
+            }
+            if (schema.has("items")) {
+                pending.add(schema.path("items"));
+            }
+            for (String composition : Set.of("oneOf", "anyOf", "allOf")) {
+                schema.path(composition).forEach(pending::add);
+            }
+        }
+
+        Set<String> nullableProperties = new HashSet<>();
+        for (String name : responseSchemas) {
+            components.path(name).path("properties").propertyStream().forEach(property -> {
+                if (isNullable(property.getValue())) {
+                    nullableProperties.add(name + "." + property.getKey());
+                }
+            });
+        }
+        assertThat(nullableProperties).containsExactlyInAnyOrderElementsOf(expectedNullableResponseProperties());
+        assertThat(responseSchemas).contains("ErrorResponse", "ErrorBody", "ErrorDetail", "SuccessResponse",
+                "CoverLetterDetailResponse", "LlmJobStateResponse", "LatestKeywordAnalysisResponse");
+    }
+
+    private boolean isNullable(JsonNode schema) {
+        JsonNode type = schema.path("type");
+        if (type.isTextual() && type.asText().equals("null")) {
+            return true;
+        }
+        if (type.isArray() && type.valueStream().anyMatch(item -> item.asText().equals("null"))) {
+            return true;
+        }
+        return schema.path("oneOf").valueStream()
+                .anyMatch(item -> item.path("type").asText().equals("null"));
+    }
+
+    private Set<String> expectedNullableResponseProperties() {
+        return Set.of(
+                "CurrentUserResponse.profileImageUrl",
+                "CoverLetterListItemResponse.title", "CoverLetterListItemResponse.companyName",
+                "CoverLetterListItemResponse.positionTitle", "CoverLetterListItemResponse.latestReviewedVersionId",
+                "CoverLetterDetailResponse.reviewVersion", "CoverLetterDetailResponse.reviewJob",
+                "CoverLetterDetailCoverLetterResponse.title", "CoverLetterDetailCoverLetterResponse.companyName",
+                "CoverLetterDetailCoverLetterResponse.positionTitle", "CoverLetterDetailCoverLetterResponse.jobPostingUrl",
+                "CoverLetterDetailCoverLetterResponse.preferences",
+                "CoverLetterDetailReviewVersionResponse.requestInstruction", "ReviewJobResponse.error",
+                "QuestionResponse.questionResultId", "QuestionResponse.question", "QuestionResponse.maxAnswerLength",
+                "QuestionResponse.originalAnswer", "QuestionResponse.originalAnswerLength",
+                "QuestionResponse.aiReport", "QuestionResponse.rewrittenAnswer",
+                "QuestionResponse.rewrittenAnswerLength", "QuestionResponse.finalAnswer",
+                "QuestionResponse.finalAnswerLength",
+                "LlmJobStateResponse.resultRef", "LlmJobStateResponse.error",
+                "LatestKeywordAnalysisResponse.sourceReviewVersion", "LatestKeywordAnalysisResponse.jobId",
+                "KeywordAnalysisCoverLetterResponse.title", "KeywordAnalysisCoverLetterResponse.companyName",
+                "KeywordAnalysisCoverLetterResponse.positionTitle",
+                "CurrentInterviewResponse.interviewSession", "CurrentInterviewCoverLetterResponse.title",
+                "CurrentInterviewCoverLetterResponse.companyName", "CurrentInterviewCoverLetterResponse.positionTitle",
+                "InterviewSessionResponse.jobId", "StartInterviewResponse.jobId",
+                "InterviewQuestionListResponse.nextCursor", "InterviewMessageListResponse.jobId",
+                "InterviewMessageResponse.score", "SubmitCoverLetterResponse.jobId"
+        );
     }
 
 }

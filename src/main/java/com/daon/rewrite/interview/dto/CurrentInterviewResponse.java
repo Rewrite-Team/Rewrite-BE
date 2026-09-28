@@ -4,12 +4,15 @@ import com.daon.rewrite.coverletter.entity.CoverLetter;
 import com.daon.rewrite.interview.entity.InterviewSession;
 import com.daon.rewrite.interview.entity.InterviewSessionStatus;
 import com.daon.rewrite.interview.service.CurrentInterviewResult;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 
+@Schema(requiredProperties = {"coverLetter", "interviewSession"})
 public record CurrentInterviewResponse(
         CoverLetterResponse coverLetter,
+        @Schema(nullable = true)
         InterviewSessionResponse interviewSession
 ) {
 
@@ -23,10 +26,14 @@ public record CurrentInterviewResponse(
         );
     }
 
+    @Schema(name = "CurrentInterviewCoverLetterResponse", requiredProperties = {"id", "title", "companyName", "positionTitle"})
     public record CoverLetterResponse(
             String id,
+            @Schema(nullable = true)
             String title,
+            @Schema(nullable = true)
             String companyName,
+            @Schema(nullable = true)
             String positionTitle
     ) {
         private static CoverLetterResponse from(CoverLetter coverLetter) {
@@ -39,10 +46,12 @@ public record CurrentInterviewResponse(
         }
     }
 
+    @Schema(requiredProperties = {"id", "initialSourceReviewVersionId", "status", "jobId", "createdAt"})
     public record InterviewSessionResponse(
             String id,
             String initialSourceReviewVersionId,
             InterviewSessionStatus status,
+            @Schema(nullable = true)
             String jobId,
             LocalDateTime createdAt
     ) {

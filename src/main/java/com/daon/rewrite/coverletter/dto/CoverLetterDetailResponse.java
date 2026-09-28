@@ -6,14 +6,18 @@ import com.daon.rewrite.coverletter.service.CoverLetterDetailResult;
 import com.daon.rewrite.llmjob.entity.LlmJob;
 import com.daon.rewrite.llmjob.entity.LlmJobStatus;
 import com.daon.rewrite.reviewversion.entity.ReviewVersion;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
 
+@Schema(requiredProperties = {"coverLetter", "reviewVersion", "reviewJob", "questions"})
 public record CoverLetterDetailResponse(
         CoverLetterResponse coverLetter,
+        @Schema(nullable = true)
         ReviewVersionResponse reviewVersion,
+        @Schema(nullable = true)
         ReviewJobResponse reviewJob,
         List<QuestionResponse> questions
 ) {
@@ -28,12 +32,18 @@ public record CoverLetterDetailResponse(
         );
     }
 
+    @Schema(name = "CoverLetterDetailCoverLetterResponse", requiredProperties = {"id", "title", "companyName", "positionTitle", "jobPostingUrl", "preferences", "displayStatus"})
     public record CoverLetterResponse(
             String id,
+            @Schema(nullable = true)
             String title,
+            @Schema(nullable = true)
             String companyName,
+            @Schema(nullable = true)
             String positionTitle,
+            @Schema(nullable = true)
             String jobPostingUrl,
+            @Schema(nullable = true)
             String preferences,
             CoverLetterStatus displayStatus
     ) {
@@ -50,10 +60,12 @@ public record CoverLetterDetailResponse(
         }
     }
 
+    @Schema(name = "CoverLetterDetailReviewVersionResponse", requiredProperties = {"id", "version", "isLatest", "requestInstruction", "createdAt"})
     public record ReviewVersionResponse(
             String id,
             String version,
             boolean isLatest,
+            @Schema(nullable = true)
             String requestInstruction,
             LocalDateTime createdAt
     ) {
@@ -72,10 +84,12 @@ public record CoverLetterDetailResponse(
         }
     }
 
+    @Schema(requiredProperties = {"id", "status", "progress", "error"})
     public record ReviewJobResponse(
             String id,
             LlmJobStatus status,
             ProgressResponse progress,
+            @Schema(nullable = true)
             ErrorResponse error
     ) {
         private static ReviewJobResponse from(LlmJob job) {
@@ -91,9 +105,11 @@ public record CoverLetterDetailResponse(
         }
     }
 
+    @Schema(name = "CoverLetterDetailProgressResponse", requiredProperties = {"current", "total", "message"})
     public record ProgressResponse(int current, int total, String message) {
     }
 
+    @Schema(name = "CoverLetterDetailJobErrorResponse", requiredProperties = {"code", "message"})
     public record ErrorResponse(String code, String message) {
         private static ErrorResponse from(LlmJob job) {
             if (job.getErrorCode() == null) {
@@ -107,18 +123,29 @@ public record CoverLetterDetailResponse(
         }
     }
 
+    @Schema(requiredProperties = {"questionResultId", "questionId", "order", "question", "maxAnswerLength", "originalAnswer", "originalAnswerLength", "aiReport", "rewrittenAnswer", "rewrittenAnswerLength", "finalAnswer", "finalAnswerLength"})
     public record QuestionResponse(
+            @Schema(nullable = true)
             String questionResultId,
             String questionId,
             int order,
+            @Schema(nullable = true)
             String question,
+            @Schema(nullable = true)
             Integer maxAnswerLength,
+            @Schema(nullable = true)
             String originalAnswer,
+            @Schema(nullable = true)
             Integer originalAnswerLength,
+            @Schema(nullable = true)
             String aiReport,
+            @Schema(nullable = true)
             String rewrittenAnswer,
+            @Schema(nullable = true)
             Integer rewrittenAnswerLength,
+            @Schema(nullable = true)
             String finalAnswer,
+            @Schema(nullable = true)
             Integer finalAnswerLength
     ) {
         private static QuestionResponse from(CoverLetterDetailResult.QuestionResult result) {

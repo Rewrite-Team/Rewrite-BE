@@ -46,8 +46,9 @@ public class CoverLetterController {
     @ResponseStatus(HttpStatus.CREATED)
     @RewriteApi(
             id = "API-008",
+            operationId = "createCoverLetter",
             summary = "자기소개서 생성",
-            tag = "자기소개서",
+            tag = "CoverLetters",
             purpose = "새 WRITING 자기소개서 초안을 생성한다.",
             screens = "자기소개서 등록",
             trigger = "사용자가 새 자기소개서 등록을 시작할 때 호출한다.",
@@ -70,8 +71,9 @@ public class CoverLetterController {
     @GetMapping("/cover-letters")
     @RewriteApi(
             id = "API-007",
+            operationId = "listCoverLetters",
             summary = "내 자기소개서 목록 조회",
-            tag = "자기소개서",
+            tag = "CoverLetters",
             purpose = "현재 사용자의 모든 상태 자기소개서를 페이지 단위로 조회한다.",
             screens = "자기소개서 목록",
             trigger = "목록 화면 진입, 페이지 이동 또는 상태 복구가 필요할 때 호출한다.",
@@ -94,8 +96,9 @@ public class CoverLetterController {
     @GetMapping("/cover-letters/{coverLetterId}")
     @RewriteApi(
             id = "API-012",
+            operationId = "getCoverLetterDetail",
             summary = "자기소개서 상세 조회",
-            tag = "자기소개서",
+            tag = "CoverLetters",
             purpose = "미완성 WRITING 입력과 자기소개서 상세·첨삭 상태를 공통 구조로 조회한다.",
             screens = {"자기소개서 목록", "자기소개서 등록", "첨삭 결과"},
             trigger = "목록에서 항목을 열거나 등록·첨삭 화면을 새로고침하고 상태를 복구할 때 호출한다.",
@@ -114,8 +117,9 @@ public class CoverLetterController {
     @DeleteMapping("/cover-letters/{coverLetterId}")
     @RewriteApi(
             id = "API-013",
+            operationId = "deleteCoverLetter",
             summary = "자기소개서 삭제",
-            tag = "자기소개서",
+            tag = "CoverLetters",
             purpose = "현재 사용자가 소유한 자기소개서를 삭제한다.",
             screens = "자기소개서 목록",
             trigger = "사용자가 목록에서 삭제를 확인할 때 호출한다.",
@@ -136,8 +140,9 @@ public class CoverLetterController {
     @PutMapping("/cover-letters/{coverLetterId}/basic-info")
     @RewriteApi(
             id = "API-009",
+            operationId = "saveCoverLetterBasicInfo",
             summary = "기본 정보 저장",
-            tag = "자기소개서",
+            tag = "CoverLetters",
             purpose = "자기소개서 등록 1단계의 미완성 기본 정보를 임시저장한다.",
             screens = "자기소개서 등록",
             trigger = "기본 정보 입력 변경 후 자동 저장할 때 호출한다.",
@@ -184,8 +189,9 @@ public class CoverLetterController {
     @PutMapping("/cover-letters/{coverLetterId}/preferences")
     @RewriteApi(
             id = "API-010",
+            operationId = "saveCoverLetterPreferences",
             summary = "채용 우대사항 저장",
-            tag = "자기소개서",
+            tag = "CoverLetters",
             purpose = "자기소개서 등록 2단계의 미완성 우대사항을 임시저장한다.",
             screens = "자기소개서 등록",
             trigger = "우대사항 입력 변경 후 자동 저장할 때 호출한다.",
@@ -218,8 +224,9 @@ public class CoverLetterController {
     @PutMapping("/cover-letters/{coverLetterId}/questions")
     @RewriteApi(
             id = "API-011",
+            operationId = "saveCoverLetterQuestions",
             summary = "질문과 답변 저장",
-            tag = "자기소개서",
+            tag = "CoverLetters",
             purpose = "자기소개서 등록 3단계의 미완성 질문과 답변을 임시저장한다.",
             screens = "자기소개서 등록",
             trigger = "문항 입력 변경 후 자동 저장할 때 호출한다.",
@@ -252,8 +259,9 @@ public class CoverLetterController {
     @PostMapping("/cover-letters/{coverLetterId}/submit")
     @RewriteApi(
             id = "API-014",
+            operationId = "submitCoverLetter",
             summary = "자기소개서 제출 및 최초 AI 첨삭 요청",
-            tag = "자기소개서",
+            tag = "CoverLetters",
             purpose = "임시저장된 자기소개서의 필수값을 최종 검증하고 최초 AI 첨삭 Job을 시작한다.",
             screens = {"자기소개서 등록", "첨삭 진행"},
             trigger = "등록 4단계에서 제출을 확정하거나 최초 첨삭 실패 화면에서 수동 재시도할 때 호출한다.",
@@ -304,18 +312,19 @@ public class CoverLetterController {
                             type = "string",
                             example = """
                                     event: cover-letter.review-status.snapshot
-                                    data: {"items":[{"coverLetterId":"cover_letter_01","displayStatus":"REVIEWING","latestReviewedVersionId":null,"jobId":"job_01"}]}
+                                    data: {"items":[{"coverLetterId":"cover_letter_01","displayStatus":"REVIEWING","latestReviewedVersionId":null}]}
 
                                     event: cover-letter.review-status.changed
-                                    data: {"coverLetterId":"cover_letter_01","displayStatus":"REVIEWED","latestReviewedVersionId":"review_version_01","jobId":null}
+                                    data: {"coverLetterId":"cover_letter_01","displayStatus":"REVIEWED","latestReviewedVersionId":"review_version_01"}
                                     """
                     )
             )
     )
     @RewriteApi(
             id = "API-030",
+            operationId = "streamCoverLetterReviewStatuses",
             summary = "내 자기소개서 첨삭 상태 스트림",
-            tag = "자기소개서",
+            tag = "CoverLetters",
             purpose = "현재 사용자의 자기소개서 첨삭 상태 변경을 하나의 SSE 연결로 수신한다.",
             screens = {"자기소개서 목록", "첨삭 진행"},
             trigger = "로그인 후 목록·첨삭 진행 화면에서 사용자 단일 EventSource를 만들 때 연결한다.",

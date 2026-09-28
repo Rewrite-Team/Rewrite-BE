@@ -49,8 +49,9 @@ public class TokenRefreshController {
     })
     @RewriteApi(
             id = "API-004",
+            operationId = "refreshAuthTokens",
             summary = "토큰 갱신",
-            tag = "인증",
+            tag = "Auth",
             purpose = "refresh token을 원자적으로 회전하고 새 인증 Cookie를 발급한다.",
             screens = "로그인",
             trigger = "보호 API의 401을 감지했을 때 여러 요청을 single-flight로 묶어 한 번 호출한다.",

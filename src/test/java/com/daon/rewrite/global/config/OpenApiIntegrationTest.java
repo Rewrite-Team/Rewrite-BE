@@ -46,9 +46,9 @@ class OpenApiIntegrationTest {
         JsonNode document = openApiDocument();
 
         JsonNode api009 = operation(document, "/cover-letters/{coverLetterId}/basic-info", "put");
-        assertThat(api009.path("operationId").asText()).isEqualTo("API-009");
+        assertThat(api009.path("operationId").asText()).isEqualTo("saveCoverLetterBasicInfo");
         assertThat(api009.path("summary").asText()).isEqualTo("API-009 · 기본 정보 저장");
-        assertThat(api009.path("tags").get(0).asText()).isEqualTo("자기소개서");
+        assertThat(api009.path("tags").get(0).asText()).isEqualTo("CoverLetters");
         assertThat(api009.path("x-rewrite-api-id").asText()).isEqualTo("API-009");
         assertThat(api009.path("x-rewrite-screens").get(0).asText())
                 .isEqualTo("자기소개서 등록");
@@ -58,7 +58,7 @@ class OpenApiIntegrationTest {
                 .contains("### 사용 목적", "### 사용 화면", "### 호출 시점", "### 주요 동작", "### 성공 후 처리", "### 오류");
 
         JsonNode api014 = operation(document, "/cover-letters/{coverLetterId}/submit", "post");
-        assertThat(api014.path("operationId").asText()).isEqualTo("API-014");
+        assertThat(api014.path("operationId").asText()).isEqualTo("submitCoverLetter");
         assertThat(api014.path("x-rewrite-screens").valueStream().map(JsonNode::asText).toList())
                 .containsExactly("자기소개서 등록", "첨삭 진행");
         assertThat(api014.path("description").asText())
@@ -70,7 +70,7 @@ class OpenApiIntegrationTest {
                 .containsExactlyInAnyOrder("CONFLICT", "LLM_JOB_ALREADY_RUNNING");
 
         JsonNode api016 = operation(document, "/llm-jobs/{jobId}/stream", "get");
-        assertThat(api016.path("operationId").asText()).isEqualTo("API-016");
+        assertThat(api016.path("operationId").asText()).isEqualTo("streamLlmJobEvents");
         assertThat(api016.path("x-rewrite-screens").valueStream().map(JsonNode::asText).toList())
                 .containsExactly("첨삭 진행", "키워드 분석", "AI 면접");
         assertThat(api016.path("x-rewrite-csrf-protected").asBoolean()).isFalse();
@@ -88,12 +88,16 @@ class OpenApiIntegrationTest {
         JsonNode api030 = operation(document, "/cover-letters/stream", "get");
         assertThat(api030.path("responses").path("200").path("content")
                 .path("text/event-stream").path("schema").path("example").asText())
-                .contains("cover-letter.review-status.snapshot", "cover-letter.review-status.changed");
+                .contains("cover-letter.review-status.snapshot", "cover-letter.review-status.changed")
+                .doesNotContain("\"jobId\"");
     }
 
     @Test
     void documentedErrorsUseSharedSchemaAndNamedExamples() throws Exception {
         JsonNode document = openApiDocument();
+        assertThat(document.path("components").path("schemas").path("SuccessResponse")
+                .path("required").valueStream().map(JsonNode::asText).toList())
+                .contains("success");
         assertThat(document.path("components").path("schemas").has("ErrorResponse")).isTrue();
         assertThat(document.path("components").path("schemas").has("ErrorBody")).isTrue();
         assertThat(document.path("components").path("schemas").has("ErrorDetail")).isTrue();
@@ -136,23 +140,27 @@ class OpenApiIntegrationTest {
     }
 
     @Test
-    void rewriteApiOperationIdsAreUniqueAndFollowApiIdFormat() throws Exception {
+    void rewriteApiOperationIdsAreUniqueAndSeparateFromApiIds() throws Exception {
         JsonNode paths = openApiDocument().path("paths");
         List<String> operationIds = new ArrayList<>();
+        List<String> apiIds = new ArrayList<>();
 
         Iterator<JsonNode> pathItems = paths.elements();
         while (pathItems.hasNext()) {
             pathItems.next().elements().forEachRemaining(operation -> {
                 if (operation.has("x-rewrite-api-id")) {
                     operationIds.add(operation.path("operationId").asText());
+                    apiIds.add(operation.path("x-rewrite-api-id").asText());
                 }
             });
         }
 
         assertThat(operationIds).hasSize(24);
         assertThat(new HashSet<>(operationIds)).hasSameSizeAs(operationIds);
-        assertThat(operationIds).allMatch(operationId -> operationId.matches("API-\\d{3}"));
-        assertThat(operationIds).doesNotContain("API-028");
+        assertThat(operationIds).allMatch(operationId -> operationId.matches("[a-z][A-Za-z0-9]*"));
+        assertThat(apiIds).allMatch(apiId -> apiId.matches("API-\\d{3}"));
+        assertThat(new HashSet<>(apiIds)).hasSameSizeAs(apiIds);
+        assertThat(apiIds).doesNotContain("API-028");
     }
 
     @Test
@@ -191,6 +199,7 @@ class OpenApiIntegrationTest {
                 .andReturn();
         return objectMapper.readTree(result.getResponse().getContentAsByteArray());
     }
+
 
     private JsonNode operation(JsonNode document, String path, String method) {
         return document.path("paths").path(path).path(method);

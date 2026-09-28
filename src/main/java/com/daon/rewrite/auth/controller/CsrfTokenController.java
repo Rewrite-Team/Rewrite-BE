@@ -38,8 +38,9 @@ public class CsrfTokenController {
     @GetMapping("/auth/csrf-token")
     @RewriteApi(
             id = "API-003",
+            operationId = "getCsrfToken",
             summary = "CSRF 토큰 조회",
-            tag = "인증",
+            tag = "Auth",
             purpose = "상태 변경 요청의 X-CSRF-Token 헤더에 사용할 토큰을 인증 없이 발급한다.",
             screens = {"공통", "로그인"},
             trigger = "앱 초기화 또는 CSRF_TOKEN_INVALID 복구 시 호출한다.",

@@ -6,8 +6,11 @@ import io.swagger.v3.core.converter.ModelConverters;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
+import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
+import java.util.List;
+import java.util.Set;
 import org.springdoc.core.customizers.OpenApiCustomizer;
 import org.springdoc.core.customizers.OperationCustomizer;
 import org.springframework.context.annotation.Bean;
@@ -52,6 +55,31 @@ public class OpenApiConfig {
             ModelConverters.getInstance()
                     .readAll(ErrorResponse.class)
                     .forEach(openApi.getComponents()::addSchemas);
+        };
+    }
+
+    @Bean
+    OpenApiCustomizer nullableReferenceSchemaCustomizer() {
+        // OpenAPI 3.1에서 nullable 객체 참조는 $ref와 type:null을 함께 둘 수 없어 oneOf로 표현한다.
+        return openApi -> {
+            for (Schema<?> schema : openApi.getComponents().getSchemas().values()) {
+                if (schema.getProperties() == null) {
+                    continue;
+                }
+                for (Schema<?> property : schema.getProperties().values()) {
+                    if (property.get$ref() == null || property.getTypes() == null
+                            || !property.getTypes().contains("null")) {
+                        continue;
+                    }
+                    String reference = property.get$ref();
+                    property.set$ref(null);
+                    property.setTypes(null);
+                    property.setOneOf(List.of(
+                            new Schema<>().$ref(reference),
+                            new Schema<>().types(Set.of("null"))
+                    ));
+                }
+            }
         };
     }
 

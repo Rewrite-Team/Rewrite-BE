@@ -3,12 +3,15 @@ package com.daon.rewrite.interview.dto;
 import com.daon.rewrite.interview.entity.InterviewMessageRole;
 import com.daon.rewrite.interview.service.InterviewMessageItemResult;
 import com.daon.rewrite.interview.service.InterviewMessageListResult;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
 
+@Schema(requiredProperties = {"jobId", "items"})
 public record InterviewMessageListResponse(
+        @Schema(nullable = true)
         String jobId,
         List<InterviewMessageResponse> items
 ) {
@@ -22,10 +25,12 @@ public record InterviewMessageListResponse(
         );
     }
 
+    @Schema(requiredProperties = {"id", "role", "content", "score", "createdAt"})
     public record InterviewMessageResponse(
             String id,
             InterviewMessageRole role,
             String content,
+            @Schema(nullable = true)
             Integer score,
             LocalDateTime createdAt
     ) {

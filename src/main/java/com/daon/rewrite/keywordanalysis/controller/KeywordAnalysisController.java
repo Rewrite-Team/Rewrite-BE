@@ -21,8 +21,9 @@ public class KeywordAnalysisController {
     @PostMapping("/cover-letters/{coverLetterId}/keyword-analysis")
     @RewriteApi(
             id = "API-020",
+            operationId = "startKeywordAnalysis",
             summary = "키워드 분석 시작 또는 재분석",
-            tag = "키워드 분석",
+            tag = "KeywordAnalysis",
             purpose = "최신 성공 첨삭 버전으로 키워드 분석 Job을 시작한다.",
             screens = "키워드 분석",
             trigger = "사용자가 키워드 분석을 처음 시작하거나 실패 후 재분석할 때 호출한다.",
@@ -44,8 +45,9 @@ public class KeywordAnalysisController {
     @GetMapping("/cover-letters/{coverLetterId}/keyword-analysis/latest")
     @RewriteApi(
             id = "API-021",
+            operationId = "getLatestKeywordAnalysis",
             summary = "최신 키워드 분석 조회",
-            tag = "키워드 분석",
+            tag = "KeywordAnalysis",
             purpose = "키워드 분석 화면 데이터와 SSE 복구용 조건부 jobId를 조회한다.",
             screens = "키워드 분석",
             trigger = "화면 진입·새로고침 또는 API-016 연결 실패 중 polling할 때 호출한다.",

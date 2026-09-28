@@ -2,11 +2,15 @@ package com.daon.rewrite.llmjob.dto;
 
 import com.daon.rewrite.llmjob.entity.LlmJob;
 import com.daon.rewrite.llmjob.entity.LlmJobStatus;
+import io.swagger.v3.oas.annotations.media.Schema;
 
+@Schema(requiredProperties = {"status", "progress", "resultRef", "error"})
 public record LlmJobStateResponse(
         LlmJobStatus status,
         ProgressResponse progress,
+        @Schema(nullable = true)
         ResultRefResponse resultRef,
+        @Schema(nullable = true)
         ErrorResponse error
 ) {
     public static LlmJobStateResponse from(LlmJob job) {
@@ -18,9 +22,11 @@ public record LlmJobStateResponse(
         );
     }
 
+    @Schema(name = "LlmJobProgressResponse", requiredProperties = {"current", "total", "message"})
     public record ProgressResponse(int current, int total, String message) {
     }
 
+    @Schema(requiredProperties = {"type", "id"})
     public record ResultRefResponse(String type, String id) {
         private static ResultRefResponse from(LlmJob job) {
             if (job.getResultRefType() == null || job.getResultRefId() == null) {
@@ -30,6 +36,7 @@ public record LlmJobStateResponse(
         }
     }
 
+    @Schema(name = "LlmJobErrorResponse", requiredProperties = {"code", "message"})
     public record ErrorResponse(String code, String message) {
         private static ErrorResponse from(LlmJob job) {
             if (job.getErrorCode() == null) {
