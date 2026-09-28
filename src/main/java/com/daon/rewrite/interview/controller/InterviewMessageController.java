@@ -23,8 +23,9 @@ public class InterviewMessageController {
     @GetMapping("/interview-threads/{threadId}/messages")
     @RewriteApi(
             id = "API-029",
+            operationId = "listInterviewMessages",
             summary = "대화 메시지 조회",
-            tag = "AI 면접",
+            tag = "Interviews",
             purpose = "질문별 대화 메시지와 피드백 SSE 복구용 조건부 jobId를 조회한다.",
             screens = "AI 면접",
             trigger = "질문 대화 진입, 새로고침 또는 피드백 완료 후 확정 메시지를 조회할 때 호출한다.",
@@ -41,8 +42,9 @@ public class InterviewMessageController {
     @PostMapping("/interview-threads/{threadId}/messages")
     @RewriteApi(
             id = "API-023",
+            operationId = "sendInterviewMessage",
             summary = "사용자 답변 전송",
-            tag = "AI 면접",
+            tag = "Interviews",
             purpose = "사용자 답변을 저장하고 실시간 피드백 생성 Job을 시작한다.",
             screens = "AI 면접",
             trigger = "사용자가 면접 답변 입력을 확정해 전송할 때 호출한다.",

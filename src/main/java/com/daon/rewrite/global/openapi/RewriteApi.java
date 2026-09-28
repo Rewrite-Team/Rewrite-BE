@@ -11,6 +11,8 @@ public @interface RewriteApi {
 
     String id();
 
+    String operationId();
+
     String summary();
 
     String tag();

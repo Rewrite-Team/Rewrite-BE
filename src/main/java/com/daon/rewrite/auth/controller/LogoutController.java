@@ -34,8 +34,9 @@ public class LogoutController {
     )
     @RewriteApi(
             id = "API-006",
+            operationId = "logout",
             summary = "로그아웃",
-            tag = "인증",
+            tag = "Auth",
             purpose = "유효한 refresh token을 폐기하고 인증 Cookie를 만료한다.",
             screens = "로그인",
             trigger = "사용자가 로그아웃을 확정할 때 진행 중인 refresh 흐름과 직렬화해 호출한다.",

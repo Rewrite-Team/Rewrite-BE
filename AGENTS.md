@@ -53,7 +53,7 @@
 - `@RewriteApi`를 적용한 API는 mapping과 DTO가 path·request·response를, annotation이 사용 목적·화면·호출 시점·주요 동작·성공 후 처리·오류 조건을 정의한다.
 - API를 추가하거나 path, request, response, error, validation, 상태 또는 구현 여부를 변경하면 코드, OpenAPI 통합 테스트, `docs/api/README.md`와 필요한 도메인·requirement·decision·status 문서를 함께 갱신한다.
 - 공개 API 계약 변경은 변경안과 영향을 사용자에게 먼저 설명해 승인받는다.
-- API ID는 `API-001` 형식의 고유한 operation ID로 사용한다. 같은 HTTP 상태의 복수 오류는 하나의 response 아래 named example로 기록한다.
+- API ID는 `API-001` 형식으로 summary와 `x-rewrite-api-id`에 유지하고, `operationId`는 고유한 의미 기반 camelCase 이름을 사용한다. 같은 HTTP 상태의 복수 오류는 하나의 response 아래 named example로 기록한다.
 - 공통 `401`, `403`, `500`과 API별 오류는 실제 `ErrorResponse` schema와 일치시킨다. 비동기 Job의 `FAILED`를 HTTP 오류 응답과 혼합하지 않는다.
 - Notion `Rewrite API (자동 동기화)`는 OpenAPI와 저장소 문서를 기준으로 갱신하는 보조 문서이며, Notion 직접 수정은 저장소로 역동기화하지 않는다. 동기화 실패는 로컬 검증 실패와 분리해 보고한다.
 - API-028을 제외한 활성 API는 모두 `@RewriteApi`를 사용한다. API-028은 Deprecated이며 controller와 OpenAPI path를 제공하지 않는다.
@@ -85,7 +85,7 @@
 
 - Swagger UI는 개발자가 사용하는 핵심 API 문서이며, controller·DTO·`@RewriteApi`에서 생성한 OpenAPI 명세를 표시한다.
 - API 설명은 사용 목적, 사용 화면, 호출 시점, 주요 동작, 성공 후 처리, 오류 순서로 작성하고 내부 Service, Repository, Entity, transaction, worker 구조는 제외한다.
-- 도메인 tag로 API를 분류하고 summary는 `API-009 · 기본 정보 저장` 형식을 사용한다.
+- 공백 없는 영문 도메인 tag로 API를 분류하고 summary는 `API-009 · 기본 정보 저장` 형식을 사용한다.
 - 명세 우선 방식으로 server stub을 생성하지 않는다. 코드 우선 OpenAPI 생성을 사용한다.
 - annotation, 생성된 명세, controller 동작, DTO와 에러 응답은 OpenAPI 통합 테스트로 일치시킨다.
 - Springdoc/OpenAPI 의존성이나 설정을 추가하는 경우 별도 이슈 또는 명시적 사용자 요청에 따라 진행한다.

@@ -1,9 +1,12 @@
 package com.daon.rewrite.global.response;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 
+@Schema(requiredProperties = "error")
 public record ErrorResponse(ErrorBody error) {
 
+    @Schema(requiredProperties = {"code", "message", "details"})
     public record ErrorBody(
             String code,
             String message,
@@ -11,6 +14,7 @@ public record ErrorResponse(ErrorBody error) {
     ) {
     }
 
+    @Schema(requiredProperties = {"field", "reason"})
     public record ErrorDetail(
             String field,
             String reason

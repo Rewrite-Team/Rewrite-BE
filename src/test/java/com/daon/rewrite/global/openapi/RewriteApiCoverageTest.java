@@ -14,6 +14,8 @@ import com.daon.rewrite.keywordanalysis.controller.KeywordAnalysisController;
 import com.daon.rewrite.llmjob.controller.LlmJobController;
 import com.daon.rewrite.reviewversion.controller.ReviewVersionController;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -49,6 +51,7 @@ class RewriteApiCoverageTest {
     @Test
     void everyActiveControllerMappingHasTheExactApiIdMethodAndPath() {
         Map<String, Endpoint> actual = new LinkedHashMap<>();
+        List<String> operationIds = new ArrayList<>();
 
         for (Class<?> controller : CONTROLLERS) {
             for (Method method : controller.getDeclaredMethods()) {
@@ -62,12 +65,18 @@ class RewriteApiCoverageTest {
                         .isNotNull();
                 assertThat(actual.put(api.id(), endpoint)).as("중복 API ID %s", api.id()).isNull();
                 assertThat(api.id()).matches("API-\\d{3}");
+                assertThat(api.operationId()).as("%s operationId", api.id())
+                        .isEqualTo(expectedOperationIds().get(api.id()));
+                assertThat(api.tag()).as("%s tag", api.id())
+                        .isEqualTo(expectedControllerTags().get(controller));
+                operationIds.add(api.operationId());
                 assertThat(List.of(api.screens())).allMatch(CANONICAL_SCREENS::contains);
             }
         }
 
         assertThat(actual).containsExactlyInAnyOrderEntriesOf(expectedEndpoints());
         assertThat(actual).hasSize(29).doesNotContainKey("API-028");
+        assertThat(new HashSet<>(operationIds)).hasSize(29);
     }
 
     @Test
@@ -168,6 +177,56 @@ class RewriteApiCoverageTest {
                 entry("API-027", "POST", "/interviews/{interviewSessionId}/questions"),
                 entry("API-029", "GET", "/interview-threads/{threadId}/messages"),
                 entry("API-030", "GET", "/cover-letters/stream")
+        );
+    }
+
+    private Map<String, String> expectedOperationIds() {
+        return Map.ofEntries(
+                Map.entry("API-001", "startKakaoLogin"),
+                Map.entry("API-002", "handleKakaoCallback"),
+                Map.entry("API-003", "getCsrfToken"),
+                Map.entry("API-004", "refreshAuthTokens"),
+                Map.entry("API-005", "getCurrentUser"),
+                Map.entry("API-006", "logout"),
+                Map.entry("API-007", "listCoverLetters"),
+                Map.entry("API-008", "createCoverLetter"),
+                Map.entry("API-009", "saveCoverLetterBasicInfo"),
+                Map.entry("API-010", "saveCoverLetterPreferences"),
+                Map.entry("API-011", "saveCoverLetterQuestions"),
+                Map.entry("API-012", "getCoverLetterDetail"),
+                Map.entry("API-013", "deleteCoverLetter"),
+                Map.entry("API-014", "submitCoverLetter"),
+                Map.entry("API-015", "getLlmJobStatus"),
+                Map.entry("API-016", "streamLlmJobEvents"),
+                Map.entry("API-017", "listReviewVersions"),
+                Map.entry("API-018", "getReviewVersionDetail"),
+                Map.entry("API-019", "saveFinalAnswers"),
+                Map.entry("API-020", "startKeywordAnalysis"),
+                Map.entry("API-021", "getLatestKeywordAnalysis"),
+                Map.entry("API-022", "startInterview"),
+                Map.entry("API-023", "sendInterviewMessage"),
+                Map.entry("API-024", "requestReReview"),
+                Map.entry("API-025", "getCurrentInterview"),
+                Map.entry("API-026", "listInterviewQuestions"),
+                Map.entry("API-027", "generateInterviewQuestions"),
+                Map.entry("API-029", "listInterviewMessages"),
+                Map.entry("API-030", "streamCoverLetterReviewStatuses")
+        );
+    }
+
+    private Map<Class<?>, String> expectedControllerTags() {
+        return Map.ofEntries(
+                Map.entry(KakaoAuthController.class, "Auth"),
+                Map.entry(CsrfTokenController.class, "Auth"),
+                Map.entry(TokenRefreshController.class, "Auth"),
+                Map.entry(UserController.class, "Auth"),
+                Map.entry(LogoutController.class, "Auth"),
+                Map.entry(CoverLetterController.class, "CoverLetters"),
+                Map.entry(LlmJobController.class, "LLMJobs"),
+                Map.entry(ReviewVersionController.class, "ReviewVersions"),
+                Map.entry(KeywordAnalysisController.class, "KeywordAnalysis"),
+                Map.entry(InterviewController.class, "Interviews"),
+                Map.entry(InterviewMessageController.class, "Interviews")
         );
     }
 

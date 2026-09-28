@@ -43,7 +43,7 @@ public class RewriteApiOperationCustomizer implements OperationCustomizer {
         List<ErrorCase> errorCases = errorCases(api);
 
         // Operation 문서 설정
-        operation.setOperationId(api.id());
+        operation.setOperationId(api.operationId());
         operation.setSummary(api.id() + " · " + api.summary());
         operation.setTags(List.of(api.tag()));
         operation.setDescription(description(api, errorCases));

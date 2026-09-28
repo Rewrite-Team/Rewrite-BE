@@ -1,12 +1,15 @@
 package com.daon.rewrite.auth.dto;
 
 import com.daon.rewrite.auth.CurrentUser;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 
+@Schema(requiredProperties = {"id", "nickname", "profileImageUrl", "provider", "createdAt"})
 public record CurrentUserResponse(
         String id,
         String nickname,
+        @Schema(nullable = true)
         String profileImageUrl,
         String provider,
         LocalDateTime createdAt

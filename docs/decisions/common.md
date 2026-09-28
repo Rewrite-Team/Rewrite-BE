@@ -217,6 +217,8 @@ completedAt
 
 controller와 DTO가 path, request와 response를 정의하고 `@RewriteApi`가 코드에서 추론할 수 없는 사용 맥락과 오류 조건을 정의한다. 생성된 OpenAPI 명세는 두 정보를 통합한다. Notion `Rewrite API (자동 동기화)`는 OpenAPI와 저장소 문서를 기준으로 갱신하는 보조 문서로 사용한다.
 
+프론트엔드가 생성하는 함수와 그룹 이름을 위해 `operationId`는 고유한 의미 기반 camelCase 이름, tag는 공백 없는 영문 도메인 이름으로 정의한다. 기존 `API-001` 형식의 추적 ID는 summary와 `x-rewrite-api-id`에 유지한다. 응답 JSON에 항상 포함되는 필드는 값이 `null`일 수 있어도 OpenAPI schema의 `required`에 포함하고, null 허용 여부를 별도로 표현한다.
+
 Swagger UI와 OpenAPI 문서는 실행 profile과 관계없이 별도 Basic Auth 없이 조회할 수 있다. Swagger에서 실제 API를 호출할 때는 각 API의 기존 Cookie 인증과 CSRF 정책을 그대로 적용한다.
 
 API 설명은 다음 순서로 통일한다.

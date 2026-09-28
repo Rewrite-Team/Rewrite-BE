@@ -2,11 +2,14 @@ package com.daon.rewrite.interview.dto;
 
 import com.daon.rewrite.interview.service.InterviewQuestionItemResult;
 import com.daon.rewrite.interview.service.InterviewQuestionListResult;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.List;
 
+@Schema(requiredProperties = {"items", "nextCursor"})
 public record InterviewQuestionListResponse(
         List<InterviewQuestionResponse> items,
+        @Schema(nullable = true)
         String nextCursor
 ) {
 
@@ -19,6 +22,7 @@ public record InterviewQuestionListResponse(
         );
     }
 
+    @Schema(requiredProperties = {"id", "order", "question", "threadId"})
     public record InterviewQuestionResponse(
             String id,
             int order,

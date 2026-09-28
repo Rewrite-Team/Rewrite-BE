@@ -20,15 +20,16 @@ PRD: `../requirements.md`
 
 ## Domain Routing
 
-| Domain | APIs | API Document | Decision Document |
+| OpenAPI Tag | APIs | API Document | Decision Document |
 |---|---|---|---|
 | Auth | API-001 - API-006 | `auth.md` | `../decisions/auth.md` |
-| Cover Letters | API-007 - API-014, API-030 | `cover-letters.md` | `../decisions/cover-letters.md` |
-| Review Versions | API-017 - API-019, API-024 | `review-versions.md` | `../decisions/review-versions.md` |
-| LLM Jobs | API-015 - API-016 | `llm-jobs.md` | `../decisions/llm-jobs.md` |
-| Keyword Analysis | API-020 - API-021 | `keyword-analysis.md` | `../decisions/keyword-analysis.md` |
+| CoverLetters | API-007 - API-014, API-030 | `cover-letters.md` | `../decisions/cover-letters.md` |
+| ReviewVersions | API-017 - API-019, API-024 | `review-versions.md` | `../decisions/review-versions.md` |
+| LLMJobs | API-015 - API-016 | `llm-jobs.md` | `../decisions/llm-jobs.md` |
+| KeywordAnalysis | API-020 - API-021 | `keyword-analysis.md` | `../decisions/keyword-analysis.md` |
 | Interviews | API-022 - API-023, API-025 - API-029 | `interviews.md` | `../decisions/interviews.md` |
-| Common Rules | 공통 인증, 에러, 시간, 도메인 모델 | `common.md` | `../decisions/common.md` |
+
+공통 인증·에러·시간·도메인 모델 규칙은 `common.md`와 `../decisions/common.md`에서 관리한다.
 
 ## OpenAPI와 Notion 문서 동기화
 
@@ -36,6 +37,8 @@ controller와 DTO가 HTTP 계약을 정의하고 `@RewriteApi`가 API ID, 사용
 
 - API를 추가, 삭제하거나 path, request, response, error, validation, 상태 또는 구현 여부를 변경하면 같은 작업에서 코드, OpenAPI 테스트, 필요한 Markdown과 Notion을 `API ID`로 갱신한다.
 - `@RewriteApi`가 적용된 API는 summary를 `API-009 · 기본 정보 저장` 형식으로 표시하고 사용 목적, 사용 화면, 호출 시점, 주요 동작, 성공 후 처리와 오류를 Swagger UI에서 확인할 수 있어야 한다.
+- `operationId`는 프론트엔드 함수 생성에 사용할 고유한 의미 기반 camelCase 이름이며, API ID는 summary와 `x-rewrite-api-id`에 유지한다. OpenAPI tag는 위 표의 공백 없는 영문 이름을 사용한다.
+- 응답 JSON의 필드가 `null`이어도 항상 존재하면 OpenAPI schema에서 required와 nullable을 함께 표시한다. 같은 이름의 중첩 응답 DTO는 서로 다른 schema 이름으로 구분한다.
 - API-028을 제외한 활성 API 29개는 모두 `@RewriteApi`를 사용한다. API-028은 Deprecated이며 controller와 OpenAPI path를 제공하지 않는다.
 - API-001~030의 오류 계약은 COMMON의 인증·CSRF·서버 오류 복구와 각 도메인 문서의 화면별 최소 오류로 구분한다. 비동기 Job 실패는 HTTP 오류와 분리한다.
 - 데이터베이스 속성은 `Name`, `Method`, `Path`, `상태`, `사용 화면`, `설명`, `API ID`를 사용한다. `API ID`는 숨김 고유 키이며 제목은 `API-007 · 내 자기소개서 목록` 형식으로 작성한다.

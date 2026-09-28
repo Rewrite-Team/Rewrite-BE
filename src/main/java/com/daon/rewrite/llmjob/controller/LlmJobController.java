@@ -26,8 +26,9 @@ public class LlmJobController {
     @GetMapping("/llm-jobs/{jobId}")
     @RewriteApi(
             id = "API-015",
+            operationId = "getLlmJobStatus",
             summary = "Job 상태 조회",
-            tag = "LLM Job",
+            tag = "LLMJobs",
             purpose = "비동기 LLM Job의 현재 상태를 조회해 SSE 실패 시 최종 상태를 복구한다.",
             screens = {"첨삭 진행", "키워드 분석", "AI 면접"},
             trigger = "API-016 연결·재연결 실패, 이벤트 유실 또는 새로고침 시 polling fallback으로 호출한다.",
@@ -63,8 +64,9 @@ public class LlmJobController {
     )
     @RewriteApi(
             id = "API-016",
+            operationId = "streamLlmJobEvents",
             summary = "Job 스트림",
-            tag = "LLM Job",
+            tag = "LLMJobs",
             purpose = "첨삭·키워드 분석·AI 면접 Job의 상태와 도메인별 중간 결과를 하나의 SSE 연결로 수신한다.",
             screens = {"첨삭 진행", "키워드 분석", "AI 면접"},
             trigger = "Job 시작 API가 반환한 jobId로 진행 상태를 구독할 때 연결한다.",

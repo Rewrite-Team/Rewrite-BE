@@ -31,8 +31,9 @@ public class ReviewVersionController {
     @GetMapping("/cover-letters/{coverLetterId}/review-versions")
     @RewriteApi(
             id = "API-017",
+            operationId = "listReviewVersions",
             summary = "첨삭 버전 목록 조회",
-            tag = "첨삭 버전",
+            tag = "ReviewVersions",
             purpose = "자기소개서의 성공한 첨삭 버전 목록을 과거부터 최신 순으로 조회한다.",
             screens = "첨삭 결과",
             trigger = "첨삭 결과 화면에서 버전 선택 목록을 구성하거나 완료 후 목록을 갱신할 때 호출한다.",
@@ -49,8 +50,9 @@ public class ReviewVersionController {
     @PostMapping("/cover-letters/{coverLetterId}/review-versions")
     @RewriteApi(
             id = "API-024",
+            operationId = "requestReReview",
             summary = "AI 첨삭 다시받기",
-            tag = "첨삭 버전",
+            tag = "ReviewVersions",
             purpose = "최신 성공 버전의 최종 작성본을 기준으로 재첨삭 Job을 시작한다.",
             screens = {"첨삭 결과", "첨삭 진행"},
             trigger = "사용자가 재첨삭 요구사항을 확인하고 다시 첨삭받기를 요청할 때 호출한다.",
@@ -85,8 +87,9 @@ public class ReviewVersionController {
     @GetMapping("/cover-letters/{coverLetterId}/review-versions/{versionId}")
     @RewriteApi(
             id = "API-018",
+            operationId = "getReviewVersionDetail",
             summary = "첨삭 버전 상세 조회",
-            tag = "첨삭 버전",
+            tag = "ReviewVersions",
             purpose = "선택한 성공 첨삭 버전의 자기소개서와 문항별 결과를 조회한다.",
             screens = "첨삭 결과",
             trigger = "사용자가 API-017 버전 목록에서 특정 버전을 선택할 때 호출한다.",
@@ -108,8 +111,9 @@ public class ReviewVersionController {
     @PutMapping("/cover-letters/{coverLetterId}/review-versions/{versionId}/final-answers")
     @RewriteApi(
             id = "API-019",
+            operationId = "saveFinalAnswers",
             summary = "최종 작성본 일괄 저장",
-            tag = "첨삭 버전",
+            tag = "ReviewVersions",
             purpose = "최신 첨삭 버전의 모든 문항 최종 작성본을 한 번에 저장한다.",
             screens = "첨삭 결과",
             trigger = "사용자가 최신 버전의 최종 작성본 편집을 저장할 때 호출한다.",

@@ -24,8 +24,9 @@ public class InterviewController {
     @GetMapping("/cover-letters/{coverLetterId}/interview")
     @RewriteApi(
             id = "API-025",
+            operationId = "getCurrentInterview",
             summary = "현재 면접 세션 조회",
-            tag = "AI 면접",
+            tag = "Interviews",
             purpose = "자기소개서 요약, 현재 면접 세션과 미해결 질문 생성 Job을 조회한다.",
             screens = "AI 면접",
             trigger = "면접 화면 진입·새로고침 또는 SSE 상태 복구 시 호출한다.",
@@ -40,8 +41,9 @@ public class InterviewController {
     @GetMapping("/interviews/{interviewSessionId}/questions")
     @RewriteApi(
             id = "API-026",
+            operationId = "listInterviewQuestions",
             summary = "면접 질문 목록 조회",
-            tag = "AI 면접",
+            tag = "Interviews",
             purpose = "최신 면접 질문부터 cursor 기반으로 조회하고 질문별 대화 진입 정보를 반환한다.",
             screens = "AI 면접",
             trigger = "면접 질문 화면 진입, 무한 스크롤 또는 추가 질문 생성 완료 후 호출한다.",
@@ -65,8 +67,9 @@ public class InterviewController {
     @PostMapping("/cover-letters/{coverLetterId}/interviews")
     @RewriteApi(
             id = "API-022",
+            operationId = "startInterview",
             summary = "모의면접 시작",
-            tag = "AI 면접",
+            tag = "Interviews",
             purpose = "최신 성공 첨삭 버전으로 초기 면접 질문 생성 Job을 시작한다.",
             screens = "AI 면접",
             trigger = "사용자가 모의면접 시작 또는 초기 질문 생성 실패 후 재시도를 선택할 때 호출한다.",
@@ -86,8 +89,9 @@ public class InterviewController {
     @PostMapping("/interviews/{interviewSessionId}/questions")
     @RewriteApi(
             id = "API-027",
+            operationId = "generateInterviewQuestions",
             summary = "면접 질문 추가 생성",
-            tag = "AI 면접",
+            tag = "Interviews",
             purpose = "활성 면접 세션에 추가 질문 생성 Job을 시작한다.",
             screens = "AI 면접",
             trigger = "사용자가 추가 질문 생성을 요청하거나 실패 후 수동 재시도할 때 호출한다.",

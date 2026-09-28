@@ -1,10 +1,12 @@
 package com.daon.rewrite.coverletter.dto;
 
 import com.daon.rewrite.coverletter.entity.CoverLetter;
+import io.swagger.v3.oas.annotations.media.Schema;
 import org.springframework.data.domain.Page;
 
 import java.util.List;
 
+@Schema(requiredProperties = {"items", "page", "size", "totalItems", "totalPages"})
 public record CoverLetterListResponse(
         List<CoverLetterListItemResponse> items,
         int page,

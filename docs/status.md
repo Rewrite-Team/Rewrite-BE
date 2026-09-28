@@ -45,6 +45,7 @@ API 계약과 API별 상태는 `docs/api/README.md`와 `docs/api/` 하위 도메
 | [#112](https://github.com/Rewrite-Team/Rewrite-BE/issues/112) | OCI Free Tier 백엔드 배포 환경 구성 | Implemented | 춘천 리전 E2.1.Micro에 `prod` 수동 배포, HTTPS reverse proxy, 외부 포트와 재부팅 복구를 사용자 확인. 실제 SSE 이벤트와 PostgreSQL 백업·복구 검증은 사용자 결정으로 미수행 |
 | [#115](https://github.com/Rewrite-Team/Rewrite-BE/issues/115) | 실행 환경 세부 프로필과 로컬 PostgreSQL 개발 구성 분리 | In Progress | 세부 profile, `local-postgres`, Compose 설정과 비-Docker 검증을 구현하고 `./gradlew check` 통과. 실제 PostgreSQL 기동·데이터 보존 수동 검증은 사용자 요청에 따라 미수행 |
 | [#117](https://github.com/Rewrite-Team/Rewrite-BE/issues/117) | Swagger UI 및 OpenAPI 문서 Basic Auth 제거 | Verified | `prod`·`auth-test` 문서 공개 접근과 비정상·만료 JWT Cookie 무시, 일반 API JWT·CSRF 및 H2 Console Basic Auth 유지를 통합 테스트로 검증. 독립 보안 리뷰와 재검토, `./gradlew check` 통과 |
+| [#121](https://github.com/Rewrite-Team/Rewrite-BE/issues/121) | 프론트엔드 생성용 OpenAPI 이름·응답 필수 필드 정정 | Verified | 활성 API 29개의 의미 기반 operationId, 공백 없는 영문 tag와 JSON 응답 required·nullable 명세를 정정했다. 독립 읽기 전용 리뷰와 재검토, `./gradlew check`, Orval 8.26.0 생성 결과(29개 함수, JSON 응답 필드 128개, 태그별 6개 파일) 검증 완료. Notion 보조 미러는 연결 수단이 없어 별도 동기화가 남아 있다. |
 
 ## Current Recommended Next Work
 

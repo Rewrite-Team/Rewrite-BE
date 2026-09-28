@@ -1,6 +1,8 @@
 package com.daon.rewrite.interview.dto;
 
 import com.daon.rewrite.interview.service.SendInterviewMessageResult;
+import io.swagger.v3.oas.annotations.media.Schema;
+@Schema(requiredProperties = {"userMessageId", "jobId"})
 public record SendInterviewMessageResponse(
         String userMessageId,
         String jobId

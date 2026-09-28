@@ -2,7 +2,9 @@ package com.daon.rewrite.reviewversion.dto;
 
 import com.daon.rewrite.coverletter.entity.CoverLetterStatus;
 import com.daon.rewrite.reviewversion.service.RequestReReviewResult;
+import io.swagger.v3.oas.annotations.media.Schema;
 
+@Schema(requiredProperties = {"displayStatus", "jobId"})
 public record RequestReReviewResponse(
         CoverLetterStatus displayStatus,
         String jobId
