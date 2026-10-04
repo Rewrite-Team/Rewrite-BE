@@ -31,7 +31,6 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ReviewVersionService {
 
-    private static final String REVIEW_VERSION_ID_PREFIX = "rv";
     private static final String QUESTION_RESULT_ID_PREFIX = "rvqr";
     private static final String COMPLETED_MESSAGE = "첨삭이 완료되었습니다.";
 
@@ -66,11 +65,7 @@ public class ReviewVersionService {
         List<ReviewJobQuestionResult> stagedResults = findCompletedStagedResults(job);
 
         Instant now = Instant.now(clock);
-        ReviewVersion reviewVersion = reviewVersionRepository.save(ReviewVersion.first(
-                idGenerator.generate(REVIEW_VERSION_ID_PREFIX),
-                coverLetter,
-                now
-        ));
+        ReviewVersion reviewVersion = findJobVersion(job);
 
         List<ReviewVersionQuestionResult> questionResults = stagedResults.stream()
                 .map(stagedResult -> ReviewVersionQuestionResult.createFromSnapshot(
@@ -132,14 +127,7 @@ public class ReviewVersionService {
         List<ReviewJobQuestionResult> stagedResults = findCompletedStagedResults(job);
 
         Instant now = Instant.now(clock);
-        // 성공한 재첨삭만 새 ReviewVersion으로 확정한다. 실패한 Job은 기존 최신 버전을 유지한다.
-        ReviewVersion reviewVersion = reviewVersionRepository.save(ReviewVersion.reReview(
-                idGenerator.generate(REVIEW_VERSION_ID_PREFIX),
-                coverLetter,
-                nextVersion(coverLetter.getId()),
-                job.getRequestInstruction(),
-                now
-        ));
+        ReviewVersion reviewVersion = findJobVersion(job);
 
         List<ReviewVersionQuestionResult> questionResults = stagedResults.stream()
                 .map(stagedResult -> ReviewVersionQuestionResult.createFromSnapshot(
@@ -204,9 +192,9 @@ public class ReviewVersionService {
         return stagedResults;
     }
 
-    private String nextVersion(String coverLetterId) {
-        long nextPatch = reviewVersionRepository.countByCoverLetterId(coverLetterId) + 1;
-        return "v0." + nextPatch;
+    private ReviewVersion findJobVersion(LlmJob job) {
+        return reviewVersionRepository.findByLlmJobId(job.getId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.INTERNAL_ERROR));
     }
 
 }

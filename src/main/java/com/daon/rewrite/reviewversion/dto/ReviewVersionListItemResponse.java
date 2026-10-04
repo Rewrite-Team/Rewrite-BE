@@ -2,16 +2,19 @@ package com.daon.rewrite.reviewversion.dto;
 
 import com.daon.rewrite.reviewversion.entity.ReviewVersion;
 import com.daon.rewrite.reviewversion.service.ReviewVersionSummary;
+import com.daon.rewrite.llmjob.entity.LlmJobStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 
-@Schema(requiredProperties = {"id", "version", "isLatest", "createdAt"})
+@Schema(requiredProperties = {"id", "version", "status", "isLatest", "isLatestReviewed", "createdAt"})
 public record ReviewVersionListItemResponse(
         String id,
         String version,
+        LlmJobStatus status,
         boolean isLatest,
+        boolean isLatestReviewed,
         LocalDateTime createdAt
 ) {
     private static final ZoneId API_ZONE = ZoneId.of("Asia/Seoul");
@@ -21,7 +24,9 @@ public record ReviewVersionListItemResponse(
         return new ReviewVersionListItemResponse(
                 reviewVersion.getId(),
                 reviewVersion.getVersion(),
+                reviewVersion.getStatus(),
                 summary.isLatest(),
+                summary.isLatestReviewed(),
                 LocalDateTime.ofInstant(reviewVersion.getCreatedAt(), API_ZONE)
         );
     }

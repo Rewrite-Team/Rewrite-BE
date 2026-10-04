@@ -4,6 +4,7 @@ import com.daon.rewrite.reviewversion.entity.ReviewVersion;
 
 public record ReviewVersionSummary(
         ReviewVersion reviewVersion,
-        boolean isLatest
+        boolean isLatest,
+        boolean isLatestReviewed
 ) {
 }

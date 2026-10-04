@@ -1,12 +1,15 @@
 package com.daon.rewrite.reviewversion.entity;
 
 import com.daon.rewrite.coverletter.entity.CoverLetter;
+import com.daon.rewrite.llmjob.entity.LlmJob;
+import com.daon.rewrite.llmjob.entity.LlmJobStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
@@ -27,8 +30,6 @@ import java.time.Instant;
 )
 public class ReviewVersion {
 
-    private static final String FIRST_VERSION = "v0.1";
-
     @Id
     @Column(name = "id", nullable = false, length = 64)
     private String id;
@@ -43,6 +44,11 @@ public class ReviewVersion {
     @Column(name = "request_instruction", length = 1000)
     private String requestInstruction;
 
+    // 버전 조회 시 연결된 Job도 로딩
+    @OneToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "llm_job_id", unique = true)
+    private LlmJob llmJob;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -51,26 +57,29 @@ public class ReviewVersion {
             CoverLetter coverLetter,
             String version,
             String requestInstruction,
+            LlmJob llmJob,
             Instant createdAt
     ) {
         this.id = id;
         this.coverLetter = coverLetter;
         this.version = version;
         this.requestInstruction = requestInstruction;
+        this.llmJob = llmJob;
         this.createdAt = createdAt;
     }
 
-    public static ReviewVersion first(String id, CoverLetter coverLetter, Instant createdAt) {
-        return new ReviewVersion(id, coverLetter, FIRST_VERSION, null, createdAt);
-    }
-
-    public static ReviewVersion reReview(
+    public static ReviewVersion started(
             String id,
             CoverLetter coverLetter,
             String version,
             String requestInstruction,
+            LlmJob llmJob,
             Instant createdAt
     ) {
-        return new ReviewVersion(id, coverLetter, version, requestInstruction, createdAt);
+        return new ReviewVersion(id, coverLetter, version, requestInstruction, llmJob, createdAt);
+    }
+
+    public LlmJobStatus getStatus() {
+        return llmJob == null ? LlmJobStatus.COMPLETED : llmJob.getStatus();
     }
 }

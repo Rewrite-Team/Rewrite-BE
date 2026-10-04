@@ -30,6 +30,7 @@ erDiagram
     REVIEW_VERSIONS ||--o{ REVIEW_VERSION_QUESTION_RESULTS : contains
 
     COVER_LETTERS ||--o{ LLM_JOBS : target_when_cover_letter
+    LLM_JOBS o|--o| REVIEW_VERSIONS : review_attempt
     LLM_JOBS ||--o{ REVIEW_JOB_QUESTION_RESULTS : stages
     COVER_LETTER_QUESTIONS ||--o{ REVIEW_JOB_QUESTION_RESULTS : source
 
@@ -99,6 +100,7 @@ erDiagram
         string cover_letter_id FK
         string version
         text request_instruction
+        string llm_job_id FK, UK
         instant created_at
     }
 
@@ -270,13 +272,13 @@ Rewrite refresh token 저장 테이블이다. 원문은 Cookie로만 전달하�
 | `updated_at` | No | 자기소개서 루트 수정 시각 |
 | `submitted_at` | Yes | 최초 제출 전까지 null |
 | `deleted_at` | Yes | Soft delete 기준. null이면 활성 |
-| `latest_review_version_id` | Yes | FK to `review_versions.id`; 성공한 최신 첨삭 버전이 없으면 null |
+| `latest_review_version_id` | Yes | FK to `review_versions.id`; 최신 성공 첨삭 버전이 없으면 null |
 
 Policy:
 
 - `deleted_at`이 있는 자기소개서와 그 하위 리소스는 사용자-facing API에서 `NOT_FOUND`로 응답한다.
 - 삭제된 자기소개서의 하위 row는 물리 삭제하지 않는다.
-- `latest_review_version_id`는 저장 필드이며, `ReviewVersion.isLatest` 응답은 이 값과 비교해 계산한다.
+- `latest_review_version_id`는 최신 성공 버전 ID다. 응답의 `isLatestReviewed`는 이 값과 비교하고, `isLatest`는 가장 최근 시도로 계산한다.
 
 ### cover_letter_questions
 
@@ -300,7 +302,7 @@ Policy:
 
 ### review_versions
 
-성공한 첨삭 또는 재첨삭 결과의 버전 스냅샷 테이블이다.
+첨삭 또는 재첨삭을 시작할 때 생성하는 버전 테이블이다.
 
 | Column | Nullable | Relationship / Policy |
 |---|---:|---|
@@ -308,13 +310,14 @@ Policy:
 | `cover_letter_id` | No | FK to `cover_letters.id` |
 | `version` | No | 화면 표시용 label. 예: `v0.1` |
 | `request_instruction` | Yes | 재첨삭 요구사항. 최초 첨삭은 null 가능 |
-| `created_at` | No | 첨삭 결과 스냅샷 생성 시각 |
+| `llm_job_id` | Yes | 새 버전의 첨삭 Job FK·unique. 기존 성공 버전은 null 가능 |
+| `created_at` | No | 첨삭 시작 시 버전 생성 시각 |
 
 Policy:
 
-- 성공한 첨삭 결과만 생성한다.
-- 진행 중이거나 실패한 첨삭 시도는 `llm_jobs`로만 표현한다.
-- `isLatest`는 저장하지 않고 `cover_letters.latest_review_version_id`와 비교해 계산한다.
+- 새 Job을 생성할 때 같은 transaction에서 버전을 생성한다. 실패·취소해도 삭제하지 않는다.
+- 버전 상태는 연결된 `llm_jobs.status`에서 읽으며, 기존 Job 연결이 없는 버전은 `COMPLETED`로 취급한다.
+- `isLatest`는 최신 시도, `isLatestReviewed`는 `cover_letters.latest_review_version_id`와 비교해 계산하며 저장하지 않는다.
 
 ### review_version_question_results
 
@@ -338,7 +341,7 @@ Policy:
 
 Policy:
 
-- 최종 작성본 저장은 최신 `review_versions`에 대해서만 허용한다.
+- 최종 작성본 저장은 최신 성공 `review_versions`에 대해서만 허용한다.
 - 저장 payload는 해당 버전의 모든 question result를 포함해야 한다.
 
 ### llm_jobs
@@ -401,8 +404,8 @@ Policy:
 - `(llm_job_id, question_id)`는 한 Job 안에서 유일해야 한다.
 - 각 문항 호출은 전체 자기소개서 문맥과 대상 문항을 입력으로 병렬 실행한다.
 - `ai_report`와 `rewritten_answer`가 모두 생성·검증된 뒤 `COMPLETED`로 전환하고 문항 완료 SSE를 발행한다.
-- 모든 문항 task가 종료되고 전체 결과가 성공하면 최종 `review_versions`, `review_version_question_results`로 한 transaction에서 확정한다.
-- Job이 최종 실패하면 임시 결과는 내부 진단을 위해 보존하되 사용자-facing API에서 숨긴다. 보존 기간과 정리 배치는 후속 운영 범위로 둔다.
+- 모든 문항 task가 종료되고 전체 결과가 성공하면 이미 생성된 버전의 `review_version_question_results`를 한 transaction에서 확정한다.
+- Job이 최종 실패하면 완료된 임시 문항 결과를 API-012·018에서 읽기 전용으로 반환한다. 보존 기간과 정리 배치는 후속 운영 범위로 둔다.
 
 ### keyword_analyses
 
@@ -412,7 +415,7 @@ Policy:
 |---|---:|---|
 | `id` | No | PK |
 | `cover_letter_id` | No | FK to `cover_letters.id`; 한 자기소개서당 최대 1개 유지 |
-| `source_review_version_id` | No | FK to `review_versions.id`; 요청에서 생략되면 서버가 최신 첨삭 버전으로 확정 |
+| `source_review_version_id` | No | FK to `review_versions.id`; 요청에서 생략되면 서버가 최신 성공 첨삭 버전으로 확정 |
 | `status` | No | `PROCESSING`, `COMPLETED`, `FAILED` |
 | `created_at` | No | 생성 시각 |
 | `completed_at` | Yes | 완료 또는 실패 전까지 null |
@@ -422,7 +425,7 @@ Policy:
 - 키워드 분석 결과는 자기소개서별 최신 결과만 유지한다.
 - 재분석은 같은 row를 갱신한다.
 - 재첨삭 완료만으로 기존 키워드 분석 결과를 삭제하지 않는다.
-- 사용자가 재분석을 실행하면 같은 row를 최신 첨삭 버전 기준으로 갱신한다.
+- 사용자가 재분석을 실행하면 같은 row를 최신 성공 첨삭 버전 기준으로 갱신한다.
 
 ### keyword_analysis_keywords
 
@@ -536,15 +539,15 @@ Policy:
 
 ### Latest references
 
-- 최신 첨삭 버전은 `cover_letters.latest_review_version_id`로 저장한다.
-- `review_versions.isLatest`는 저장하지 않고 응답 DTO에서 계산한다.
+- 최신 성공 첨삭 버전은 `cover_letters.latest_review_version_id`로 저장한다.
+- `review_versions.isLatest`와 `isLatestReviewed`는 저장하지 않고 응답 DTO에서 계산한다.
 - 키워드 분석은 자기소개서별 최신 결과 하나만 유지한다.
 - 면접 세션은 자기소개서당 하나만 유지한다.
 
 ### Replace policies
 
 - `cover_letter_questions`는 step3 전체 replace 정책에 따라 기존 row가 삭제되고 새 row로 교체될 수 있다.
-- 최종 작성본 저장은 최신 `review_versions`의 모든 `review_version_question_results`를 한 번에 갱신한다.
+- 최종 작성본 저장은 최신 성공 `review_versions`의 모든 `review_version_question_results`를 한 번에 갱신한다.
 
 ### Physical FK exceptions
 

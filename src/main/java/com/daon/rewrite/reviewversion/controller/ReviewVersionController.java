@@ -34,11 +34,11 @@ public class ReviewVersionController {
             operationId = "listReviewVersions",
             summary = "첨삭 버전 목록 조회",
             tag = "ReviewVersions",
-            purpose = "자기소개서의 성공한 첨삭 버전 목록을 과거부터 최신 순으로 조회한다.",
+            purpose = "자기소개서에서 시작한 첨삭 버전 목록을 과거부터 최신 순으로 조회한다.",
             screens = "첨삭 결과",
             trigger = "첨삭 결과 화면에서 버전 선택 목록을 구성하거나 완료 후 목록을 갱신할 때 호출한다.",
-            behavior = "성공한 버전만 반환하며 isLatest로 최신 버전의 편집 가능 여부를 구분한다. 성공 버전이 없으면 빈 배열이다.",
-            success = "선택한 versionId로 API-018을 조회하고 isLatest 버전에만 최종 작성본 편집을 제공한다.",
+            behavior = "진행·성공·실패 버전을 반환한다. status는 첨삭 상태, isLatest는 최신 시도, isLatestReviewed는 최신 성공 결과를 나타낸다.",
+            success = "선택한 versionId로 API-018을 조회하고 완료된 isLatestReviewed 버전에만 최종 작성본 편집을 제공한다.",
             errors = @ApiError(code = ErrorCode.NOT_FOUND, condition = "자기소개서 없음·비소유·삭제", action = "대상 없음 안내 후 자기소개서 목록으로 이동한다.")
     )
     public ReviewVersionListResponse findReviewVersions(@PathVariable String coverLetterId) {
@@ -57,7 +57,7 @@ public class ReviewVersionController {
             screens = {"첨삭 결과", "첨삭 진행"},
             trigger = "사용자가 재첨삭 요구사항을 확인하고 다시 첨삭받기를 요청할 때 호출한다.",
             behavior = "동일 재첨삭 Job이 진행 중이면 기존 jobId를 반환한다. Job 시작 후 AI 실패는 API-016·015의 FAILED 상태로 전달된다.",
-            success = "displayStatus=REVIEWING을 반영하고 jobId로 API-016에 연결한다. 완료 후 API-017과 상세를 다시 조회한다.",
+            success = "displayStatus=REVIEWING을 반영하고 jobId로 API-016에 연결한다. 새 버전은 시작 시 생성되므로 API-017과 상세에서 진행 상태를 조회할 수 있다.",
             csrfProtected = true,
             errors = {
                     @ApiError(
@@ -90,11 +90,11 @@ public class ReviewVersionController {
             operationId = "getReviewVersionDetail",
             summary = "첨삭 버전 상세 조회",
             tag = "ReviewVersions",
-            purpose = "선택한 성공 첨삭 버전의 자기소개서와 문항별 결과를 조회한다.",
+            purpose = "선택한 첨삭 버전의 상태와 문항별 결과를 조회한다.",
             screens = "첨삭 결과",
             trigger = "사용자가 API-017 버전 목록에서 특정 버전을 선택할 때 호출한다.",
-            behavior = "선택 버전의 aiReport·rewrittenAnswer·finalAnswer와 길이 필드를 공통 상세 구조로 반환한다.",
-            success = "문항을 order로 정렬해 표시하고 최신 버전 여부에 따라 최종 작성본 편집을 제어한다.",
+            behavior = "진행·실패 버전은 완료된 문항의 부분 결과와 Job 상태를, 성공 버전은 확정된 전체 문항 결과를 공통 상세 구조로 반환한다.",
+            success = "문항을 order로 정렬해 표시하고 완료된 isLatestReviewed 버전에만 최종 작성본 편집을 제공한다.",
             errors = @ApiError(
                     code = ErrorCode.NOT_FOUND,
                     condition = "자기소개서·첨삭 버전 없음, 비소유·삭제 또는 버전 소속 불일치",
@@ -114,10 +114,10 @@ public class ReviewVersionController {
             operationId = "saveFinalAnswers",
             summary = "최종 작성본 일괄 저장",
             tag = "ReviewVersions",
-            purpose = "최신 첨삭 버전의 모든 문항 최종 작성본을 한 번에 저장한다.",
+            purpose = "최신 성공 첨삭 버전의 모든 문항 최종 작성본을 한 번에 저장한다.",
             screens = "첨삭 결과",
-            trigger = "사용자가 최신 버전의 최종 작성본 편집을 저장할 때 호출한다.",
-            behavior = "모든 문항 포함·중복·소속·빈 값·길이를 검증하고 최신 버전에만 전체 replace로 저장한다.",
+            trigger = "사용자가 최신 성공 버전의 최종 작성본 편집을 저장할 때 호출한다.",
+            behavior = "모든 문항 포함·중복·소속·빈 값·길이를 검증하고 최신 성공 버전에만 전체 replace로 저장한다.",
             success = "로컬 입력을 유지하고 서버 정규화 값을 다시 맞출 필요가 있으면 API-012 또는 API-018을 조회한다.",
             csrfProtected = true,
             errors = {
@@ -129,7 +129,7 @@ public class ReviewVersionController {
                             detailReason = "최종 작성본은 최대 5000자까지 입력할 수 있습니다."
                     ),
                     @ApiError(code = ErrorCode.NOT_FOUND, condition = "자기소개서·버전 없음, 비소유·삭제", action = "입력값을 유지하고 대상 없음 안내 후 이전 화면으로 이동한다."),
-                    @ApiError(code = ErrorCode.REVIEW_VERSION_NOT_LATEST, condition = "열린 버전이 더 이상 최신 버전이 아님", action = "자동 재전송하지 않고 API-012 또는 API-018로 최신 데이터를 조회한다.")
+                    @ApiError(code = ErrorCode.REVIEW_VERSION_NOT_LATEST, condition = "열린 버전이 최신 성공 버전이 아니거나 첨삭 미완료 버전임", action = "자동 재전송하지 않고 API-012 또는 API-018로 최신 데이터를 조회한다.")
             }
     )
     public SuccessResponse saveFinalAnswers(

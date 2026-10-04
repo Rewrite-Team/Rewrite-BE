@@ -389,9 +389,11 @@ Response:
   },
   "reviewVersion": {
     "id": "rv_01HZ...",
-    "version": "v0.1",
+    "version": "v0.2",
+    "status": "FAILED",
     "isLatest": true,
-    "requestInstruction": null,
+    "isLatestReviewed": false,
+    "requestInstruction": "직무 키워드를 강조해주세요.",
     "createdAt": "2026-06-20T14:11:00"
   },
   "reviewJob": {
@@ -444,24 +446,24 @@ Response:
 
 ```text
 WRITING: reviewVersion=null, reviewJob=null. 현재 임시저장된 기본 정보와 nullable 원본 문항을 반환한다.
-최초 첨삭 REVIEWING: reviewVersion=null, 진행 중 reviewJob과 현재 Job 문항 스냅샷을 반환한다.
-재첨삭 REVIEWING: 이전 최신 성공 reviewVersion, 진행 중 reviewJob과 현재 Job 문항 스냅샷을 반환한다.
-최초 첨삭 REVIEW_FAILED: reviewVersion=null, 실패한 reviewJob과 실패한 최신 Job 문항 스냅샷을 반환한다.
-재첨삭 REVIEW_FAILED: 이전 최신 성공 reviewVersion, 실패한 reviewJob과 실패한 최신 Job 문항 스냅샷을 반환한다.
+최초·재첨삭 REVIEWING: 현재 진행 버전, 진행 중 reviewJob과 현재 Job 문항 스냅샷을 반환한다.
+최초·재첨삭 REVIEW_FAILED: 현재 실패 버전, 실패한 reviewJob과 해당 Job 문항 스냅샷을 반환한다.
 REVIEWED: 최신 성공 reviewVersion과 해당 버전 questions를 반환하고 reviewJob=null이다.
 ```
 
+최초 첨삭 Job의 문항 스냅샷이 아직 생성되지 않은 대기 상태에는 제출된 원본 문항을 반환한다.
+
 `coverLetter.displayStatus`는 API-007과 같은 `WRITING | REVIEWING | REVIEWED | REVIEW_FAILED`를 사용한다. `title`, `companyName`, `positionTitle`, `jobPostingUrl`, `preferences`는 등록 단계에 따라 `null`일 수 있다.
 
-`reviewVersion`은 API-012에서 최신 성공 버전, API-018에서 URL로 선택한 버전이다. `version`은 `v0.1`, `v0.2` 형식의 문자열이다. `requestInstruction`은 최초 첨삭 버전이면 `null`이고 나머지 필드는 non-null이다.
+`reviewVersion`은 API-012에서 현재 첨삭 시도 또는 최신 성공 버전, API-018에서 URL로 선택한 버전이다. `version`은 `v0.1`, `v0.2` 형식의 문자열이다. `status`는 연결된 Job의 상태이고, `isLatest`는 최신 시도, `isLatestReviewed`는 최신 성공 결과다. `requestInstruction`은 최초 첨삭 버전이면 `null`이다.
 
-`reviewJob`은 진행 중이거나 가장 최근 실패한 첨삭 Job 요약이다. `id`, `status`, `progress.current`, `progress.total`, `progress.message`는 non-null이다. 진행 중에는 `error=null`, 실패하면 `error.code`와 `error.message`를 반환한다. 완료된 Job은 `reviewVersion`으로 표현하므로 `reviewJob=null`이다. API-018의 `reviewJob`은 항상 `null`이다.
+`reviewJob`은 진행 중이거나 가장 최근 실패한 첨삭 Job 요약이다. `id`, `status`, `progress.current`, `progress.total`, `progress.message`는 non-null이다. 진행 중에는 `error=null`, 실패하면 `error.code`와 `error.message`를 반환한다. 완료된 Job은 `reviewVersion`으로 표현하므로 `reviewJob=null`이다. API-018도 진행·실패 버전에는 해당 Job을 반환한다.
 
-재첨삭 진행 또는 실패 시 `originalAnswer`는 해당 Job 입력으로 확정한 이전 최신 `ReviewVersion`의 `finalAnswer`다. 새 작업을 시작할 때 이전 버전의 AI 필드를 복사하지 않으며, 현재 Job에서 완료된 문항만 `aiReport`, `rewrittenAnswer`, 길이 필드와 `finalAnswer`를 채운다. 완료된 임시 결과의 `finalAnswer` 초깃값은 `rewrittenAnswer`와 같다.
+재첨삭 진행 또는 실패 시 `originalAnswer`는 해당 Job 입력으로 확정한 이전 최신 성공 `ReviewVersion`의 `finalAnswer`다. 새 작업을 시작할 때 이전 버전의 AI 필드를 복사하지 않으며, 현재 Job에서 완료된 문항만 `aiReport`, `rewrittenAnswer`, 길이 필드와 `finalAnswer`를 채운다. 완료된 임시 결과의 `finalAnswer` 초깃값은 `rewrittenAnswer`와 같다.
 
 최초·재첨삭 Job이 최종 실패해도 현재 Job에서 성공한 문항의 AI 필드는 그대로 반환하고, 실패하거나 완료되지 않은 문항의 AI 필드는 `null`로 반환한다. AI와 무관한 문항 필드는 모든 문항에서 그대로 반환한다.
 
-`questions`는 항상 배열이며 문항이 없으면 `[]`이다. `questionResultId`는 확정된 `ReviewVersion` 문항 결과 ID이며 원본 또는 임시 Job 문항에서는 `null`이다. `WRITING`에서는 임시저장 상태에 따라 `question`, `maxAnswerLength`, `originalAnswer`, `originalAnswerLength`가 `null`일 수 있다. 제출이 성공한 이후의 원본 문항 필드는 모두 non-null이다. AI·최종 작성본 필드는 결과가 없는 문항에서 `null`이고, 확정된 버전 결과에서는 모두 non-null이다.
+`questions`는 항상 배열이며 문항이 없으면 `[]`이다. `questionResultId`는 성공 확정된 버전의 문항 결과 ID이며 원본 또는 진행·실패 Job 문항에서는 `null`이다. `WRITING`에서는 임시저장 상태에 따라 `question`, `maxAnswerLength`, `originalAnswer`, `originalAnswerLength`가 `null`일 수 있다. 제출이 성공한 이후의 원본 문항 필드는 모두 non-null이다. AI·최종 작성본 필드는 결과가 없는 문항에서 `null`이고, 확정된 버전 결과에서는 모두 non-null이다.
 
 `REVIEWED` 상태에서도 최신 결과를 보기 위해 API-018을 다시 호출하지 않는다. API-018은 버전 히스토리에서 선택한 특정 버전을 조회할 때만 사용한다.
 
@@ -518,9 +520,9 @@ questions는 1개 이상이어야 한다.
 
 `REVIEW_FAILED` 상태의 사용자 수동 재시도에는 제품 도메인상 횟수 제한을 두지 않는다. 단, LLM 비용과 남용 방지를 위한 rate limit, 사용자 quota, 운영 정책은 별도로 적용할 수 있다.
 
-새 Job이 생성되면 submit transaction commit 이후 최초 첨삭 worker가 비동기로 실행된다. worker는 전체 자기소개서 문맥과 대상 문항을 입력으로 각 문항 호출을 병렬 실행하고, provider 오류나 출력 검증 실패가 발생한 문항만 1회 재시도한다. 문항의 `aiReport`와 `rewrittenAnswer`가 모두 완성되면 임시 문항 결과를 영속 저장하고 해당 문항 하나를 담은 `review.questions` 이벤트를 전송한 뒤 갱신된 진행률의 `job.state`를 전송한다.
+새 Job과 다음 버전을 같은 transaction에서 생성한다. commit 이후 최초 첨삭 worker가 비동기로 실행된다. worker는 전체 자기소개서 문맥과 대상 문항을 입력으로 각 문항 호출을 병렬 실행하고, provider 오류나 출력 검증 실패가 발생한 문항만 1회 재시도한다. 문항의 `aiReport`와 `rewrittenAnswer`가 모두 완성되면 임시 문항 결과를 영속 저장하고 해당 문항 하나를 담은 `review.questions` 이벤트를 전송한 뒤 갱신된 진행률의 `job.state`를 전송한다.
 
-모든 문항 task가 종료된 뒤 모든 임시 결과가 성공하면 최종 `ReviewVersion`과 문항별 결과로 한 transaction에서 확정하고 `CoverLetter.status`를 `REVIEWED`로 변경한다. 최종 실패하면 `LlmJob.status`는 `FAILED`, 최초 첨삭의 `CoverLetter.status`는 `REVIEW_FAILED`가 된다. 실패 Job에서 성공한 임시 문항 결과는 API-012에서 읽기 전용 부분 결과로 반환한다.
+모든 문항 task가 종료된 뒤 모든 임시 결과가 성공하면 이미 생성된 버전의 문항별 결과를 확정하고 `CoverLetter.status`를 `REVIEWED`로 변경한다. 최종 실패하면 버전을 유지하고 `LlmJob.status`와 `CoverLetter.status`를 각각 `FAILED`, `REVIEW_FAILED`로 변경한다. 실패 Job에서 성공한 임시 문항 결과는 API-012·018에서 읽기 전용 부분 결과로 반환한다.
 
 이미 최초 첨삭 Job이 `PENDING` 또는 `PROCESSING` 상태이면 새 Job을 만들지 않고 기존 진행 중 Job을 반환한다.
 

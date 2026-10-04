@@ -1633,7 +1633,7 @@ MVP에서 삭제는 사용자 화면에서 해당 자기소개서를 제거하�
 
 API-012 자기소개서 상세와 API-018 첨삭 버전 상세는 `coverLetter`, `reviewVersion`, `reviewJob`, `questions`로 구성된 같은 최상위 응답 구조를 사용한다. `coverLetter`는 내부 상태 대신 API-007과 같은 `displayStatus`를 반환한다.
 
-API-012는 `WRITING`, `REVIEWING`, `REVIEW_FAILED`, `REVIEWED` 모든 표시 상태에서 사용한다. `reviewVersion`은 최신 성공 버전이 없으면 `null`이며, `reviewJob`은 진행 중이거나 가장 최근 실패한 첨삭 Job 요약이다. `REVIEWED`이면 최신 `ReviewVersion` 전체 결과를 직접 반환하고, API-018은 사용자가 히스토리에서 선택한 특정 버전을 조회할 때만 사용한다. API-018의 `reviewJob`은 항상 `null`이다.
+API-012는 `WRITING`, `REVIEWING`, `REVIEW_FAILED`, `REVIEWED` 모든 표시 상태에서 사용한다. `reviewVersion`은 첨삭 전에는 `null`, 진행·실패 중에는 현재 시도, 완료 후에는 최신 성공 버전이다. `reviewJob`은 진행 중이거나 가장 최근 실패한 첨삭 Job 요약이다. `REVIEWED`이면 최신 성공 버전 전체 결과를 직접 반환하고, API-018은 사용자가 히스토리에서 선택한 특정 버전을 조회할 때만 사용한다. API-018도 진행·실패 버전에는 해당 `reviewJob`을 반환한다.
 
 ### 선택 이유
 
