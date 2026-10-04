@@ -93,6 +93,30 @@ class OpenApiIntegrationTest {
     }
 
     @Test
+    void reviewVersionApisDocumentAttemptStatusAndLatestSuccessfulResult() throws Exception {
+        JsonNode document = openApiDocument();
+        JsonNode schemas = document.path("components").path("schemas");
+
+        for (String schemaName : List.of("ReviewVersionListItemResponse", "CoverLetterDetailReviewVersionResponse")) {
+            JsonNode schema = schemas.path(schemaName);
+            assertThat(schema.isMissingNode()).isFalse();
+            assertThat(schema.path("required").valueStream().map(JsonNode::asText).toList())
+                    .contains("status", "isLatest", "isLatestReviewed");
+            assertThat(schema.path("properties").has("status")).isTrue();
+        }
+
+        assertThat(operation(document, "/cover-letters/{coverLetterId}/review-versions", "get")
+                .path("description").asText())
+                .contains("진행·성공·실패 버전", "isLatestReviewed");
+        assertThat(operation(document, "/cover-letters/{coverLetterId}/review-versions/{versionId}", "get")
+                .path("description").asText())
+                .contains("진행·실패 버전", "부분 결과");
+        assertThat(operation(document, "/cover-letters/{coverLetterId}/submit", "post")
+                .path("description").asText())
+                .contains("Job과 첨삭 버전을 함께");
+    }
+
+    @Test
     void documentedErrorsUseSharedSchemaAndNamedExamples() throws Exception {
         JsonNode document = openApiDocument();
         assertThat(document.path("components").path("schemas").path("SuccessResponse")

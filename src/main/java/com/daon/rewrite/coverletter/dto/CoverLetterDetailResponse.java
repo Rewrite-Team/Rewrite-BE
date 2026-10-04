@@ -60,11 +60,13 @@ public record CoverLetterDetailResponse(
         }
     }
 
-    @Schema(name = "CoverLetterDetailReviewVersionResponse", requiredProperties = {"id", "version", "isLatest", "requestInstruction", "createdAt"})
+    @Schema(name = "CoverLetterDetailReviewVersionResponse", requiredProperties = {"id", "version", "status", "isLatest", "isLatestReviewed", "requestInstruction", "createdAt"})
     public record ReviewVersionResponse(
             String id,
             String version,
+            LlmJobStatus status,
             boolean isLatest,
+            boolean isLatestReviewed,
             @Schema(nullable = true)
             String requestInstruction,
             LocalDateTime createdAt
@@ -77,7 +79,9 @@ public record CoverLetterDetailResponse(
             return new ReviewVersionResponse(
                     reviewVersion.getId(),
                     reviewVersion.getVersion(),
+                    reviewVersion.getStatus(),
                     result.latest(),
+                    result.latestReviewed(),
                     reviewVersion.getRequestInstruction(),
                     LocalDateTime.ofInstant(reviewVersion.getCreatedAt(), API_ZONE)
             );

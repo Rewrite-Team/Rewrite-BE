@@ -16,6 +16,8 @@ import com.daon.rewrite.llmjob.entity.LlmJobType;
 import com.daon.rewrite.llmjob.repository.LlmJobRepository;
 import com.daon.rewrite.llmjob.service.LlmJobCreatedEvent;
 import com.daon.rewrite.llmjob.service.LlmJobService;
+import com.daon.rewrite.reviewversion.entity.ReviewVersion;
+import com.daon.rewrite.reviewversion.repository.ReviewVersionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
@@ -49,10 +51,12 @@ public class CoverLetterService {
     private static final int MAX_MAX_ANSWER_LENGTH = 5000;
     private static final int MAX_ORIGINAL_ANSWER_LENGTH = 5000;
     private static final String LLM_JOB_ID_PREFIX = "job";
+    private static final String REVIEW_VERSION_ID_PREFIX = "rv";
     private final CurrentUserProvider currentUserProvider;
     private final CoverLetterRepository coverLetterRepository;
     private final CoverLetterQuestionRepository coverLetterQuestionRepository;
     private final LlmJobRepository llmJobRepository;
+    private final ReviewVersionRepository reviewVersionRepository;
     private final LlmJobService llmJobService;
     private final IdGenerator idGenerator;
     private final Clock clock;
@@ -252,6 +256,15 @@ public class CoverLetterService {
                 coverLetter.getId(),
                 now,
                 questions.size()
+        ));
+        long nextPatch = reviewVersionRepository.countByCoverLetterId(coverLetter.getId()) + 1;
+        reviewVersionRepository.save(ReviewVersion.started(
+                idGenerator.generate(REVIEW_VERSION_ID_PREFIX),
+                coverLetter,
+                "v0." + nextPatch,
+                null,
+                job,
+                now
         ));
 
         /*

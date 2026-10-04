@@ -13,7 +13,7 @@ FAILED: 실패 안내와 다시 시작하기 또는 재시도 버튼
 
 면접 세션은 최초 질문 세트를 생성할 때 기준이 된 첨삭 버전을 `initialSourceReviewVersionId`로 기록한다. 재첨삭 후에도 기존 면접 세션과 기존 질문별 대화방은 유지된다.
 
-면접 질문과 질문별 thread는 항상 같은 transaction에서 1:1로 생성한다. 사용자가 `새로운 질문 추가하기`를 실행하면 기존 면접 세션에 가장 최근 첨삭 버전 기준 면접 질문 1개와 thread 1개를 추가한다. 기존 질문과 대화 기록은 변경하지 않는다.
+면접 질문과 질문별 thread는 항상 같은 transaction에서 1:1로 생성한다. 사용자가 `새로운 질문 추가하기`를 실행하면 기존 면접 세션에 최신 성공 첨삭 버전 기준 면접 질문 1개와 thread 1개를 추가한다. 기존 질문과 대화 기록은 변경하지 않는다.
 
 ### 현재 면접 세션 조회
 
@@ -172,9 +172,9 @@ Response:
 POST /interviews/{interviewSessionId}/questions
 ```
 
-Request body는 없다. 서버는 항상 해당 자기소개서의 최신 첨삭 버전인 `CoverLetter.latestReviewedVersionId`를 기준으로 질문을 생성한다.
+Request body는 없다. 서버는 항상 해당 자기소개서의 최신 성공 첨삭 버전인 `CoverLetter.latestReviewedVersionId`를 기준으로 질문을 생성한다.
 
-요청 시점의 최신 첨삭 버전은 Job의 `requestRef.type=REVIEW_VERSION`, `requestRef.id=latestReviewedVersionId`로 확정한다. 추가 질문 생성 Job은 `type=INTERVIEW_ADDITIONAL_QUESTION_GENERATION`, `progress.total=1`로 생성한다.
+요청 시점의 최신 성공 첨삭 버전은 Job의 `requestRef.type=REVIEW_VERSION`, `requestRef.id=latestReviewedVersionId`로 확정한다. 추가 질문 생성 Job은 `type=INTERVIEW_ADDITIONAL_QUESTION_GENERATION`, `progress.total=1`로 생성한다.
 
 추가 질문은 자기소개서 최종 작성본을 기반으로 총 1개 생성한다. 질문 종류는 구분하지 않는다.
 

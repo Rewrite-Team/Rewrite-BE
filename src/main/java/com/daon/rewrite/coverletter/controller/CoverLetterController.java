@@ -100,9 +100,9 @@ public class CoverLetterController {
             summary = "자기소개서 상세 조회",
             tag = "CoverLetters",
             purpose = "미완성 WRITING 입력과 자기소개서 상세·첨삭 상태를 공통 구조로 조회한다.",
-            screens = {"자기소개서 목록", "자기소개서 등록", "첨삭 결과"},
+            screens = {"자기소개서 목록", "자기소개서 등록", "첨삭 진행", "첨삭 결과"},
             trigger = "목록에서 항목을 열거나 등록·첨삭 화면을 새로고침하고 상태를 복구할 때 호출한다.",
-            behavior = "displayStatus에 따라 nullable 등록 데이터, 최신 성공 버전, 진행·실패 Job과 성공한 부분 문항을 조건부 반환한다.",
+            behavior = "displayStatus에 따라 nullable 등록 데이터, 현재 첨삭 시도 또는 최신 성공 버전, 진행·실패 Job과 성공한 부분 문항을 조건부 반환한다.",
             success = "WRITING은 등록 폼을 복구하고 REVIEWING은 API-016에 연결하며 REVIEWED·REVIEW_FAILED는 결과 또는 실패 화면을 구성한다.",
             errors = @ApiError(
                     code = ErrorCode.NOT_FOUND,
@@ -267,7 +267,7 @@ public class CoverLetterController {
             trigger = "등록 4단계에서 제출을 확정하거나 최초 첨삭 실패 화면에서 수동 재시도할 때 호출한다.",
             behavior = """
                     WRITING 또는 최초 첨삭 실패 상태의 저장 데이터를 최종 검증한다.
-                    새 Job을 만들거나 동일 최초 첨삭 Job이 진행 중이면 기존 jobId를 반환한다.
+                    새 Job과 첨삭 버전을 함께 만들거나 동일 최초 첨삭 Job이 진행 중이면 기존 jobId를 반환한다.
                     200 OK 이후의 AI 처리 실패는 HTTP 오류가 아니라 API-016의 job.state.status=FAILED로 전달된다.
                     """,
             success = "displayStatus=REVIEWING이면 jobId로 API-016 SSE 연결을 시작한다. REVIEWED이면 jobId=null이며 API-012를 조회해 기존 결과 화면으로 전환한다.",

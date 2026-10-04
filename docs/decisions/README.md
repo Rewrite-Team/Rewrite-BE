@@ -24,7 +24,7 @@ API 계약: `../api/README.md`
 | ID | Title | File | Related REQ | Related API | Status |
 |---|---|---|---|---|---|
 | Decision 001 | LLM 작업은 비동기 Job 방식으로 처리한다 | `llm-jobs.md` | REQ-005, REQ-009, REQ-010 | API-015 - API-016, LLM 시작 API | Active |
-| Decision 002 | 버전 히스토리는 AI 첨삭 결과를 기준으로 관리한다 | `review-versions.md` | REQ-006 | API-017 - API-019, API-024 | Active |
+| Decision 002 | 버전 히스토리는 AI 첨삭 결과를 기준으로 관리한다 | `review-versions.md` | REQ-006 | API-017 - API-019, API-024 | Superseded by Decision 102 |
 | Decision 003 | 임시저장 자기소개서도 목록에 노출한다 | `cover-letters.md` | REQ-003, REQ-004, REQ-005 | API-007 - API-014 | Active |
 | Decision 004 | AI 첨삭 결과는 질문별로 독립 저장한다 | `review-versions.md` | REQ-006 | API-017 - API-019, API-024 | Active |
 | Decision 005 | LLM 스트리밍 프로토콜은 SSE를 사용한다 | `llm-jobs.md` | REQ-005, REQ-009, REQ-010 | API-015 - API-016, LLM 시작 API | Active |
@@ -37,7 +37,7 @@ API 계약: `../api/README.md`
 | Decision 012 | 재첨삭 요구사항은 최대 1000자로 제한한다 | `review-versions.md` | REQ-006 | API-017 - API-019, API-024 | Active |
 | Decision 013 | AI 리포트는 단일 문자열로 제공한다 | `review-versions.md` | REQ-006 | API-017 - API-019, API-024 | Active |
 | Decision 014 | Diff는 프론트엔드에서 계산한다 | `review-versions.md` | REQ-006 | API-017 - API-019, API-024 | Active |
-| Decision 015 | 첨삭 버전 라벨은 v0.1부터 순차 증가한다 | `review-versions.md` | REQ-006 | API-017 - API-019, API-024 | Active |
+| Decision 015 | 첨삭 버전 라벨은 v0.1부터 순차 증가한다 | `review-versions.md` | REQ-006 | API-017 - API-019, API-024 | Superseded by Decision 102 |
 | Decision 016 | 자기소개서 삭제는 Soft delete로 처리한다 | `cover-letters.md` | REQ-003, REQ-004, REQ-005 | API-007 - API-014 | Active |
 | Decision 017 | LLM Job은 실패 시 서버에서 1회 자동 재시도한다 | `llm-jobs.md` | REQ-005, REQ-009, REQ-010 | API-015 - API-016, LLM 시작 API | Active |
 | Decision 018 | 인증 Cookie는 SameSite=None과 CSRF 토큰을 함께 사용한다 | `auth.md` | REQ-008 | API-001 - API-006 | Active |
@@ -58,8 +58,8 @@ API 계약: `../api/README.md`
 | Decision 033 | 키워드 분석과 면접 세션은 Job 실패 시 FAILED 상태로 저장한다 | `llm-jobs.md` | REQ-005, REQ-009, REQ-010 | API-015 - API-016, LLM 시작 API | Active |
 | Decision 034 | FAILED 키워드 분석과 면접 세션은 같은 리소스로 재시도한다 | `llm-jobs.md` | REQ-005, REQ-009, REQ-010 | API-015 - API-016, LLM 시작 API | Active |
 | Decision 035 | 공고 링크는 URL 형식만 검증한다 | `cover-letters.md` | REQ-003, REQ-004, REQ-005 | API-007 - API-014 | Active |
-| Decision 036 | ReviewVersion은 성공한 첨삭 결과만 생성한다 | `review-versions.md` | REQ-006 | API-017 - API-019, API-024 | Active |
-| Decision 037 | 최종 작성본은 최신 ReviewVersion에서만 수정할 수 있다 | `review-versions.md` | REQ-006 | API-017 - API-019, API-024 | Active |
+| Decision 036 | ReviewVersion은 성공한 첨삭 결과만 생성한다 | `review-versions.md` | REQ-006 | API-017 - API-019, API-024 | Superseded by Decision 102 |
+| Decision 037 | 최종 작성본은 최신 성공 ReviewVersion에서만 수정할 수 있다 | `review-versions.md` | REQ-006 | API-017 - API-019, API-024 | Active |
 | Decision 038 | 최종 작성본 저장 payload는 전체 문항을 항상 포함한다 | `review-versions.md` | REQ-006 | API-017 - API-019, API-024 | Active |
 | Decision 039 | 최종 작성본은 빈 문자열로 저장할 수 없다 | `review-versions.md` | REQ-006 | API-017 - API-019, API-024 | Active |
 | Decision 040 | 최종 작성본은 앞뒤 공백을 trim한 뒤 검증하고 저장한다 | `review-versions.md` | REQ-006 | API-017 - API-019, API-024 | Active |
@@ -113,7 +113,7 @@ API 계약: `../api/README.md`
 | Decision 088 | 키워드 분석 시작은 최신 버전을 자동 선택하고 Job 정보만 반환한다 | `keyword-analysis.md` | REQ-009 | API-020 | Active |
 | Decision 089 | 키워드 분석 상태는 결과 조회 API를 polling한다 | `keyword-analysis.md` | REQ-009 | API-020, API-021 | Superseded by Decision 090 |
 | Decision 090 | API-016은 첨삭·키워드 분석·면접 Job의 공통 SSE다 | `llm-jobs.md` | REQ-005, REQ-006, REQ-009, REQ-010 | API-016, API-020 - API-023, API-025, API-029 | Active |
-| Decision 091 | 모의면접 시작은 최신 첨삭 버전을 자동 선택하고 공통 Job SSE로 추적한다 | `interviews.md` | REQ-010 | API-016, API-022, API-025 - API-026 | Active |
+| Decision 091 | 모의면접 시작은 최신 성공 첨삭 버전을 자동 선택하고 공통 Job SSE로 추적한다 | `interviews.md` | REQ-010 | API-016, API-022, API-025 - API-026 | Active |
 | Decision 092 | 면접 질문 목록은 화면과 대화 진입에 필요한 필드만 반환한다 | `interviews.md` | REQ-010 | API-026 | Active |
 | Decision 093 | 추가 면접 질문 생성은 Job ID만 반환하고 현재 세션 조회로 복구한다 | `interviews.md` | REQ-010 | API-016, API-025 - API-027 | Active |
 | Decision 094 | 면접 메시지 조회는 표시 문장과 점수만 공개하고 피드백 Job을 복구한다 | `interviews.md` | REQ-010 | API-016, API-023, API-029 | Active |
@@ -124,3 +124,4 @@ API 계약: `../api/README.md`
 | Decision 099 | 면접 질문 목록은 최신 질문 우선 cursor 무한 스크롤로 조회한다 | `interviews.md` | REQ-010 | API-026 | Active |
 | Decision 100 | Swagger UI를 핵심 API 문서로 사용한다 | `common.md` | REQ-001, REQ-003 - REQ-010 | API-001 - API-030 | Active |
 | Decision 101 | 실행 프로필은 DB와 인증 세부 프로필을 조합한다 | `persistence.md` | REQ-007, REQ-008 | 내부 persistence·실행 환경 | Active |
+| Decision 102 | 첨삭 버전은 Job 시작 시 생성하고 실패해도 보존한다 | `review-versions.md` | REQ-005, REQ-006 | API-012, API-014, API-017 - API-019, API-024 | Active |

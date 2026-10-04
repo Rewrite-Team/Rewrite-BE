@@ -9,6 +9,7 @@ import com.daon.rewrite.global.exception.ErrorCode;
 import com.daon.rewrite.global.response.ErrorResponse;
 import com.daon.rewrite.global.util.IdGenerator;
 import com.daon.rewrite.llmjob.entity.LlmJob;
+import com.daon.rewrite.llmjob.entity.LlmJobStatus;
 import com.daon.rewrite.llmjob.entity.LlmJobType;
 import com.daon.rewrite.llmjob.repository.LlmJobRepository;
 import com.daon.rewrite.llmjob.service.LlmJobCreatedEvent;
@@ -41,6 +42,7 @@ public class ReviewVersionCommandService {
     private static final int MAX_REQUEST_INSTRUCTION_LENGTH = 1000;
     private static final String LLM_JOB_ID_PREFIX = "job";
     private static final String JOB_QUESTION_RESULT_ID_PREFIX = "rjqr";
+    private static final String REVIEW_VERSION_ID_PREFIX = "rv";
 
     private final CurrentUserProvider currentUserProvider;
     private final CoverLetterRepository coverLetterRepository;
@@ -66,7 +68,8 @@ public class ReviewVersionCommandService {
         ReviewVersion reviewVersion = reviewVersionRepository.findByIdAndCoverLetterId(versionId, coverLetter.getId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
 
-        if (!reviewVersion.getId().equals(coverLetter.getLatestReviewedVersionId())) {
+        if (!reviewVersion.getId().equals(coverLetter.getLatestReviewedVersionId())
+                || reviewVersion.getStatus() != LlmJobStatus.COMPLETED) {
             throw new BusinessException(ErrorCode.REVIEW_VERSION_NOT_LATEST);
         }
 
@@ -114,6 +117,15 @@ public class ReviewVersionCommandService {
                 coverLetter.getLatestReviewedVersionId(),
                 now,
                 latestResults.size()
+        ));
+        long nextPatch = reviewVersionRepository.countByCoverLetterId(coverLetter.getId()) + 1;
+        reviewVersionRepository.save(ReviewVersion.started(
+                idGenerator.generate(REVIEW_VERSION_ID_PREFIX),
+                coverLetter,
+                "v0." + nextPatch,
+                normalizedInstruction,
+                job,
+                now
         ));
         jobQuestionResultRepository.saveAll(latestResults.stream()
                 .map(result -> ReviewJobQuestionResult.processing(

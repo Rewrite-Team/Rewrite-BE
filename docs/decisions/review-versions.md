@@ -2,6 +2,8 @@
 
 ## Decision 002: 버전 히스토리는 AI 첨삭 결과를 기준으로 관리한다
 
+> Superseded by Decision 102. 버전 히스토리는 첨삭 결과가 아니라 시작된 첨삭 시도를 기준으로 관리한다.
+
 ### 결정
 
 자기소개서의 버전 히스토리는 AI 첨삭 또는 재첨삭 결과를 기준으로 생성한다.
@@ -339,6 +341,8 @@ Diff는 현재 PRD에서 화면 표시용 기능이다. 이미 API가 원문과 
 
 ## Decision 015: 첨삭 버전 라벨은 v0.1부터 순차 증가한다
 
+> Superseded by Decision 102. 라벨 형식은 유지하지만 성공 완료가 아니라 새 Job 시작마다 증가한다.
+
 ### 결정
 
 AI 첨삭 버전 라벨은 최초 첨삭 결과를 `v0.1`로 표시하고, 재첨삭이 완료될 때마다 `v0.2`, `v0.3`처럼 patch 숫자를 1씩 증가시킨다.
@@ -389,6 +393,8 @@ PRD가 이미 `v0.1` 형태의 버전 표시를 예시로 제시한다. 따라�
 
 
 ## Decision 036: ReviewVersion은 성공한 첨삭 결과만 생성한다
+
+> Superseded by Decision 102. 진행·실패 버전도 시작 시 생성해 보존한다.
 
 ### 결정
 
@@ -446,13 +452,13 @@ PRD가 이미 `v0.1` 형태의 버전 표시를 예시로 제시한다. 따라�
 
 
 
-## Decision 037: 최종 작성본은 최신 ReviewVersion에서만 수정할 수 있다
+## Decision 037: 최종 작성본은 최신 성공 ReviewVersion에서만 수정할 수 있다
 
 ### 결정
 
-`최종 작성본` 저장 API는 최신 `ReviewVersion`에 대해서만 허용한다.
+`최종 작성본` 저장 API는 최신 성공 `ReviewVersion`에 대해서만 허용한다.
 
-과거 `ReviewVersion`은 버전 히스토리 열람과 비교 용도로만 사용하고, 최종 작성본을 수정할 수 없다.
+최신 성공 버전이 아닌 `ReviewVersion`은 버전 히스토리 열람과 비교 용도로만 사용하고, 최종 작성본을 수정할 수 없다.
 
 적용 API:
 
@@ -463,17 +469,17 @@ PUT /cover-letters/{coverLetterId}/review-versions/{versionId}/final-answers
 Validation:
 
 ```text
-versionId는 해당 자기소개서의 최신 ReviewVersion이어야 한다.
+versionId는 해당 자기소개서의 최신 성공 ReviewVersion이어야 한다.
 ```
 
-최신 버전이 아닌 경우:
+최신 성공 버전이 아닌 경우:
 
 ```text
 CONFLICT
 REVIEW_VERSION_NOT_LATEST
 ```
 
-최신 버전의 최종 작성본을 저장해도 새 `ReviewVersion`은 생성하지 않는다.
+최신 성공 버전의 최종 작성본을 저장해도 새 `ReviewVersion`은 생성하지 않는다.
 
 ### PRD 근거
 
@@ -483,7 +489,7 @@ REVIEW_VERSION_NOT_LATEST
 
 ### 고려한 대안
 
-1. 최신 `ReviewVersion`만 최종 작성본 수정 가능
+1. 최신 성공 `ReviewVersion`만 최종 작성본 수정 가능
    - 과거 버전은 히스토리로 보고 읽기 전용으로 유지한다.
    - 현재 작업 대상과 과거 기록의 역할이 분리된다.
 
@@ -497,7 +503,7 @@ REVIEW_VERSION_NOT_LATEST
 
 ### 선택 이유
 
-버전 히스토리는 과거 AI 첨삭 결과를 안정적으로 열람하고 비교하기 위한 기록이다. 과거 버전의 최종 작성본까지 수정 가능하게 만들면 히스토리의 의미가 흐려지고, 현재 제출용 최종본이 어느 버전을 기준으로 관리되는지도 애매해진다. 따라서 최신 버전만 수정 가능하게 제한한다.
+버전 히스토리는 과거 AI 첨삭 시도와 결과를 안정적으로 열람하기 위한 기록이다. 과거 성공 버전의 최종 작성본까지 수정 가능하게 만들면 현재 제출용 최종본의 기준이 모호해진다. 따라서 최신 성공 버전만 수정 가능하게 제한한다.
 
 ### 트레이드오프
 
@@ -518,7 +524,7 @@ REVIEW_VERSION_NOT_LATEST
 
 최종 작성본 저장 API는 변경된 문항만 보내는 부분 저장을 지원하지 않는다.
 
-클라이언트는 최신 `ReviewVersion`에 포함된 모든 `ReviewVersionQuestionResult`의 `questionResultId`와 `finalAnswer`를 `answers` 배열에 포함해야 한다.
+클라이언트는 최신 성공 `ReviewVersion`에 포함된 모든 `ReviewVersionQuestionResult`의 `questionResultId`와 `finalAnswer`를 `answers` 배열에 포함해야 한다.
 
 적용 API:
 
@@ -692,11 +698,11 @@ Decision 039에서 최종 작성본은 빈 문자열로 저장할 수 없다고 
 
 최초 첨삭과 재첨삭은 문항별 OpenAI 호출을 병렬 실행한다. 각 호출에는 전체 자기소개서 문맥과 대상 문항을 전달하고, 문항의 `aiReport`와 `rewrittenAnswer`가 모두 완성되고 검증되면 Job과 연결된 임시 문항 결과로 DB에 저장한다.
 
-모든 문항 task가 종료되고 모든 임시 결과가 성공한 경우에만 최종 `ReviewVersion`과 `ReviewVersionQuestionResult`로 한 transaction에서 확정한다. 최종 실패한 Job은 새 `ReviewVersion`을 만들지 않는다. 실패 Job의 임시 결과 노출 정책은 Decision 082를 따른다.
+모든 문항 task가 종료되고 모든 임시 결과가 성공한 경우에만 이미 생성된 버전의 `ReviewVersionQuestionResult`로 한 transaction에서 확정한다. 버전의 생성 시점과 실패 후 보존 정책은 Decision 102를 따른다. 실패 Job의 임시 결과 노출 정책은 Decision 082를 따른다.
 
 ### 선택 이유
 
-완성된 문항부터 화면에 표시하면서 새로고침과 재연결에도 결과를 복구하려면 프로세스 메모리보다 Job과 함께 조회 가능한 영속 스냅샷이 필요하다. 성공한 버전만 `ReviewVersion`으로 보존한다는 기존 정책도 유지한다.
+완성된 문항부터 화면에 표시하면서 새로고침과 재연결에도 결과를 복구하려면 프로세스 메모리보다 Job과 함께 조회 가능한 영속 스냅샷이 필요하다. 성공한 문항 결과만 확정 테이블에 저장하고 실패한 시도의 임시 결과는 읽기 전용으로 구분한다.
 
 ### 트레이드오프
 
@@ -707,7 +713,7 @@ Decision 039에서 최종 작성본은 빈 문자열로 저장할 수 없다고 
 
 ### 결정
 
-재첨삭 Job은 요청 transaction에서 요청 시점의 최신 `ReviewVersion`을 `requestRef`로 고정하고, 각 문항의 `finalAnswer`를 임시 입력 스냅샷으로 함께 저장한다. 진행 상세의 `originalAnswer`는 이 실제 입력값을 반환한다.
+재첨삭 Job은 요청 transaction에서 요청 시점의 최신 성공 `ReviewVersion`을 `requestRef`로 고정하고, 각 문항의 `finalAnswer`를 임시 입력 스냅샷으로 함께 저장한다. 진행 상세의 `originalAnswer`는 이 실제 입력값을 반환한다.
 
 새 Job 시작 시 이전 버전의 `aiReport`, `rewrittenAnswer`, `finalAnswer`를 진행 결과에 복사하지 않는다. 새 문항 결과가 완성될 때마다 해당 문항의 AI 필드와 `finalAnswer`를 새 결과로 채우며, `finalAnswer` 초깃값은 `rewrittenAnswer`와 같다.
 
@@ -726,7 +732,7 @@ Decision 039에서 최종 작성본은 빈 문자열로 저장할 수 없다고 
 
 최초 첨삭과 재첨삭 Job이 최종 실패해도 API-012는 해당 Job에서 성공한 임시 문항 결과를 읽기 전용으로 반환한다. 실패하거나 완료되지 않은 문항은 AI 관련 필드를 `null`로 반환하고, 질문과 실제 Job 입력 같은 AI 비관련 필드는 그대로 반환한다. 임시 결과의 내부 staging ID는 노출하지 않으므로 `questionResultId=null`이다.
 
-최초 첨삭 실패는 `reviewVersion=null`, 재첨삭 실패는 이전 최신 성공 `reviewVersion`을 유지한다. 두 경우 모두 `reviewJob.status=FAILED`와 실패 정보를 반환하고 `questions`는 실패한 최신 Job의 입력 및 부분 결과를 기준으로 한다.
+최초 첨삭과 재첨삭 실패 모두 `reviewVersion`은 실패한 현재 버전을 반환한다. 두 경우 모두 `reviewJob.status=FAILED`와 실패 정보를 반환하고 `questions`는 실패한 최신 Job의 입력 및 부분 결과를 기준으로 한다. 기존 성공 버전은 API-018로 계속 조회할 수 있다.
 
 ### 선택 이유
 
@@ -735,7 +741,7 @@ Decision 039에서 최종 작성본은 빈 문자열로 저장할 수 없다고 
 ### 트레이드오프
 
 - 장점: 성공한 문항 결과가 유실되지 않고 최초 첨삭과 재첨삭 실패 응답을 같은 규칙으로 처리할 수 있다.
-- 단점: 부분 결과는 확정된 `ReviewVersion`이 아니므로 읽기 전용임을 화면에서 구분해야 한다.
+- 단점: 부분 결과는 확정된 버전 문항 결과가 아니므로 읽기 전용임을 화면에서 구분해야 한다.
 
 ## Decision 086: 재첨삭 시작 응답은 표시 상태와 Job ID만 반환한다
 
@@ -758,7 +764,7 @@ API-024 재첨삭 시작 응답은 `displayStatus=REVIEWING`과 `jobId`만 반�
 
 ### 결정
 
-API-019는 path의 `versionId`를 유지해 사용자가 열어 둔 버전이 저장 시점에도 최신인지 검증한다. 최신이 아니면 `REVIEW_VERSION_NOT_LATEST`를 반환한다. 저장 성공 응답은 `{ "success": true }`만 반환한다.
+API-019는 path의 `versionId`를 유지해 사용자가 열어 둔 버전이 저장 시점에도 최신 성공 버전인지 검증한다. 최신 성공 버전이 아니면 `REVIEW_VERSION_NOT_LATEST`를 반환한다. 저장 성공 응답은 `{ "success": true }`만 반환한다.
 
 ### 선택 이유
 
@@ -768,3 +774,22 @@ API-019는 path의 `versionId`를 유지해 사용자가 열어 둔 버전이 �
 
 - 장점: 오래 열린 화면의 잘못된 저장을 명확한 오류로 차단하고 성공 응답은 단순하게 유지한다.
 - 단점: 서버가 trim한 최종 저장값을 즉시 다시 표시하려면 API-012 또는 API-018 재조회가 필요하다.
+
+## Decision 102: 첨삭 버전은 Job 시작 시 생성하고 실패해도 보존한다
+
+### 결정
+
+API-014 또는 API-024에서 새 첨삭 Job을 생성할 때 같은 transaction에서 다음 `ReviewVersion`을 생성한다. 최초 시도는 `v0.1`이며, 실패 후 재시도를 포함해 새 Job마다 번호를 하나씩 증가시킨다. 중복 요청이 기존 진행 Job을 반환하거나 입력 검증에 실패한 경우에는 새 버전을 만들지 않는다.
+
+버전은 연결된 Job의 `PENDING | PROCESSING | COMPLETED | FAILED | CANCELED` 상태를 표시하고 실패해도 삭제하지 않는다. 기존 Job 연결이 없는 성공 버전은 `COMPLETED`로 읽는다. 성공한 문항의 임시 결과는 진행·실패 버전 상세에서 읽기 전용으로 보여주며, 모든 문항이 성공하면 이미 생성된 버전에 확정 문항 결과를 저장한다.
+
+`isLatest`는 가장 최근에 시작한 첨삭 시도, `isLatestReviewed`와 `CoverLetter.latestReviewedVersionId`는 최신 성공 결과를 뜻한다. 재첨삭 입력, 최종 작성본 저장, 키워드 분석과 면접은 최신 성공 버전만 사용한다. 실패·취소 버전은 최종 작성본을 저장할 수 없다. 취소는 자기소개서 삭제 시 발생하므로 버전은 보존하지만 삭제된 자기소개서의 사용자-facing 조회는 기존대로 `NOT_FOUND`다.
+
+### 선택 이유
+
+첨삭 시도마다 이력을 남기면 최초 실패와 재첨삭 실패도 버전 번호와 함께 확인할 수 있다. 성공 결과의 기준을 별도로 유지하면 실패 이력을 추가해도 기존 최종 작성본과 후속 AI 기능의 입력이 바뀌지 않는다.
+
+### 트레이드오프
+
+- 장점: 실패 후 재시도도 빠짐없는 버전 이력으로 남고, 실패한 문항의 부분 결과를 나중에 다시 조회할 수 있다.
+- 단점: 버전 목록과 상세에서 진행·실패 상태를 표시해야 하고, 최신 시도와 최신 성공 결과를 구분해야 한다.

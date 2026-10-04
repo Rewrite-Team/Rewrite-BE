@@ -46,8 +46,13 @@ public class CoverLetterDetailQueryService {
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public CoverLetterDetailResult findCurrent(String coverLetterId) {
         CoverLetter coverLetter = findMyActiveCoverLetter(coverLetterId);
-        CoverLetterDetailResult.ReviewVersionResult reviewVersion = findLatestReviewVersion(coverLetter);
         LlmJob reviewJob = findCurrentReviewJob(coverLetter);
+        ReviewVersion currentVersion = reviewJob == null ? null : reviewVersionRepository
+                .findByLlmJobId(reviewJob.getId()).orElse(null);
+        if (currentVersion == null) {
+            currentVersion = findLatestReviewVersion(coverLetter);
+        }
+        CoverLetterDetailResult.ReviewVersionResult reviewVersion = toVersionResult(coverLetter, currentVersion);
 
         // 진행·실패 Job의 임시 문항 결과를 우선 반환한다.
         if (reviewJob != null) {
@@ -63,14 +68,13 @@ public class CoverLetterDetailQueryService {
             }
         }
 
-        // Job 결과가 없으면 최신 성공 버전을 반환한다.
+        // 확정된 문항 결과가 있으면 반환한다.
         if (reviewVersion != null && coverLetter.getStatus() != CoverLetterStatus.WRITING) {
-            return new CoverLetterDetailResult(
-                    coverLetter,
-                    reviewVersion,
-                    reviewJob,
-                    findVersionQuestions(reviewVersion.value())
-            );
+            List<CoverLetterDetailResult.QuestionResult> versionQuestions =
+                    findVersionQuestions(reviewVersion.value());
+            if (!versionQuestions.isEmpty()) {
+                return new CoverLetterDetailResult(coverLetter, reviewVersion, reviewJob, versionQuestions);
+            }
         }
 
         // 첨삭 전에는 원본 문항을 반환한다.
@@ -88,12 +92,27 @@ public class CoverLetterDetailQueryService {
         ReviewVersion reviewVersion = reviewVersionRepository
                 .findByIdAndCoverLetterId(versionId, coverLetter.getId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
+        // 조회할 첨삭 버전을 처리한 Job을 가져온다.
+        LlmJob job = reviewVersion.getLlmJob();
+        // PENDING·PROCESSING·FAILED·CANCELED는 정식 결과가 확정되지 않았으므로 임시 결과를 조회한다.
+        if (job != null && job.getStatus() != LlmJobStatus.COMPLETED) {
+            // 성공 문항뿐 아니라 진행 중·실패 문항도 포함해 문항 순서대로 가져온다.
+            List<ReviewJobQuestionResult> jobResults = reviewJobQuestionResultRepository
+                    .findByLlmJobIdOrderByQuestionOrderAsc(job.getId());
+            // 해당 버전 정보, Job 상태와 현재까지 저장된 문항 정보를 함께 반환한다.
+            return new CoverLetterDetailResult(
+                    coverLetter,
+                    toVersionResult(coverLetter, reviewVersion),
+                    job,
+                    // 임시 행이 없으면 원본 문항을 반환한다. 최초 첨삭 Worker 시작 전이 이에 해당한다.
+                    // 임시 행이 있으면 응답용 객체로 변환한다. 아직 AI 결과가 없는 문항의 AI 필드는 null이다.
+                    jobResults.isEmpty() ? findOriginalQuestions(coverLetter)
+                            : jobResults.stream().map(this::fromJobResult).toList()
+            );
+        }
         return new CoverLetterDetailResult(
                 coverLetter,
-                new CoverLetterDetailResult.ReviewVersionResult(
-                        reviewVersion,
-                        reviewVersion.getId().equals(coverLetter.getLatestReviewedVersionId())
-                ),
+                toVersionResult(coverLetter, reviewVersion),
                 null,
                 findVersionQuestions(reviewVersion)
         );
@@ -105,14 +124,29 @@ public class CoverLetterDetailQueryService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
     }
 
-    private CoverLetterDetailResult.ReviewVersionResult findLatestReviewVersion(CoverLetter coverLetter) {
+    private ReviewVersion findLatestReviewVersion(CoverLetter coverLetter) {
         if (coverLetter.getLatestReviewedVersionId() == null) {
             return null;
         }
         ReviewVersion reviewVersion = reviewVersionRepository
                 .findByIdAndCoverLetterId(coverLetter.getLatestReviewedVersionId(), coverLetter.getId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.INTERNAL_ERROR));
-        return new CoverLetterDetailResult.ReviewVersionResult(reviewVersion, true);
+        return reviewVersion;
+    }
+
+    private CoverLetterDetailResult.ReviewVersionResult toVersionResult(
+            CoverLetter coverLetter,
+            ReviewVersion reviewVersion
+    ) {
+        if (reviewVersion == null) {
+            return null;
+        }
+        long versionCount = reviewVersionRepository.countByCoverLetterId(coverLetter.getId());
+        return new CoverLetterDetailResult.ReviewVersionResult(
+                reviewVersion,
+                reviewVersion.getVersion().equals("v0." + versionCount),
+                reviewVersion.getId().equals(coverLetter.getLatestReviewedVersionId())
+        );
     }
 
     private LlmJob findCurrentReviewJob(CoverLetter coverLetter) {

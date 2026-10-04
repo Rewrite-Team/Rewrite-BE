@@ -80,19 +80,19 @@ API 설계 결정과 트레이드오프는 `../decisions/README.md`를 함께 �
 | API-009 | PUT | `/cover-letters/{coverLetterId}/basic-info` | Implemented | REQ-004 | nullable 기본 정보 WRITING 스냅샷과 `success` 응답 구현, Swagger 문서화 적용 |
 | API-010 | PUT | `/cover-letters/{coverLetterId}/preferences` | Implemented | REQ-004 | nullable 우대사항 WRITING 스냅샷과 `success` 응답 구현 |
 | API-011 | PUT | `/cover-letters/{coverLetterId}/questions` | Implemented | REQ-004 | nullable 문항 WRITING 전체 replace와 `success` 응답 구현 |
-| API-012 | GET | `/cover-letters/{coverLetterId}` | Verified | REQ-003, REQ-004, REQ-005, REQ-006 | WRITING 복구와 상태 공통 상세, 실패 Job의 성공 문항 조회 구현·검증 |
+| API-012 | GET | `/cover-letters/{coverLetterId}` | Implemented | REQ-003, REQ-004, REQ-005, REQ-006 | #123 현재 첨삭 시도 버전과 실패 Job의 성공 문항 조회 반영 |
 | API-013 | DELETE | `/cover-letters/{coverLetterId}` | Implemented | REQ-003 | `success` 응답과 진행 중 Job 취소 구현 |
-| API-014 | POST | `/cover-letters/{coverLetterId}/submit` | Implemented | REQ-004, REQ-005 | WRITING 최종 검증과 `displayStatus`, `jobId` 응답 구현, 복수 409 Swagger example 적용 |
+| API-014 | POST | `/cover-letters/{coverLetterId}/submit` | Implemented | REQ-004, REQ-005 | #123 새 최초 첨삭 Job과 버전을 함께 생성하고 중복 제출은 기존 Job을 반환 |
 | API-015 | GET | `/llm-jobs/{jobId}` | Verified | REQ-005, REQ-009, REQ-010 | 복구용 경량 Job 상태 응답 구현·검증 |
 | API-016 | GET | `/llm-jobs/{jobId}/stream` | Verified | REQ-005, REQ-006, REQ-009, REQ-010 | Job 상태, 첨삭 문항, 검증된 면접 피드백 delta와 재연결 replay 구현·검증, SSE 실패 Swagger 문서화 적용 |
-| API-017 | GET | `/cover-letters/{coverLetterId}/review-versions` | Implemented | REQ-006 | 성공한 첨삭 버전을 `createdAt` 오름차순으로 반환 |
-| API-018 | GET | `/cover-letters/{coverLetterId}/review-versions/{versionId}` | Verified | REQ-006 | API-012와 같은 공통 상세 응답으로 선택 버전 조회 구현·검증 |
-| API-019 | PUT | `/cover-letters/{coverLetterId}/review-versions/{versionId}/final-answers` | Implemented | REQ-006 | `versionId` 동시성 검증과 `success` 단일 응답 구현 |
+| API-017 | GET | `/cover-letters/{coverLetterId}/review-versions` | Implemented | REQ-006 | #123 진행·성공·실패 버전과 최신 시도·최신 성공 여부를 `createdAt` 오름차순으로 반환 |
+| API-018 | GET | `/cover-letters/{coverLetterId}/review-versions/{versionId}` | Implemented | REQ-006 | #123 진행·실패 버전도 Job 상태와 부분 문항 결과를 공통 상세 응답으로 조회 |
+| API-019 | PUT | `/cover-letters/{coverLetterId}/review-versions/{versionId}/final-answers` | Implemented | REQ-006 | #123 최신 성공 버전에만 최종 작성본 저장 허용 |
 | API-020 | POST | `/cover-letters/{coverLetterId}/keyword-analysis` | Implemented | REQ-009 | 요청 body 없이 최신 성공 버전을 사용하고 동일 분석 Job을 멱등 반환 |
 | API-021 | GET | `/cover-letters/{coverLetterId}/keyword-analysis/latest` | Verified | REQ-009 | 화면 메타데이터와 조건부 `jobId`, SSE 복구용 polling fallback 구현·검증 |
 | API-022 | POST | `/cover-letters/{coverLetterId}/interviews` | Implemented | REQ-010 | 최신 성공 버전 자동 선택과 기존 Job 멱등 반환 구현 |
 | API-023 | POST | `/interview-threads/{threadId}/messages` | Verified | REQ-010 | `userMessageId`·`jobId` 응답과 API-016 피드백 delta 연결 구현·검증 |
-| API-024 | POST | `/cover-letters/{coverLetterId}/review-versions` | Implemented | REQ-006 | `displayStatus`, `jobId` 응답과 동일 재첨삭 Job 멱등 반환 구현 |
+| API-024 | POST | `/cover-letters/{coverLetterId}/review-versions` | Implemented | REQ-006 | #123 새 재첨삭 Job과 버전을 함께 생성하고 동일 Job은 멱등 반환 |
 | API-025 | GET | `/cover-letters/{coverLetterId}/interview` | Verified | REQ-010 | 자기소개서 요약, 현재 세션과 초기·추가 질문 생성용 조건부 `jobId` 구현·검증 |
 | API-026 | GET | `/interviews/{interviewSessionId}/questions` | Implemented | REQ-010 | 최신 질문 우선 cursor 무한 스크롤과 화면에 필요한 질문 필드만 반환 |
 | API-027 | POST | `/interviews/{interviewSessionId}/questions` | Implemented | REQ-010 | `jobId` 단일 응답과 동일 추가 질문 Job 멱등 반환 구현 |

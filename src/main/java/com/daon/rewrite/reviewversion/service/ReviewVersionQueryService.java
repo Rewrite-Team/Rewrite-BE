@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Comparator;
 
 @Service
 @RequiredArgsConstructor
@@ -25,11 +26,16 @@ public class ReviewVersionQueryService {
     @Transactional(readOnly = true)
     public List<ReviewVersionSummary> findMyReviewVersions(String coverLetterId) {
         CoverLetter coverLetter = findMyActiveCoverLetter(coverLetterId);
-        return reviewVersionRepository.findByCoverLetterIdOrderByCreatedAtAsc(coverLetter.getId())
+        List<ReviewVersion> versions = reviewVersionRepository.findByCoverLetterIdOrderByCreatedAtAsc(coverLetter.getId());
+        versions.sort(Comparator.comparing(ReviewVersion::getCreatedAt)
+                .thenComparingInt(version -> Integer.parseInt(version.getVersion().substring(3))));
+        String latestVersion = "v0." + versions.size();
+        return versions
                 .stream()
                 .map(reviewVersion -> new ReviewVersionSummary(
                         reviewVersion,
-                        isLatest(coverLetter, reviewVersion)
+                        reviewVersion.getVersion().equals(latestVersion),
+                        reviewVersion.getId().equals(coverLetter.getLatestReviewedVersionId())
                 ))
                 .toList();
     }
@@ -41,7 +47,4 @@ public class ReviewVersionQueryService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
     }
 
-    private boolean isLatest(CoverLetter coverLetter, ReviewVersion reviewVersion) {
-        return reviewVersion.getId().equals(coverLetter.getLatestReviewedVersionId());
-    }
 }

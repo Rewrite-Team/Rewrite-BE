@@ -14,7 +14,8 @@ public record CoverLetterDetailResult(
 ) {
     public record ReviewVersionResult(
             ReviewVersion value,
-            boolean latest
+            boolean latest,
+            boolean latestReviewed
     ) {
     }
 

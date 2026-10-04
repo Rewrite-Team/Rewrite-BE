@@ -10,9 +10,9 @@ LLM 작업 요청 API는 즉시 `jobId`를 반환한다. API-016을 지원하는
 
 ### 버전 관리
 
-자기소개서 버전 히스토리는 AI 첨삭 또는 재첨삭 결과를 기준으로 생성한다.
+자기소개서 버전 히스토리는 AI 첨삭 또는 재첨삭 시도를 기준으로 생성한다.
 
-`ReviewVersion`은 성공한 첨삭 결과에 대해서만 생성한다. 첨삭 또는 재첨삭 LLM Job이 진행 중이거나 실패한 상태는 `ReviewVersion`으로 만들지 않고 `LlmJob`과 `CoverLetter.status`로 표현한다.
+새 첨삭 Job과 `ReviewVersion`을 함께 생성한다. 진행 중·실패 버전도 이력에 남기고, 버전 상태는 연결된 `LlmJob.status`를 따른다. 기존 성공 버전은 새 시도의 실패 후에도 유지한다.
 
 사용자가 최종 작성본을 저장하는 행위만으로는 새 버전을 생성하지 않는다.
 
@@ -321,15 +321,15 @@ WRITING 임시저장: question, maxAnswerLength, originalAnswer는 nullable
 
 ### ReviewVersion
 
-`version`은 화면 표시용 revision label이다. 최초 첨삭 완료 시 `v0.1`로 생성하고, 재첨삭 완료마다 `v0.2`, `v0.3`처럼 patch 숫자를 1씩 증가시킨다. semantic versioning 의미는 없다.
+`version`은 화면 표시용 revision label이다. 최초 첨삭 시작 시 `v0.1`로 생성하고, 실패 후 재시도를 포함한 새 첨삭 Job마다 `v0.2`, `v0.3`처럼 patch 숫자를 1씩 증가시킨다. semantic versioning 의미는 없다.
 
-`ReviewVersion`은 성공한 첨삭 결과에 대해서만 생성되는 완료 스냅샷이다. LLM Job 진행 중이거나 실패한 첨삭 시도는 `ReviewVersion`으로 저장하지 않고 `LlmJob`과 `CoverLetter.status`로 표현한다.
+`ReviewVersion`은 첨삭 시도의 버전이다. 새 Job 시작 transaction에서 생성되며 실패·취소해도 삭제하지 않는다. 기존 데이터에서 Job 연결이 없는 버전은 완료된 버전으로 읽는다.
 
-최신 첨삭 버전의 저장 기준은 `CoverLetter.latestReviewedVersionId`다. `ReviewVersion`은 `isLatest`를 저장 필드로 갖지 않는다.
+`isLatest`는 가장 최근에 생성된 버전, `isLatestReviewed`와 `CoverLetter.latestReviewedVersionId`는 최신 성공 버전을 가리킨다. 두 boolean은 저장 필드가 아니다. 최종 작성본 저장과 키워드 분석·면접 입력은 최신 성공 버전만 사용한다.
 
-성공한 첨삭 결과만 `ReviewVersion`으로 저장하므로 `ReviewVersion`은 별도의 `status` 필드를 갖지 않는다.
+응답의 `status`는 연결된 첨삭 Job의 `PENDING | PROCESSING | COMPLETED | FAILED | CANCELED` 상태다. `ReviewVersion`에는 상태를 중복 저장하지 않는다.
 
-`createdAt`은 첨삭 결과 스냅샷이 생성된 시각이다. 첨삭 Job의 시작/완료 시각은 `LlmJob.createdAt`, `LlmJob.completedAt`으로 확인한다.
+`createdAt`은 첨삭 버전이 생성된 시각이다. 첨삭 Job의 시작/완료 시각은 `LlmJob.createdAt`, `LlmJob.completedAt`으로 확인한다.
 
 ```json
 {
@@ -429,7 +429,7 @@ LLM 출력 파싱 실패, 필수 필드 누락, 타입 불일치, 범위 위반�
 
 Job 상태 조회는 복구에 필요한 상태, 진행률, 결과 참조와 오류만 반환한다. 필드별 partial text와 토큰별 첨삭 delta는 저장하거나 전송하지 않는다.
 
-모든 문항이 성공하면 임시 결과를 `ReviewVersionQuestionResult`로 확정하고 `ReviewVersion`을 생성한다. 최종 실패한 Job은 새 버전을 만들지 않지만, 성공한 임시 문항 결과는 API-012에서 읽기 전용 부분 결과로 반환한다.
+모든 문항이 성공하면 임시 결과를 이미 생성된 버전의 `ReviewVersionQuestionResult`로 확정한다. 최종 실패한 Job의 버전과 성공한 임시 문항 결과는 API-012·018에서 읽기 전용으로 반환한다.
 
 ### KeywordAnalysis
 
@@ -437,7 +437,7 @@ Job 상태 조회는 복구에 필요한 상태, 진행률, 결과 참조와 오
 
 `keywords`는 중요도 기준 상위 20개를 제공한다. `importance`는 1~100 범위의 정수다.
 
-재첨삭 완료만으로 기존 키워드 분석 결과를 삭제하지 않는다. 키워드 분석 결과가 있는 상태에서 사용자가 `AI 키워드 재분석`을 실행하면 같은 `KeywordAnalysis` 리소스를 `PROCESSING`으로 전환하고, 가장 최근 `ReviewVersion`을 기준으로 다시 분석한다. 성공 시 기존 키워드 결과와 `sourceReviewVersionId`를 최신 분석 결과로 덮어쓴다.
+재첨삭 완료만으로 기존 키워드 분석 결과를 삭제하지 않는다. 키워드 분석 결과가 있는 상태에서 사용자가 `AI 키워드 재분석`을 실행하면 같은 `KeywordAnalysis` 리소스를 `PROCESSING`으로 전환하고, 최신 성공 `ReviewVersion`(`CoverLetter.latestReviewedVersionId`)을 기준으로 다시 분석한다. 성공 시 기존 키워드 결과와 `sourceReviewVersionId`를 최신 분석 결과로 덮어쓴다.
 
 상태:
 
@@ -472,7 +472,7 @@ FAILED
 
 면접 세션은 최초 질문 세트를 생성할 때 기준이 된 첨삭 버전을 `initialSourceReviewVersionId`로 기록한다. 이 값은 세션의 시작 기준을 나타내는 메타데이터이며, 세션 안의 모든 질문이 같은 첨삭 버전을 기준으로 생성되었다는 뜻은 아니다.
 
-사용자가 `새로운 질문 추가하기`를 실행하면 기존 면접 세션은 유지하고, 가장 최근 `ReviewVersion`을 기준으로 면접 질문 1개를 추가 생성한다. 질문마다 생성 기준 버전이 다를 수 있으므로 `InterviewQuestion.sourceReviewVersionId`에 각 질문의 기준 첨삭 버전을 기록한다.
+사용자가 `새로운 질문 추가하기`를 실행하면 기존 면접 세션은 유지하고, 최신 성공 `ReviewVersion`(`CoverLetter.latestReviewedVersionId`)을 기준으로 면접 질문 1개를 추가 생성한다. 질문마다 생성 기준 버전이 다를 수 있으므로 `InterviewQuestion.sourceReviewVersionId`에 각 질문의 기준 첨삭 버전을 기록한다.
 
 상태:
 
