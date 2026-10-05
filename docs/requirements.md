@@ -2,8 +2,7 @@
 
 이 문서는 Rewrite 제품 요구사항의 기준 문서다.
 
-진행 상태와 남은 작업은 `docs/status.md`에서 추적한다.
-API 계약과 API별 구현 상태는 `docs/api/README.md`와 `docs/api/` 하위 도메인 문서에서 추적한다.
+HTTP 계약은 Swagger UI와 생성 OpenAPI, 교차 API 흐름은 `docs/api/README.md`와 연결된 문서에서 확인한다.
 설계 결정과 트레이드오프는 `docs/decisions/README.md`와 `docs/decisions/` 하위 도메인 문서에서 추적한다.
 
 ## Product Goal
@@ -14,18 +13,18 @@ Rewrite는 AI를 활용해 자기소개서 첨삭, 자기소개서 키워드 분
 
 ## Requirement Index
 
-| ID | Requirement | Domain | Priority | API Documents |
+| ID | Requirement | Domain | Priority | 관련 문서 |
 |---|---|---|---|---|
-| REQ-001 | 공통 예외 응답 기반 | Common | High | `docs/api/common.md` |
-| REQ-002 | 개발용 현재 사용자 Provider | Common/Auth | High | `docs/api/common.md`, `docs/api/auth.md` |
-| REQ-003 | 자기소개서 기본 CRUD | Cover Letters | High | `docs/api/cover-letters.md` |
-| REQ-004 | 자기소개서 등록 step 저장 | Cover Letters | High | `docs/api/cover-letters.md` |
-| REQ-005 | 자기소개서 제출과 LLM Job 생성 | Cover Letters/LLM Jobs | High | `docs/api/cover-letters.md`, `docs/api/llm-jobs.md` |
-| REQ-006 | 첨삭 버전 조회와 최종 작성본 저장 | Review Versions | High | `docs/api/review-versions.md` |
-| REQ-007 | DB/JPA 전환 | Persistence | High | 내부 persistence 변경 |
-| REQ-008 | 실제 인증 경계 | Auth | Medium | `docs/api/auth.md` |
-| REQ-009 | 키워드 분석 | Keyword Analysis | Medium | `docs/api/keyword-analysis.md`, `docs/api/llm-jobs.md` |
-| REQ-010 | AI 면접 | Interviews | Medium | `docs/api/interviews.md`, `docs/api/llm-jobs.md` |
+| REQ-001 | 공통 예외 응답 기반 | Common | High | [공통 API 흐름](api/common.md#공통-처리) |
+| REQ-002 | 개발용 현재 사용자 Provider | Common/Auth | High | [실행 프로필](../README.md#실행-프로필) |
+| REQ-003 | 자기소개서 기본 CRUD | Cover Letters | High | [자기소개서 흐름](api/cover-letters.md) |
+| REQ-004 | 자기소개서 등록 step 저장 | Cover Letters | High | [등록과 임시저장](api/cover-letters.md#등록과-임시저장) |
+| REQ-005 | 자기소개서 제출과 LLM Job 생성 | Cover Letters/LLM Jobs | High | [최초 첨삭](api/cover-letters.md#최초-첨삭과-재첨삭), [Job·SSE](api/common.md#비동기-job과-sse) |
+| REQ-006 | 첨삭 버전 조회와 최종 작성본 저장 | Review Versions | High | [첨삭 버전과 최종 작성본](api/cover-letters.md#첨삭-버전과-최종-작성본) |
+| REQ-007 | DB/JPA 영속성 | Persistence | High | [ERD](erd.md), [persistence 결정](decisions/persistence.md) |
+| REQ-008 | 실제 인증 경계 | Auth | Medium | [로그인과 인증](api/common.md#로그인과-인증) |
+| REQ-009 | 키워드 분석 | Keyword Analysis | Medium | [키워드 분석](api/cover-letters.md#키워드-분석), [Job·SSE](api/common.md#비동기-job과-sse) |
+| REQ-010 | AI 면접 | Interviews | Medium | [면접 흐름](api/interviews.md), [Job·SSE](api/common.md#비동기-job과-sse) |
 
 ## REQ-001: 공통 예외 응답 기반
 
@@ -52,13 +51,14 @@ Rewrite는 AI를 활용해 자기소개서 첨삭, 자기소개서 키워드 분
 
 ### Goal
 
-실제 OAuth 구현 전에도 인증이 필요한 API의 소유자 검증 경계를 개발하고 테스트할 수 있다.
+개발 환경에서 고정된 사용자를 사용해 인증이 필요한 API의 소유자 검증 경계를 개발하고 테스트할 수 있다.
 
 ### Rules
 
 - 현재 로그인 사용자를 조회하는 경계는 `CurrentUserProvider`로 둔다.
-- 개발 단계에서는 고정된 개발용 사용자를 반환하는 구현체를 사용한다.
-- 실제 인증 도입 시 controller/service의 소유자 검증 흐름을 유지하고 provider 구현체를 교체한다.
+- `auth-dev`는 고정된 개발용 사용자, `auth-real`은 현재 인증한 사용자를 반환한다.
+- controller/service는 인증 profile에 관계없이 동일한 provider 경계로 소유자를 검증한다.
+- 실행 profile과 인증 세부 profile의 조합은 [실행 프로필](../README.md#실행-프로필)을 따른다.
 
 ### Acceptance Criteria
 
@@ -96,7 +96,9 @@ Rewrite는 AI를 활용해 자기소개서 첨삭, 자기소개서 키워드 분
 - 삭제 후 목록과 상세 조회에서 삭제된 자기소개서가 노출되지 않는다.
 - 첨삭 상태 SSE 연결 시 모든 자기소개서의 현재 표시 상태를 하나의 스냅샷 이벤트로 먼저 수신하고 이후 상태가 바뀐 자기소개서의 단건 변경 이벤트를 실시간으로 수신한다.
 - 스냅샷과 변경 이벤트는 `displayStatus`와 최신 성공 첨삭 버전 ID를 하나의 목록 상태로 함께 갱신하며, 연결 등록과 스냅샷 전송 사이의 변경 이벤트를 유실하지 않는다.
-- 프론트엔드는 `CoverLetter.status`와 Job 상태를 조합하지 않는다. 최초·재첨삭 실패는 모두 `displayStatus=REVIEW_FAILED`이며, `latestReviewedVersionId` 유무로 기존 결과 접근 가능 여부를 구분한다.
+- 프론트엔드는 `CoverLetter.status`와 Job 상태를 조합하지 않는다.
+- 최초·재첨삭 실패 시 `displayStatus=REVIEW_FAILED`를 사용한다.
+- 기존 결과 접근 가능 여부는 `latestReviewedVersionId` 유무로 구분한다.
 
 ## REQ-004: 자기소개서 등록 step 저장
 
@@ -136,7 +138,8 @@ Rewrite는 AI를 활용해 자기소개서 첨삭, 자기소개서 키워드 분
 
 사용자는 작성 완료한 자기소개서를 제출하고, 서버는 최초 AI 첨삭을 비동기 LLM Job으로 시작한다.
 
-API-014는 임시저장된 WRITING의 모든 필수값과 문항 완성 여부를 검증하는 단일 최종 경계다. 검증에 실패하면 필드별 오류를 반환하고 Job을 생성하지 않는다.
+API-014는 임시저장된 WRITING의 모든 필수값과 문항 완성 여부를 검증하는 단일 최종 경계다.
+검증에 실패하면 필드별 오류를 반환하고 Job을 생성하지 않는다.
 
 ### User Flow
 
@@ -168,7 +171,9 @@ LLM 첨삭은 다음 기준을 참고한다.
 - 최초 첨삭과 재첨삭은 문항별 OpenAI 호출을 병렬 실행한다.
 - 각 호출은 전체 자기소개서 문맥과 대상 문항을 함께 입력으로 사용한다.
 - 문항의 AI 리포트와 수정본이 모두 완성된 시점에 문항 결과를 임시 영속 저장하고 하나의 SSE 이벤트로 전달한다.
-- 새 첨삭 Job을 시작할 때 다음 ReviewVersion을 생성한다. 모든 문항이 성공하면 해당 버전의 문항별 결과를 확정하고, 실패해도 버전과 성공한 임시 문항 결과를 보존한다.
+- 새 첨삭 Job을 시작할 때 다음 ReviewVersion을 생성한다.
+- 모든 문항이 성공하면 해당 버전의 문항별 결과를 확정한다.
+- 첨삭에 실패해도 버전과 성공한 임시 문항 결과를 보존한다.
 - 최종 실패한 Job도 성공한 임시 문항 결과는 사용자-facing 상세 API에서 반환하고, 실패하거나 완료되지 않은 문항의 AI 필드는 `null`로 반환한다.
 
 ### Acceptance Criteria
@@ -199,8 +204,11 @@ LLM 첨삭은 다음 기준을 참고한다.
 
 ### Rules
 
-- 최초 첨삭과 재첨삭은 새 Job을 생성할 때 다음 ReviewVersion을 함께 생성한다. 실패한 버전도 히스토리에 남고, 재시도할 때마다 버전 라벨을 순차 증가시킨다.
-- 버전의 `status`는 연결된 첨삭 Job 상태를 표시한다. `isLatest`는 가장 최근 첨삭 시도, `isLatestReviewed`는 최신 성공 결과를 나타낸다.
+- 최초 첨삭과 재첨삭은 새 Job을 생성할 때 다음 ReviewVersion을 함께 생성한다.
+- 실패한 버전도 히스토리에 보존한다.
+- 재시도할 때마다 버전 라벨을 순차 증가시킨다.
+- 버전의 `status`는 연결된 첨삭 Job 상태를 표시한다.
+- `isLatest`는 가장 최근 첨삭 시도, `isLatestReviewed`는 최신 성공 결과를 나타낸다.
 - 기존 성공 버전은 새 시도가 실패해도 유지하며, 최종 작성본 저장과 키워드 분석·면접 입력은 최신 성공 버전을 기준으로 한다.
 - 최종 작성본 저장만으로는 새 버전을 생성하지 않는다.
 - 최종 작성본은 최신 성공 ReviewVersion에서만 수정할 수 있다.
@@ -222,31 +230,30 @@ LLM 첨삭은 다음 기준을 참고한다.
 - `REVIEWED` 자기소개서 상세 조회는 최신 성공 첨삭 버전 전체 결과를 직접 반환한다.
 - 특정 과거 버전 조회는 자기소개서 상세와 같은 응답 구조를 반환한다.
 
-## REQ-007: DB/JPA 전환
+## REQ-007: DB/JPA 영속성
 
 ### Goal
 
-API-008 자기소개서 초안 생성의 공개 API 계약은 유지하되, 현재 in-memory persistence 구현을 DB/JPA 기반으로 교체한 뒤 남은 자기소개서 CRUD를 확장한다.
+자기소개서 CRUD 데이터와 완성된 첨삭 문항 결과를 DB/JPA로 저장한다.
+로컬·운영 환경에서 같은 DB와 저장 공간을 유지하면 애플리케이션 재시작 후에도 데이터를 보존한다.
 
 ### Rules
 
-- API-008 자기소개서 초안 생성까지는 in-memory repository로 API 계약과 기본 service/controller 흐름을 확인한 상태로 본다.
-- DB/JPA 전환 이슈는 API-008의 path, status code, response body 계약을 유지하면서 내부 persistence 구현을 DB/JPA로 교체하는 작업을 포함한다.
-- API-007 목록 조회, API-012 상세 조회, API-013 soft delete, 등록 step 저장 API는 pagination, owner filter, deletedAt 필터, 정렬, transaction boundary 영향을 받으므로 DB/JPA 전환 이후 구현한다.
-- DB/JPA 전환은 기존 API 계약을 유지하면서 persistence 구현을 교체하는 별도 이슈로 진행한다.
-- 초기 DB/JPA 전환 범위는 JPA entity/repository, DB driver, 테스트 가능한 DB 설정, transaction 검증까지로 제한한다.
-- Flyway와 migration versioning은 초기 DB/JPA 전환 범위에 포함하지 않고, 스키마 변경 이력 관리가 필요한 시점에 별도 이슈로 검토한다.
-- 기본 로컬 개발과 일반 테스트는 H2를 유지하고, 실제 PostgreSQL 동작을 확인하는 로컬 개발에는 Docker PostgreSQL을 선택할 수 있다.
+- 자기소개서 CRUD는 JPA entity/repository와 service transaction을 사용한다.
+- 목록·상세·삭제·등록 step 저장은 owner, soft delete, pagination·정렬과 각 API의 상태·저장 규칙을 유지한다.
+- 내부 persistence 변경으로 공개 API의 path, status code, request·response·error 계약을 바꾸지 않는다.
+- `local`은 파일형 H2, `local-postgres`와 `prod`는 PostgreSQL을 사용한다.
+- `test`와 `auth-test`는 인메모리 H2를 사용한다.
 - 운영 DB 접속 정보는 환경 변수로 주입한다.
+- 테이블·관계·저장 정책은 [ERD](erd.md), 과거 전환 순서와 이유는 [Decision 072](decisions/persistence.md#decision-072-남은-자기소개서-crud-확장-전-dbjpa-전환을-선행한다)를 따른다.
 
 ### Acceptance Criteria
 
-- 기존 API-008 응답 계약은 DB/JPA 전환 후에도 유지된다.
-- 선택한 DB 설정에서 애플리케이션 프로세스 재시작 후에도 저장 데이터가 보존된다.
-- repository 테스트와 transaction 검증이 추가된다.
-- 운영 profile이 PostgreSQL 연결 설정을 사용하고, 실제 PostgreSQL의 schema 생성·JSON 저장·재시작 후 데이터 보존을 로컬 수동 검증으로 확인한다.
+- 동일한 DB와 저장 공간을 유지한 파일형 H2·PostgreSQL 환경에서 애플리케이션 재시작 후에도 저장 데이터가 보존된다.
+- repository·transaction 테스트에서 조회·저장·변경의 정합성을 확인한다.
+- 운영 profile이 PostgreSQL 연결 설정을 사용한다.
+- PostgreSQL의 schema 생성·JSON 저장·재시작 후 데이터 보존을 로컬 PostgreSQL 환경에서 수동 확인한다.
 - 로컬 PostgreSQL profile이 개발용 고정 사용자를 유지한 채 Docker PostgreSQL에 연결할 수 있다.
-- Flyway 의존성, migration 파일, migration 검증은 이번 전환의 완료 기준에 포함하지 않는다.
 - 기존 API 계약은 유지된다.
 
 ## REQ-008: 실제 인증 경계
@@ -265,14 +272,21 @@ API-008 자기소개서 초안 생성의 공개 API 계약은 유지하되, 현�
 ### Rules
 
 - 백엔드는 카카오 OAuth callback을 직접 처리한다.
-- 로그인 시작의 `target`은 `local`, `production`만 허용하고 OAuth state에 결합해 callback에서 검증한다. 성공 목적지는 각각 `http://localhost:3000/writing`, `https://rewrite-coverletters.site/writing`으로 제한한다.
-- 운영 백엔드는 `http://localhost:3000`과 `https://rewrite-coverletters.site` Origin을 credential CORS 대상으로 허용한다. access token과 refresh token Cookie는 `SameSite=None; Secure; HttpOnly`, OAuth nonce는 `SameSite=Lax; Secure; HttpOnly`를 사용한다.
+- 로그인 시작의 `target`은 `local`, `production`만 허용한다.
+- OAuth state에 `target`을 결합하고 callback에서 검증한다.
+- `target=local`의 성공 목적지는 `http://localhost:3000/writing`으로 제한한다.
+- `target=production`의 성공 목적지는 `https://rewrite-coverletters.site/writing`으로 제한한다.
+- 운영 백엔드는 `http://localhost:3000`과 `https://rewrite-coverletters.site` Origin을 credential CORS 대상으로 허용한다.
+- access token과 refresh token Cookie는 `SameSite=None; Secure; HttpOnly`를 사용한다.
+- OAuth nonce는 `SameSite=Lax; Secure; HttpOnly`를 사용한다.
 - 카카오 로그인 시작 또는 callback 처리 실패는 프론트엔드 로그인 화면으로 `KAKAO_LOGIN_FAILED`를 포함해 리다이렉트하고, 사용자가 카카오 로그인이나 동의를 취소하면 `KAKAO_LOGIN_CANCELED`를 사용한다.
 - access token은 30분, refresh token은 14일 동안 유효하다.
 - refresh token rotation을 사용한다.
 - 상태 변경 요청에는 CSRF 토큰을 포함한다.
 - CSRF 토큰 조회는 인증 없이 호출할 수 있으며, 상태 변경 API의 `CSRF_TOKEN_INVALID` 응답에서는 토큰 재발급 후 원래 요청을 한 번만 재시도한다.
-- 클라이언트는 토큰 갱신과 로그아웃을 하나의 인증 요청 흐름에서 직렬화한다. 로그아웃은 진행 중인 토큰 갱신이 끝난 뒤 최신 Cookie로 호출하고, 로그아웃을 시작한 뒤에는 새 토큰 갱신이나 인증 요청 재시도를 시작하지 않는다.
+- 클라이언트는 토큰 갱신과 로그아웃을 하나의 인증 요청 흐름에서 직렬화한다.
+- 로그아웃 요청 시 진행 중인 토큰 갱신이 있으면, 갱신이 끝난 뒤 최신 Cookie로 로그아웃을 호출한다.
+- 로그아웃을 시작한 뒤에는 새 토큰 갱신이나 인증 요청 재시도를 시작하지 않는다.
 - JavaScript에서는 token 값을 직접 읽지 않는다.
 
 ### Acceptance Criteria
@@ -369,11 +383,14 @@ API-008 자기소개서 초안 생성의 공개 API 계약은 유지하되, 현�
 - 주요 사용자는 브라우저 기반 웹 클라이언트 사용자다.
 - 일반 CRUD 요청은 짧은 동기 HTTP 요청으로 처리한다.
 - AI 첨삭, 재첨삭, 키워드 분석, 면접 질문 생성, 면접 답변 피드백은 수 초에서 수 분까지 걸릴 수 있는 장기 작업이다.
-- 장기 LLM 작업은 비동기 Job으로 처리한다. 첨삭·키워드 분석·초기 면접 질문 생성은 공통 Job SSE를 우선 사용하고 도메인 조회 polling을 연결 실패 fallback으로 사용한다.
+- 장기 LLM 작업은 비동기 Job으로 처리한다.
+- 첨삭·키워드 분석·초기 면접 질문 생성은 공통 Job SSE를 우선 사용한다.
+- SSE 연결에 실패하면 도메인 조회 polling을 fallback으로 사용한다.
 - 같은 자기소개서에 대한 진행 중 LLM Job은 하나만 허용한다.
 - 한 자기소개서 안에서 첨삭, 키워드 분석, 면접 질문 생성, 면접 답변 피드백을 동시에 실행하지 않는다.
-- DB/JPA 전환 전 in-memory repository에 저장된 데이터는 서버 재시작 시 유실될 수 있다.
-- DB/JPA 전환 후 일반 CRUD 데이터와 완성된 첨삭 문항 임시 결과는 선택한 DB 저장소에 보존한다.
+- 일반 CRUD 데이터와 완성된 첨삭 문항 임시 결과는 DB/JPA에 저장한다.
+- `local`·`local-postgres`·`prod`는 같은 DB와 저장 공간을 유지하면 애플리케이션 재시작 후에도 저장 데이터를 보존한다.
+- `test`·`auth-test`는 인메모리 H2로 테스트 데이터를 격리한다.
 - 필드별 또는 토큰별 LLM partial text는 저장하지 않으며, 문항의 AI 리포트와 수정본이 모두 완성된 결과만 영속화한다.
 - LLM 비용과 남용 방지를 위해 사용자별 rate limit, quota, Job 재시도 정책을 운영 설정으로 둘 수 있어야 한다.
 - 인증 cookie, CORS, CSRF, SameSite 설정은 프론트엔드 배포 도메인과 함께 검증해야 한다.

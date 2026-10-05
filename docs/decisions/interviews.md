@@ -555,9 +555,14 @@ MVP에서는 모든 생성 질문이 바로 답변 가능한 대상이며 thread
 
 ### 결정
 
-API-022는 request body를 받지 않고 호출 시점의 최신 성공 첨삭 버전을 초기 질문 생성 기준으로 사용한다. 새 세션은 새 `interviewSessionId`와 `jobId`를 반환하고, `FAILED` 재시도는 같은 세션과 새 Job을 사용한다. 이미 `QUESTION_GENERATING`이면 기존 세션과 기존 Job을 반환하며, 이미 `ACTIVE`이면 기존 세션과 `jobId=null`을 반환한다.
+- API-022는 request body를 받지 않고 호출 시점의 최신 성공 첨삭 버전을 초기 질문 생성 기준으로 사용한다.
+- 새 세션은 새 `interviewSessionId`와 `jobId`를 반환하고, `FAILED` 재시도는 같은 세션과 새 Job을 사용한다.
+- 이미 `QUESTION_GENERATING`이면 기존 세션과 기존 Job을 반환하며, 이미 `ACTIVE`이면 기존 세션과 `jobId=null`을 반환한다.
 
-프론트엔드는 non-null `jobId`로 API-016 공통 Job SSE에 연결한다. API-025는 AI 면접 화면 표시에 필요한 `coverLetter { id, title, companyName, positionTitle }` 요약을 항상 반환한다. 또한 `QUESTION_GENERATING`이면 현재 Job ID, `FAILED`이면 최근 실패 Job ID, `ACTIVE`이면 `null`을 반환한다. 완료 후 API-025와 API-026을 다시 조회하고, SSE 연결 실패 시 API-025 polling으로 최종 상태를 복구한다.
+- 프론트엔드는 non-null `jobId`로 API-016 공통 Job SSE에 연결한다.
+- API-025는 AI 면접 화면 표시에 필요한 `coverLetter { id, title, companyName, positionTitle }` 요약을 항상 반환한다.
+- 또한 `QUESTION_GENERATING`이면 현재 Job ID, `FAILED`이면 최근 실패 Job ID, `ACTIVE`이면 `null`을 반환한다.
+- 완료 후 API-025와 API-026을 다시 조회하고, SSE 연결 실패 시 API-025 polling으로 최종 상태를 복구한다.
 
 ### 선택 이유
 
@@ -591,9 +596,13 @@ API-026 응답은 최상위 `items`와 nullable `nextCursor`만 반환한다. �
 
 API-027은 request body 없이 최신 성공 첨삭 버전을 기준으로 질문 1개와 thread를 비동기로 생성하고 성공 응답으로 `jobId`만 반환한다. path와 중복되는 `interviewSessionId`, 항상 `ACTIVE`인 세션 `status`, 생성 직후 항상 `PENDING`인 `jobStatus`는 응답하지 않는다.
 
-동일한 추가 질문 생성 Job이 이미 진행 중이면 새 Job을 만들지 않고 기존 `jobId`를 반환한다. 다른 종류의 Job이 진행 중이면 `LLM_JOB_ALREADY_RUNNING`을 반환한다. 프론트엔드는 API-016에 연결하고 완료 후 API-026을 다시 조회한다.
+- 동일한 추가 질문 생성 Job이 이미 진행 중이면 새 Job을 만들지 않고 기존 `jobId`를 반환한다.
+- 다른 종류의 Job이 진행 중이면 `LLM_JOB_ALREADY_RUNNING`을 반환한다.
+- 프론트엔드는 API-016에 연결하고 완료 후 API-026을 다시 조회한다.
 
-API-025의 `interviewSession.jobId`는 초기 질문 생성뿐 아니라 아직 처리해야 하는 추가 질문 생성 Job도 반환한다. 세션이 `ACTIVE`여도 추가 질문 Job이 `PENDING`, `PROCESSING`, `FAILED`이면 해당 ID를 반환하며, 미해결 질문 생성 Job이 없으면 `null`이다. 면접 답변 피드백 Job은 질문별 thread에 속하므로 포함하지 않는다.
+- API-025의 `interviewSession.jobId`는 초기 질문 생성뿐 아니라 아직 처리해야 하는 추가 질문 생성 Job도 반환한다.
+- 세션이 `ACTIVE`여도 추가 질문 Job이 `PENDING`, `PROCESSING`, `FAILED`이면 해당 ID를 반환하며, 미해결 질문 생성 Job이 없으면 `null`이다.
+- 면접 답변 피드백 Job은 질문별 thread에 속하므로 포함하지 않는다.
 
 ### 선택 이유
 
@@ -608,11 +617,17 @@ API-025의 `interviewSession.jobId`는 초기 질문 생성뿐 아니라 아직 
 
 ### 결정
 
-API-029 응답은 최상위 nullable `jobId`와 `items`를 반환한다. path와 중복되는 `threadId`는 응답하지 않는다. 각 메시지는 `id`, `role`, `content`, nullable `score`, `createdAt`만 포함한다. USER의 `score`는 `null`, ASSISTANT의 `score`는 1~100 정수다.
+- API-029 응답은 최상위 nullable `jobId`와 `items`를 반환한다.
+- path와 중복되는 `threadId`는 응답하지 않는다.
+- 각 메시지는 `id`, `role`, `content`, nullable `score`, `createdAt`만 포함한다.
+- USER의 `score`는 `null`, ASSISTANT의 `score`는 1~100 정수다.
 
-ASSISTANT `content`는 핵심 피드백과 다음 꼬리질문을 자연스럽게 연결한 전체 표시 문장이다. 구조화된 피드백과 별도 `followUpQuestion`은 다음 LLM 요청 문맥을 위해 내부 저장하지만 공개 API에는 포함하지 않는다.
+- ASSISTANT `content`는 핵심 피드백과 다음 꼬리질문을 자연스럽게 연결한 전체 표시 문장이다.
+- 구조화된 피드백과 별도 `followUpQuestion`은 다음 LLM 요청 문맥을 위해 내부 저장하지만 공개 API에는 포함하지 않는다.
 
-이 thread의 피드백 Job이 `PENDING`, `PROCESSING`, `FAILED`이면 `jobId`를 반환하고, 완료됐거나 처리할 Job이 없으면 `null`이다. 새로고침 후에는 이 ID로 API-016에 연결하고 완료 후 API-029를 다시 조회한다. 메시지는 `createdAt`, `id` 오름차순이며 현재 범위에서는 페이지네이션하지 않는다.
+- 이 thread의 피드백 Job이 `PENDING`, `PROCESSING`, `FAILED`이면 `jobId`를 반환하고, 완료됐거나 처리할 Job이 없으면 `null`이다.
+- 새로고침 후에는 이 ID로 API-016에 연결하고 완료 후 API-029를 다시 조회한다.
+- 메시지는 `createdAt`, `id` 오름차순이며 현재 범위에서는 페이지네이션하지 않는다.
 
 ### 선택 이유
 
@@ -642,11 +657,19 @@ API-023 응답은 저장된 USER 메시지를 식별하는 `userMessageId`와 AP
 
 ### 결정
 
-면접 피드백은 실제 OpenAI 토큰 스트리밍을 사용하지 않는다. 기존 동기 호출로 OpenAI 응답 전체를 받은 뒤 `content`, `score`와 내부 구조를 먼저 파싱·검증한다. 검증이 성공한 `content`만 화면 표시용 문자열 조각으로 나눠 API-016 `interview.feedback.delta`로 순차 전송한다.
+- 면접 피드백은 실제 OpenAI 토큰 스트리밍을 사용하지 않는다.
+- 기존 동기 호출로 OpenAI 응답 전체를 받은 뒤 `content`, `score`와 내부 구조를 먼저 파싱·검증한다.
+- 검증이 성공한 `content`만 화면 표시용 문자열 조각으로 나눠 API-016 `interview.feedback.delta`로 순차 전송한다.
 
-각 delta는 Job 안에서 1부터 증가하는 `sequence`와 `contentDelta`를 사용한다. 조각 크기와 전송 간격은 서버 구현 세부사항이며 프론트엔드는 이에 의존하지 않는다. 서버는 Job이 `PROCESSING`인 동안 이미 전송한 delta를 메모리에 보관하고, 재연결 시 `job.state` 다음에 1번부터 replay한 뒤 새 delta를 이어서 전송한다. 프론트엔드는 마지막으로 반영한 sequence 이하를 무시한다.
+- 각 delta는 Job 안에서 1부터 증가하는 `sequence`와 `contentDelta`를 사용한다.
+- 조각 크기와 전송 간격은 서버 구현 세부사항이며 프론트엔드는 이에 의존하지 않는다.
+- 서버는 Job이 `PROCESSING`인 동안 이미 전송한 delta를 메모리에 보관하고, 재연결 시 `job.state` 다음에 1번부터 replay한 뒤 새 delta를 이어서 전송한다.
+- 프론트엔드는 마지막으로 반영한 sequence 이하를 무시한다.
 
-모든 delta 전송이 끝나면 assistant 메시지와 Job 완료 상태를 확정한다. 프론트엔드는 완료 `job.state`를 받은 뒤 API-029를 다시 조회해 임시 문장을 저장된 전체 `content`와 `score`로 교체한다. 출력 검증에 실패하면 delta를 전송하지 않고 Job을 실패 처리한다. 서버 재시작 등으로 replay 버퍼를 복구할 수 없으면 진행 상태만 표시하고 API-029의 완료 결과를 기다린다.
+- 모든 delta 전송이 끝나면 assistant 메시지와 Job 완료 상태를 확정한다.
+- 프론트엔드는 완료 `job.state`를 받은 뒤 API-029를 다시 조회해 임시 문장을 저장된 전체 `content`와 `score`로 교체한다.
+- 출력 검증에 실패하면 delta를 전송하지 않고 Job을 실패 처리한다.
+- 서버 재시작 등으로 replay 버퍼를 복구할 수 없으면 진행 상태만 표시하고 API-029의 완료 결과를 기다린다.
 
 ### 선택 이유
 
@@ -668,9 +691,13 @@ API-023 응답은 저장된 USER 메시지를 식별하는 `userMessageId`와 AP
 
 ### 결정
 
-API-026은 질문을 `order` 내림차순으로 조회한다. 최초 요청은 cursor를 생략하고, 다음 묶음이 있으면 마지막 반환 질문의 위치를 나타내는 불투명 `nextCursor`를 반환한다. 프론트엔드는 이를 다음 요청의 `cursor`로 그대로 전달하며, 마지막 응답은 `nextCursor: null`을 반환한다.
+- API-026은 질문을 `order` 내림차순으로 조회한다.
+- 최초 요청은 cursor를 생략하고, 다음 묶음이 있으면 마지막 반환 질문의 위치를 나타내는 불투명 `nextCursor`를 반환한다.
+- 프론트엔드는 이를 다음 요청의 `cursor`로 그대로 전달하며, 마지막 응답은 `nextCursor: null`을 반환한다.
 
-`size` 기본값은 10이고 1~20만 허용한다. 응답에는 page 번호나 전체 개수 정보를 포함하지 않는다. 추가 질문 생성 완료 후 프론트엔드는 cursor 없는 첫 묶음을 다시 조회하고 질문 ID 기준으로 새 질문을 목록 앞에 병합한다.
+- `size` 기본값은 10이고 1~20만 허용한다.
+- 응답에는 page 번호나 전체 개수 정보를 포함하지 않는다.
+- 추가 질문 생성 완료 후 프론트엔드는 cursor 없는 첫 묶음을 다시 조회하고 질문 ID 기준으로 새 질문을 목록 앞에 병합한다.
 
 ### 선택 이유
 

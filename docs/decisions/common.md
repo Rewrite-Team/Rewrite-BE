@@ -189,11 +189,16 @@ completedAt
 
 ### 결정
 
-프론트엔드가 모든 API에서 동일하게 처리하는 인증, CSRF와 예상하지 못한 서버 오류는 COMMON 계약과 중앙 interceptor에서 처리한다. 개별 API는 validation 입력 표시, 대상 없음 이동, 상태 충돌처럼 해당 화면의 행동이 달라지는 오류만 기록한다.
+- 프론트엔드가 모든 API에서 동일하게 처리하는 인증, CSRF와 예상하지 못한 서버 오류는 COMMON 계약과 중앙 interceptor에서 처리한다.
+- 개별 API는 validation 입력 표시, 대상 없음 이동, 상태 충돌처럼 해당 화면의 행동이 달라지는 오류만 기록한다.
 
-`401 UNAUTHORIZED`는 API-004 single-flight 갱신 후 원 요청을 한 번만 재시도하고, `403 CSRF_TOKEN_INVALID`는 API-003 재발급 후 원 요청을 한 번만 재시도한다. 반복 실패에서는 재시도를 중단한다. API별로 별도 허용하지 않은 상태 변경 요청은 네트워크 또는 `5xx`에서 자동 재전송하지 않는다.
+- `401 UNAUTHORIZED`는 API-004 single-flight 갱신 후 원 요청을 한 번만 재시도하고, `403 CSRF_TOKEN_INVALID`는 API-003 재발급 후 원 요청을 한 번만 재시도한다.
+- 반복 실패에서는 재시도를 중단한다.
+- API별로 별도 허용하지 않은 상태 변경 요청은 네트워크 또는 `5xx`에서 자동 재전송하지 않는다.
 
-비동기 Job의 `FAILED`와 API-016 `job.state.status=FAILED`는 HTTP 오류가 아니라 정상 조회·스트림에서 받은 작업 결과로 분리한다. 공개 Job 오류 코드는 프론트 동작이 다른 `LLM_PROVIDER_ERROR`, `LLM_CONTEXT_LENGTH_EXCEEDED`, `LLM_CONTENT_FILTERED`만 사용한다. timeout, provider 장애·요청 제한과 출력 형식 검증 실패는 내부 로그에서는 구분하되 공개 응답에서는 `LLM_PROVIDER_ERROR`로 정규화한다.
+- 비동기 Job의 `FAILED`와 API-016 `job.state.status=FAILED`는 HTTP 오류가 아니라 정상 조회·스트림에서 받은 작업 결과로 분리한다.
+- 공개 Job 오류 코드는 프론트 동작이 다른 `LLM_PROVIDER_ERROR`, `LLM_CONTEXT_LENGTH_EXCEEDED`, `LLM_CONTENT_FILTERED`만 사용한다.
+- timeout, provider 장애·요청 제한과 출력 형식 검증 실패는 내부 로그에서는 구분하되 공개 응답에서는 `LLM_PROVIDER_ERROR`로 정규화한다.
 
 ### 선택 이유
 
@@ -215,7 +220,9 @@ completedAt
 
 개발자가 API 번호, 사용 목적, 사용 화면, 호출 시점, 주요 동작, 성공 후 처리와 오류 조건을 한 곳에서 확인할 수 있도록 Swagger UI를 핵심 API 문서로 사용한다.
 
-controller와 DTO가 path, request와 response를 정의하고 `@RewriteApi`가 코드에서 추론할 수 없는 사용 맥락과 오류 조건을 정의한다. 생성된 OpenAPI 명세는 두 정보를 통합한다. Notion `Rewrite API (자동 동기화)`는 OpenAPI와 저장소 문서를 기준으로 갱신하는 보조 문서로 사용한다.
+- controller와 DTO가 path·request·response를 정의한다.
+- `@RewriteApi`가 코드에서 추론할 수 없는 사용 맥락과 오류 조건을 정의한다.
+- 생성된 OpenAPI 명세는 두 정보를 통합한다.
 
 프론트엔드가 생성하는 함수와 그룹 이름을 위해 `operationId`는 고유한 의미 기반 camelCase 이름, tag는 공백 없는 영문 도메인 이름으로 정의한다. 기존 `API-001` 형식의 추적 ID는 summary와 `x-rewrite-api-id`에 유지한다. 응답 JSON에 항상 포함되는 필드는 값이 `null`일 수 있어도 OpenAPI schema의 `required`에 포함하고, null 허용 여부를 별도로 표현한다.
 
@@ -243,7 +250,6 @@ controller·DTO와 분리된 API 문서만 사용하면 구현 변경이 문서�
 - 장점
   - API 번호, 화면 맥락, schema와 오류 예시를 한 화면에서 확인할 수 있다.
   - 구현과 문서의 불일치를 OpenAPI 통합 테스트로 방지할 수 있다.
-  - Notion 동기화를 구조화된 `x-rewrite-*` 메타데이터로 확장할 수 있다.
 - 단점
   - controller annotation이 길어질 수 있다.
   - 복잡한 화면 흐름과 설계 배경은 Swagger와 저장소 보완 문서를 함께 확인해야 한다.

@@ -1,8 +1,12 @@
 # OCI 수동 배포 가이드
 
-이 문서는 Oracle Cloud Infrastructure(OCI)에 Rewrite 백엔드를 수동 배포하고 점검하는 절차를 정리한다. GitHub Actions CD 자동화는 [#113](https://github.com/Rewrite-Team/Rewrite-BE/issues/113)의 범위이며 이 문서에서는 다루지 않는다.
+이 문서는 Oracle Cloud Infrastructure(OCI)의 Rewrite 백엔드 수동 배포·점검·복구 절차를 관리한다.
+GitHub Actions CD 자동화는 [#113](https://github.com/Rewrite-Team/Rewrite-BE/issues/113)에서 별도로 관리한다.
 
-관련 기준은 `REQ-007`, `REQ-008`, [Decision 009](decisions/auth.md#decision-009-카카오-oauth-callback은-백엔드가-직접-처리한다)와 [Decision 101](decisions/persistence.md#decision-101-실행-프로필은-db와-인증-세부-프로필을-조합한다)이다. 배포 환경 변경이 API path나 schema를 바꾸지는 않지만, OAuth callback과 로그인 완료 redirect의 공개 URL은 환경 설정과 함께 관리한다.
+관련 기준은 `REQ-007`, `REQ-008`, [Decision 009](decisions/auth.md#decision-009-카카오-oauth-callback은-백엔드가-직접-처리한다)와 [Decision 101](decisions/persistence.md#decision-101-실행-프로필은-db와-인증-세부-프로필을-조합한다)이다.
+
+- 배포 환경 변경 시 API path와 schema를 유지한다.
+- OAuth callback과 로그인 완료 redirect의 공개 URL은 환경 설정과 함께 관리한다.
 
 ## #119 전환 후 배포 기준
 
@@ -20,7 +24,10 @@
 | 도메인 | `api.rewrite-coverletters.site` |
 | 애플리케이션 주소 | `127.0.0.1:8080` |
 
-이 shape는 메모리가 1 GB이므로 애플리케이션 JVM heap을 384 MB로 제한하고 2 GB swap을 사용한다. 별도 애플리케이션 사용자는 만들지 않고 `ubuntu`로 실행하되 systemd의 권한 제한 옵션을 적용한다. `prod`는 사용자-facing 실행 profile이며 `db-postgres`, `auth-real` 세부 profile을 함께 활성화한다.
+- 이 shape의 메모리는 1 GB이므로 JVM heap을 384 MB로 제한하고 2 GB swap을 사용한다.
+- 애플리케이션은 별도 사용자 생성 없이 `ubuntu`로 실행하고 systemd의 권한 제한 옵션을 적용한다.
+- 사용자-facing 실행 profile은 `prod`다.
+- `prod`는 `db-postgres`, `auth-real` 세부 profile을 함께 활성화한다.
 
 ```text
 Internet
@@ -48,9 +55,12 @@ Internet
 | `0.0.0.0/0` | TCP 80 | HTTP 및 HTTPS redirect |
 | `0.0.0.0/0` | TCP 443 | HTTPS |
 
-TCP 8080과 5432 ingress는 만들지 않는다. 관리자 공인 IP가 변경되면 SSH 22의 source를 먼저 새 `/32` 값으로 교체한 뒤 기존 규칙을 제거한다.
+- TCP 8080과 5432 ingress는 만들지 않는다.
+- 관리자 공인 IP가 변경되면 SSH 22의 source를 새 `/32` 값으로 교체한 뒤 기존 규칙을 제거한다.
 
-Canonical OCI Ubuntu 이미지에는 OCI 기본 iptables 규칙이 있으므로 Nginx 설치 후 OS 방화벽에도 80과 443을 허용한다. 기존 규칙을 flush하지 않고 최종 `REJECT` 규칙보다 앞에 추가한다.
+Canonical OCI Ubuntu 이미지에는 OCI 기본 iptables 규칙이 있다.
+Nginx 설치 후 OS 방화벽에도 80과 443을 허용한다.
+기존 규칙은 flush하지 않고 최종 `REJECT` 규칙보다 앞에 허용 규칙을 추가한다.
 
 ```bash
 sudo iptables -I INPUT -p tcp --dport 80 -j ACCEPT
@@ -100,7 +110,8 @@ sudo apt-get update
 sudo apt-get install -y postgresql-17
 ```
 
-애플리케이션 role과 database를 만든다. 실제 비밀번호를 명령행 인자나 저장소 파일에 남기지 않는다.
+애플리케이션 role과 database를 만든다.
+실제 비밀번호는 명령행 인자나 저장소 파일에 남기지 않는다.
 
 ```bash
 sudo -u postgres psql
@@ -146,7 +157,11 @@ ssh ubuntu@api.rewrite-coverletters.site \
   'ln -sfn /home/ubuntu/rewrite/releases/rewrite-<commit-sha>.jar /home/ubuntu/rewrite/current.jar'
 ```
 
-`/home/ubuntu/rewrite/config/rewrite.env`에는 다음 키를 넣는다. `KEY=value` 형식을 사용하고 `export`를 붙이지 않는다. 실제 값은 이 파일에만 저장하며 저장소, 이슈, 로그에 노출하지 않는다.
+`/home/ubuntu/rewrite/config/rewrite.env`에 다음 키를 넣는다.
+
+- `KEY=value` 형식을 사용하고 `export`를 붙이지 않는다.
+- 실제 값은 이 파일에만 저장한다.
+- 저장소·이슈·로그에 실제 값을 노출하지 않는다.
 
 ```dotenv
 SPRING_PROFILES_ACTIVE=prod
@@ -169,7 +184,12 @@ KAKAO_CLIENT_SECRET='replace-me'
 KAKAO_REDIRECT_URI=https://api.rewrite-coverletters.site/auth/kakao/callback
 ```
 
-운영 백엔드는 `FRONTEND_*`를 운영 목적지로, `LOCAL_FRONTEND_*`를 로컬 개발 목적지로 사용한다. 로컬 프론트엔드는 API-001을 `target=local`로 호출하고 모든 API 요청에 `credentials: include`를 지정한다. 서드파티 Cookie가 차단된 개발 브라우저에서는 `api.rewrite-coverletters.site`의 Cookie를 허용해야 한다. 로컬 백엔드의 `auth-real` 실행은 기본값만으로 localhost callback과 프론트엔드를 사용한다. JWT secret은 환경별로 별도로 생성한다.
+- 운영 백엔드는 `FRONTEND_*`를 운영 목적지로, `LOCAL_FRONTEND_*`를 로컬 개발 목적지로 사용한다.
+- 로컬 프론트엔드는 API-001을 `target=local`로 호출한다.
+- 로컬 프론트엔드는 모든 API 요청에 `credentials: include`를 지정한다.
+- 서드파티 Cookie가 차단된 개발 브라우저에서는 `api.rewrite-coverletters.site`의 Cookie를 허용해야 한다.
+- 로컬 백엔드의 `auth-real` 실행은 기본값만으로 localhost callback과 프론트엔드를 사용한다.
+- JWT secret은 환경별로 별도로 생성한다.
 
 ```bash
 openssl rand -base64 64 | tr -d '\n'; echo
@@ -224,7 +244,9 @@ sudo journalctl -u rewrite -n 100 --no-pager
 sudo ss -lntp | grep ':8080'
 ```
 
-로그에는 활성 profile이 `prod`로 표시되어야 하고 8080은 `127.0.0.1:8080`에서만 대기해야 한다. 환경변수 파일을 바꾼 경우 `daemon-reload`가 아니라 `sudo systemctl restart rewrite`로 프로세스를 다시 시작한다.
+- 로그의 활성 profile은 `prod`여야 한다.
+- 8080은 `127.0.0.1:8080`에서만 대기해야 한다.
+- 환경변수 파일을 바꾸면 `sudo systemctl restart rewrite`로 프로세스를 다시 시작한다.
 
 ## Nginx와 TLS
 
@@ -249,7 +271,8 @@ location / {
 }
 ```
 
-`proxy_buffering off`는 SSE 응답을 Nginx가 모아서 전달하지 않게 한다. 설정 문법을 확인한 뒤 reload한다.
+`proxy_buffering off`는 Nginx의 SSE 응답 buffering을 비활성화한다.
+설정 문법을 확인한 뒤 reload한다.
 
 ```bash
 sudo nginx -t
@@ -268,7 +291,10 @@ Certbot이 관리하는 인증서 경로와 SSL include 구문은 수동으로 �
 
 ## 수동 배포와 rollback
 
-새 버전은 기존 JAR을 덮어쓰지 않고 `releases`에 추가한다. symlink를 새 JAR로 교체한 뒤 서비스를 재시작하고 로그와 외부 HTTPS 응답을 확인한다.
+1. 기존 JAR을 보존하고 새 버전을 `releases`에 추가한다.
+2. symlink를 새 JAR로 교체한다.
+3. 서비스를 재시작한다.
+4. 로그와 외부 HTTPS 응답을 확인한다.
 
 ```bash
 ln -sfn /home/ubuntu/rewrite/releases/rewrite-<new-commit-sha>.jar \
@@ -308,34 +334,4 @@ sudo -u postgres pg_restore \
   /var/backups/rewrite/rewrite-<timestamp>.dump
 ```
 
-이번 OCI 초기 구성에서는 사용자의 결정에 따라 실제 백업 생성과 별도 database 복구 검증을 수행하지 않았다. 따라서 운영 데이터를 보존하기 전에 백업 주기, 외부 보관 위치와 복구 리허설을 별도로 확정해야 한다.
-
-## 검증 기록
-
-2026-09-10에 임시 도메인 `playmcpfinder.store`를 사용해 다음 기반 환경을 수동 검증했다.
-
-- Reserved Public IP와 임시 도메인 A record 연결
-- 관리자 노트북의 SSH 공개키 접속
-- JDK 21 `amd64`, PostgreSQL, Nginx와 Rewrite 서비스 실행
-- Rewrite의 `prod` profile 활성화와 `127.0.0.1:8080` binding
-- Nginx를 통한 외부 HTTPS 요청과 애플리케이션의 `401 UNAUTHORIZED` JSON 응답
-- 외부 TCP 80/443 접근 허용과 8080/5432 접근 차단
-- 서버 재부팅 후 PostgreSQL, Rewrite, Nginx와 방화벽 규칙 자동 복구
-- Nginx의 SSE용 buffering 비활성화 설정과 설정 문법
-
-실제 SSE 이벤트 전달과 PostgreSQL 백업·복구는 사용자의 결정에 따라 검증하지 않았다.
-
-2026-09-15에 `api.rewrite-coverletters.site` 전환과 다음 항목을 수동 검증했다.
-
-- DNS와 Nginx의 HTTP→HTTPS redirect
-- `api.rewrite-coverletters.site`를 포함하는 TLS 인증서
-- 카카오 디벨로퍼스 운영 callback URI 등록
-- 운영 환경변수의 프론트엔드 Origin, `/writing` 성공 URL과 운영 callback URI
-- Swagger UI와 `/v3/api-docs`의 무인증 접근
-- API-001 인가 시작 응답의 운영 callback URI
-- target 생략 시 production state와 운영 실패 URL 선택
-- `target=local` state와 localhost 실패 URL 선택
-- localhost·운영 프론트엔드 Origin의 credential CORS preflight와 미허용 Origin 거부
-- 인증 Cookie 만료 응답의 `SameSite=None; Secure; HttpOnly`
-
-운영 로그인 실패 URL은 `https://rewrite-coverletters.site/login`, 로컬 로그인 실패 URL은 `http://localhost:3000/login`으로 설정했다. 합성 state를 사용한 취소 callback까지 검증했으며, 실제 카카오 로그인 성공과 localhost에서의 API-005 Cookie 인증은 프론트엔드 연동 후 브라우저의 서드파티 Cookie 허용 조건과 함께 검증한다.
+운영 데이터를 보존하기 전에 백업 주기·외부 보관 위치·복구 리허설을 별도로 확정해야 한다.

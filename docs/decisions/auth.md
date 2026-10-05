@@ -63,9 +63,14 @@ Rewrite는 현재 PRD 기준으로 브라우저 기반 웹 제품이다. 웹 서
 
 카카오 OAuth callback은 프론트엔드가 아니라 백엔드가 직접 받는다.
 
-프론트엔드는 사용자를 백엔드의 로그인 시작 URL로 이동시키고, 백엔드는 카카오 인증 URL로 리다이렉트한다. 카카오 인증 완료 후 카카오는 백엔드 callback URL로 `code`를 전달한다. 백엔드는 code를 access token으로 교환하고, 카카오 사용자 정보를 조회한 뒤 Rewrite 서비스용 인증 cookie를 설정하고 프론트엔드로 리다이렉트한다.
+- 프론트엔드는 사용자를 백엔드의 로그인 시작 URL로 이동시키고, 백엔드는 카카오 인증 URL로 리다이렉트한다.
+- 카카오 인증 완료 후 카카오는 백엔드 callback URL로 `code`를 전달한다.
+- 백엔드는 code를 access token으로 교환하고, 카카오 사용자 정보를 조회한 뒤 Rewrite 서비스용 인증 cookie를 설정하고 프론트엔드로 리다이렉트한다.
 
-로그인 시작 시 백엔드는 허용된 `local`, `production` target을 256-bit OAuth `state` 원문에 결합하고 별도의 256-bit 브라우저 nonce를 생성한다. state와 nonce 원문은 각각 카카오 redirect query와 5분 수명의 `oauth_login_nonce` HttpOnly Cookie로 전달하고, 서버에는 두 값의 해시와 만료 시각만 저장한다. callback은 state와 브라우저 nonce가 모두 일치할 때만 state를 원자적으로 한 번 소비하고, 검증된 state에서 target을 복원한다. 이를 통해 목적지 변조와 state URL의 다른 브라우저 재생을 차단한다.
+- 로그인 시작 시 백엔드는 허용된 `local`, `production` target을 256-bit OAuth `state` 원문에 결합하고 별도의 256-bit 브라우저 nonce를 생성한다.
+- state와 nonce 원문은 각각 카카오 redirect query와 5분 수명의 `oauth_login_nonce` HttpOnly Cookie로 전달하고, 서버에는 두 값의 해시와 만료 시각만 저장한다.
+- callback은 state와 브라우저 nonce가 모두 일치할 때만 state를 원자적으로 한 번 소비하고, 검증된 state에서 target을 복원한다.
+- 이를 통해 목적지 변조와 state URL의 다른 브라우저 재생을 차단한다.
 
 API 형태:
 
@@ -104,9 +109,14 @@ HTTP/1.1 302 Found
 Location: https://rewrite-coverletters.site/login?error=KAKAO_LOGIN_CANCELED
 ```
 
-OAuth 브라우저 이동 흐름에서는 JSON `ErrorResponse` 대신 프론트엔드 로그인 화면으로 리다이렉트하고 `error` query로 실패 코드를 전달한다. 프론트엔드는 `KAKAO_LOGIN_CANCELED`에 취소 안내를, `KAKAO_LOGIN_FAILED`와 알 수 없는 오류 코드에 일반 로그인 실패 안내를 표시한다. 모든 실패에서 로그인 버튼을 다시 활성화하고 자동 재시도하지 않는다. 카카오 `error_description`, state 검증 원인, 내부 오류 메시지와 설정 정보는 노출하지 않는다.
+- OAuth 브라우저 이동 흐름에서는 JSON `ErrorResponse` 대신 프론트엔드 로그인 화면으로 리다이렉트하고 `error` query로 실패 코드를 전달한다.
+- 프론트엔드는 `KAKAO_LOGIN_CANCELED`에 취소 안내를, `KAKAO_LOGIN_FAILED`와 알 수 없는 오류 코드에 일반 로그인 실패 안내를 표시한다.
+- 모든 실패에서 로그인 버튼을 다시 활성화하고 자동 재시도하지 않는다.
+- 카카오 `error_description`, state 검증 원인, 내부 오류 메시지와 설정 정보는 노출하지 않는다.
 
-`target`은 임의 URL이 아니라 `local`, `production` enum만 허용하고, 생략 시 기존 운영 동작을 보존하도록 `production`을 사용한다. 로그인 결과는 검증된 state에 결합된 target에 따라 로컬 `http://localhost:3000` 또는 운영 `https://rewrite-coverletters.site`로 이동한다. 운영 백엔드는 두 프론트엔드가 공유하고 카카오 callback URI는 `https://api.rewrite-coverletters.site/auth/kakao/callback` 하나를 사용한다.
+- `target`은 임의 URL이 아니라 `local`, `production` enum만 허용하고, 생략 시 기존 운영 동작을 보존하도록 `production`을 사용한다.
+- 로그인 결과는 검증된 state에 결합된 target에 따라 로컬 `http://localhost:3000` 또는 운영 `https://rewrite-coverletters.site`로 이동한다.
+- 운영 백엔드는 두 프론트엔드가 공유하고 카카오 callback URI는 `https://api.rewrite-coverletters.site/auth/kakao/callback` 하나를 사용한다.
 
 ### PRD 근거
 
@@ -172,7 +182,9 @@ GET /auth/csrf-token
 X-CSRF-Token: csrf-token-value
 ```
 
-상태 변경 요청의 CSRF 토큰이 누락·만료·불일치하면 `403 CSRF_TOKEN_INVALID`를 반환한다. 프론트엔드는 API-003으로 토큰을 재발급한 뒤 원래 요청을 한 번만 재시도하고, 같은 오류가 반복되면 중단한다. API-003 자체가 `500 INTERNAL_ERROR`로 실패하면 한 번만 재요청하고 다시 실패할 때 상태 변경 기능을 막고 새로고침을 안내한다.
+- 상태 변경 요청의 CSRF 토큰이 누락·만료·불일치하면 `403 CSRF_TOKEN_INVALID`를 반환한다.
+- 프론트엔드는 API-003으로 토큰을 재발급한 뒤 원래 요청을 한 번만 재시도하고, 같은 오류가 반복되면 중단한다.
+- API-003 자체가 `500 INTERNAL_ERROR`로 실패하면 한 번만 재요청하고 다시 실패할 때 상태 변경 기능을 막고 새로고침을 안내한다.
 
 ### PRD 근거
 
@@ -241,7 +253,9 @@ Set-Cookie: access_token=...; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=1
 Set-Cookie: refresh_token=...; HttpOnly; Secure; SameSite=None; Path=/auth; Max-Age=1209600
 ```
 
-토큰 갱신과 로그아웃은 프론트엔드의 동일한 인증 요청 흐름에서 직렬화한다. 로그아웃 의사가 설정되면 새 토큰 갱신을 시작하지 않고, 이미 진행 중인 갱신의 응답과 Cookie 반영이 끝난 뒤 최신 Cookie로 로그아웃을 호출한다. 로그아웃을 시작한 뒤에는 갱신을 기다리던 인증 요청도 재시도하지 않는다.
+- 토큰 갱신과 로그아웃은 프론트엔드의 동일한 인증 요청 흐름에서 직렬화한다.
+- 로그아웃 의사가 설정되면 새 토큰 갱신을 시작하지 않고, 이미 진행 중인 갱신의 응답과 Cookie 반영이 끝난 뒤 최신 Cookie로 로그아웃을 호출한다.
+- 로그아웃을 시작한 뒤에는 갱신을 기다리던 인증 요청도 재시도하지 않는다.
 
 서버의 refresh token row 잠금만으로는 먼저 완료된 rotation의 새 access token 응답이 로그아웃 응답보다 늦게 브라우저에 도착하는 상황까지 막을 수 없다. 현재 access token은 stateless JWT이고 서버 세션·폐기 목록을 두지 않으므로, 인증 요청 순서를 클라이언트에서 직렬화해 늦은 갱신 응답이 로그아웃 Cookie를 덮어쓰지 않도록 한다.
 
