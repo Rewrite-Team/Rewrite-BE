@@ -2,7 +2,8 @@
 
 이 문서는 Rewrite MVP의 persistence 기준 ERD다.
 
-API 계약은 `docs/api/README.md`와 도메인별 API 문서를 기준으로 하고, 설계 결정의 배경은 `docs/decisions/README.md`와 도메인별 결정 문서를 기준으로 한다.
+HTTP 계약은 controller·DTO·`@RewriteApi`에서 생성한 OpenAPI와 Swagger UI를 기준으로 한다.
+교차 API 흐름은 [API 안내](api/README.md), 설계 결정의 배경은 [Decision Index](decisions/README.md#decision-index)와 해당 결정에서 확인한다.
 
 이 문서는 DB/JPA entity, repository, schema, migration, persistence 전략 작업 전에 확인한다.
 
@@ -12,9 +13,8 @@ API 계약은 `docs/api/README.md`와 도메인별 API 문서를 기준으로 �
 - 서버 내부 시간 값은 `Instant`로 저장하고 처리한다.
 - API 응답 DTO는 Asia/Seoul 기준 `LocalDateTime`으로 변환한다.
 - 이 ERD는 MVP persistence의 논리 구조 기준이며, 실제 DB column type과 index 세부사항은 구현 이슈에서 확정한다.
-- Flyway migration 파일은 현 시점 범위에 포함하지 않는다.
 - 기본 로컬 개발과 일반 테스트는 H2를 사용하고, `local-postgres`와 운영 환경은 PostgreSQL을 사용한다.
-- 첨삭 진행 결과는 필드별 partial text가 아니라 완성된 문항 단위 임시 결과로 영속 저장한다.
+- 첨삭 진행 결과는 완성된 문항 단위 임시 결과로 영속 저장한다.
 
 ## Relationship Overview
 
@@ -220,7 +220,8 @@ erDiagram
 
 ### users
 
-사용자 계정 기준 테이블이다. 실제 인증 도입 전에는 개발용 현재 사용자 provider가 고정 사용자 값을 제공한다.
+사용자 계정을 저장한다.
+`auth-dev`는 개발용 고정 사용자를 제공하고, `auth-real`은 현재 인증한 사용자를 사용한다.
 
 | Column | Nullable | Relationship / Policy |
 |---|---:|---|
@@ -234,7 +235,9 @@ erDiagram
 
 ### refresh_tokens
 
-Rewrite refresh token 저장 테이블이다. 원문은 Cookie로만 전달하고 DB에는 SHA-256 해시만 저장한다.
+Rewrite refresh token을 저장한다.
+토큰 원문은 Cookie로만 전달한다.
+DB에는 SHA-256 해시만 저장한다.
 
 | Column | Nullable | Relationship / Policy |
 |---|---:|---|
@@ -256,7 +259,8 @@ Rewrite refresh token 저장 테이블이다. 원문은 Cookie로만 전달하�
 
 ### cover_letters
 
-자기소개서 루트 aggregate 테이블이다. 목록, 상세, 등록 step, 제출, 첨삭, 키워드 분석, 면접의 기준 리소스다.
+자기소개서 루트 aggregate를 저장한다.
+목록·상세·등록 step·제출·첨삭·키워드 분석·면접의 기준 리소스다.
 
 | Column | Nullable | Relationship / Policy |
 |---|---:|---|
@@ -278,7 +282,9 @@ Policy:
 
 - `deleted_at`이 있는 자기소개서와 그 하위 리소스는 사용자-facing API에서 `NOT_FOUND`로 응답한다.
 - 삭제된 자기소개서의 하위 row는 물리 삭제하지 않는다.
-- `latest_review_version_id`는 최신 성공 버전 ID다. 응답의 `isLatestReviewed`는 이 값과 비교하고, `isLatest`는 가장 최근 시도로 계산한다.
+- `latest_review_version_id`는 최신 성공 버전 ID다.
+- 응답의 `isLatestReviewed`는 이 값과 비교해 계산한다.
+- 응답의 `isLatest`는 가장 최근 시도로 계산한다.
 
 ### cover_letter_questions
 
@@ -296,7 +302,8 @@ Policy:
 Policy:
 
 - `(cover_letter_id, question_order)`는 한 자기소개서 안에서 유일해야 한다.
-- Step3 저장 API는 전체 replace다. 요청에 없는 기존 문항 row는 삭제될 수 있다.
+- Step3 저장 API는 전체 replace 방식으로 처리한다.
+- 요청에 없는 기존 문항 row는 삭제될 수 있다.
 - 미완성 WRITING 문항은 nullable 필드로 저장하고, 제출 transaction에서 모든 필수값을 검증한 뒤에만 첨삭 Job을 생성한다.
 - 제출 후 원본 질문과 답변은 수정하지 않는다.
 
@@ -315,7 +322,8 @@ Policy:
 
 Policy:
 
-- 새 Job을 생성할 때 같은 transaction에서 버전을 생성한다. 실패·취소해도 삭제하지 않는다.
+- 새 Job을 생성할 때 같은 transaction에서 버전을 생성한다.
+- Job이 실패·취소돼도 해당 버전을 삭제하지 않는다.
 - 버전 상태는 연결된 `llm_jobs.status`에서 읽으며, 기존 Job 연결이 없는 버전은 `COMPLETED`로 취급한다.
 - `isLatest`는 최신 시도, `isLatestReviewed`는 `cover_letters.latest_review_version_id`와 비교해 계산하며 저장하지 않는다.
 
@@ -373,9 +381,10 @@ LLM 비동기 작업 상태 테이블이다.
 Policy:
 
 - 같은 자기소개서에 대해 `PENDING` 또는 `PROCESSING` LLM Job은 동시에 하나만 허용한다.
-- 최초·추가 면접 질문 생성 Job은 모두 `request_ref_type=REVIEW_VERSION`, `request_ref_id=생성 기준 첨삭 버전 id`로 입력을 확정한다. 최초 생성은 `progress_total=5`, 추가 생성은 `progress_total=1`을 사용한다.
+- 최초·추가 면접 질문 생성 Job은 모두 `request_ref_type=REVIEW_VERSION`, `request_ref_id=생성 기준 첨삭 버전 id`로 입력을 확정한다.
+- 최초 생성은 `progress_total=5`를 사용한다.
+- 추가 생성은 `progress_total=1`을 사용한다.
 - `INTERVIEW_MESSAGE_FEEDBACK` Job은 `request_ref_type=INTERVIEW_MESSAGE`, `request_ref_id=USER 메시지 id`로 처리할 답변을 확정한다.
-- Job 상태 조회의 `partialResult`는 호환 필드로만 유지하고 첨삭 진행 결과 저장에는 사용하지 않는다.
 
 ### review_job_question_results
 
@@ -405,7 +414,8 @@ Policy:
 - 각 문항 호출은 전체 자기소개서 문맥과 대상 문항을 입력으로 병렬 실행한다.
 - `ai_report`와 `rewritten_answer`가 모두 생성·검증된 뒤 `COMPLETED`로 전환하고 문항 완료 SSE를 발행한다.
 - 모든 문항 task가 종료되고 전체 결과가 성공하면 이미 생성된 버전의 `review_version_question_results`를 한 transaction에서 확정한다.
-- Job이 최종 실패하면 완료된 임시 문항 결과를 API-012·018에서 읽기 전용으로 반환한다. 보존 기간과 정리 배치는 후속 운영 범위로 둔다.
+- Job이 최종 실패하면 완료된 임시 문항 결과를 API-012·018에서 읽기 전용으로 반환한다.
+- 임시 문항 결과의 보존 기간과 정리 배치는 후속 운영 범위로 둔다.
 
 ### keyword_analyses
 
@@ -529,7 +539,8 @@ Policy:
 
 모든 사용자 리소스 접근은 `cover_letters.owner_id`를 기준으로 소유자를 검증한다.
 
-중첩 리소스는 상위 리소스 관계를 따라 `cover_letters`까지 역추적해 owner를 검증한다. 리소스가 없거나 소유자가 다르면 `NOT_FOUND`로 응답한다.
+- 중첩 리소스는 상위 관계를 따라 `cover_letters`까지 역추적해 owner를 검증한다.
+- 리소스가 없거나 소유자가 다르면 `NOT_FOUND`로 응답한다.
 
 ### Soft delete
 
@@ -551,4 +562,6 @@ Policy:
 
 ### Physical FK exceptions
 
-`llm_jobs.target_id`, `llm_jobs.request_ref_id`, `llm_jobs.result_ref_id`는 여러 도메인 리소스를 가리키는 polymorphic reference다. ERD에서는 논리 관계를 문서화하지만, DB physical FK는 강제하지 않는다.
+- `llm_jobs.target_id`, `llm_jobs.request_ref_id`, `llm_jobs.result_ref_id`는 여러 도메인 리소스를 가리키는 polymorphic reference다.
+- ERD에는 논리 관계를 문서화한다.
+- 해당 참조의 DB physical FK는 강제하지 않는다.

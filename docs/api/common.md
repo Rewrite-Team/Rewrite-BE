@@ -1,556 +1,167 @@
-# Common API Rules
+# 공통 API·인증·Job 흐름
 
-## 설계 원칙
+HTTP 경로·요청·응답·validation·오류 예시는 Swagger UI를 기준으로 확인한다.
+이 문서는 여러 API에 걸친 인증 복구와 SSE 사용 흐름을 보완한다.
+구현·명세 작성 기준은 [명세 작성 기준](../README.md#openapi--swagger), 모델·영속 구조는 [ERD](../erd.md)를 따른다.
 
-### LLM 작업 처리
+## 공통 처리
 
-첨삭, 재첨삭, 키워드 분석, 면접 질문 생성, 면접 답변 피드백은 비동기 Job으로 처리한다.
+- 인증 요청은 `credentials: include`를 사용하며 JavaScript에서 HttpOnly token을 읽지 않는다.
+- 리소스 소유권·중첩 관계를 검증하고, 없음·비소유·soft delete 리소스와 그 하위 리소스는 `NOT_FOUND`로 처리한다.
+- 응답은 API별 DTO를 최상위 객체로 반환하며 공통 `data` envelope를 사용하지 않는다.
+- nullable 필드는 생략하지 않고 `null`, 값이 없는 배열은 `[]`로 반환한다.
+- 서버 시간은 `Instant`, 응답은 `Asia/Seoul`의 offset 없는 ISO 8601 `LocalDateTime`이다.
+- 화면에서는 목록 등록일 `2026.06.20`, 버전 기록 `2026.05.20 14:00`처럼 변환한다.
+- 문자열 제한·`*Length`·프론트엔드 글자 수는 Unicode code point 기준이다.
+- cursor 최초 요청은 생략하고 다음 요청은 받은 `nextCursor`를 그대로 사용한다.
+- 마지막 `nextCursor`는 `null`이며 클라이언트에서 cursor를 해석·생성하지 않는다.
 
-LLM 작업 요청 API는 즉시 `jobId`를 반환한다. API-016을 지원하는 화면은 SSE를 우선 사용하고, API-015 Job 상태 조회 또는 도메인 조회 polling은 연결 복구와 fallback에 사용한다. Job 완료 후에는 해당 도메인 결과 조회 API를 다시 호출한다.
+### 오류 복구
 
-### 버전 관리
+프론트엔드는 중앙 interceptor에서 `HTTP 상태 + error.code`로 분기한다.
+서버 `error.message`·provider 원문은 노출하지 않고 알려진 code를 사용자 문구로 매핑한다.
+알 수 없는 code는 공통 오류 문구를 사용한다.
 
-자기소개서 버전 히스토리는 AI 첨삭 또는 재첨삭 시도를 기준으로 생성한다.
+| 오류 | 처리 |
+|---|---|
+| `VALIDATION_ERROR` | `details[].field`와 `reason`을 입력 항목에 연결 |
+| 인증 필요 API의 `UNAUTHORIZED` | API-004 single-flight 1회 → 원 요청 각각 1회 재시도; refresh 또는 원 요청이 다시 401이면 로그인으로 이동하고 반복 중단 |
+| `CSRF_TOKEN_INVALID` | API-003 재발급 → 원 요청 1회 재시도; 반복 실패 시 중단 |
+| `NOT_FOUND` | 대상 없음 안내 후 해당 도메인의 이전 화면으로 이동 |
+| `CONFLICT` | 현재 상태를 재조회해 가능한 화면·동작으로 전환 |
+| `LLM_JOB_ALREADY_RUNNING` | 새 요청 중단; 오류에 `jobId`가 없으면 기존 Job 복구를 가정하지 않음 |
+| 네트워크·예상하지 못한 `5xx` | 일시 오류 안내; API에서 명시하지 않은 상태 변경 요청은 자동 재전송하지 않음 |
 
-새 첨삭 Job과 `ReviewVersion`을 함께 생성한다. 진행 중·실패 버전도 이력에 남기고, 버전 상태는 연결된 `LlmJob.status`를 따른다. 기존 성공 버전은 새 시도의 실패 후에도 유지한다.
+## 로그인과 인증
 
-사용자가 최종 작성본을 저장하는 행위만으로는 새 버전을 생성하지 않는다.
+관련 API: API-001~006. 설계 근거: [인증 결정](../decisions/auth.md), 제품 기준: [REQ-008](../requirements.md#req-008-실제-인증-경계).
 
-### 임시저장
+### 카카오 로그인
 
-임시저장된 자기소개서도 내 자기소개서 목록에 노출한다.
+1. API-001로 카카오 인가 화면에 이동한다.
+2. 백엔드가 API-002 callback의 state·브라우저 nonce를 검증한다.
+3. 성공하면 인증 Cookie를 발급하고 target의 `/writing`으로 이동한다.
+4. 실패·취소하면 target의 `/login?error={code}`로 redirect한다.
 
-자기소개서 상태는 다음 값을 사용한다.
+| 프론트엔드 | API-001 `target` | 로그인 결과 origin |
+|---|---|---|
+| 로컬 | `local` | `http://localhost:3000` |
+| 운영 | `production` 또는 생략 | `https://rewrite-coverletters.site` |
+
+- 임의 URL을 target으로 받지 않으며 선택한 target은 state에 결합한다.
+- callback은 운영 백엔드 `https://api.rewrite-coverletters.site/auth/kakao/callback` 하나를 사용한다.
+- `code`와 `error` 중 하나만 전달하고 두 경우 모두 state·nonce가 필요하다.
+- 저장한 해시와 비교해 5분 안에 한 번만 소비하며 callback 성공·취소·실패 모두 nonce를 만료시킨다.
+- 로그인 시작 실패와 callback 오류는 JSON `ErrorResponse` 대신 redirect로 처리한다.
+- 취소 code `KAKAO_LOGIN_CANCELED`는 “카카오 로그인이 취소되었습니다.”를 표시한다.
+- state·nonce 누락/불일치/만료/재사용, code 교환·카카오 사용자 조회·저장 실패는 `KAKAO_LOGIN_FAILED`로 처리한다.
+- 취소·실패 모두 버튼을 다시 활성화하고 자동 재시도하지 않는다.
+- 알 수 없는 code는 일반 로그인 실패로 처리하며 `error_description`·내부 검증 원인·오류 메시지는 노출하지 않는다.
+
+### Cookie와 사용자 상태
+
+모든 Cookie는 `HttpOnly; Secure`를 사용한다.
+
+| Cookie | Path | SameSite | 수명 |
+|---|---|---|---|
+| `oauth_login_nonce` | `/auth/kakao` | `Lax` | 5분(300초) |
+| `access_token` | `/` | `None` | 30분(1800초) |
+| `refresh_token` | `/auth` | `None` | 14일(1209600초) |
+
+- localhost에서 운영 API로 요청하는 Cookie가 차단되면 개발 브라우저에서 `api.rewrite-coverletters.site`의 서드파티 Cookie를 허용해야 한다.
+- API-005로 사용자 상태를 반영하며 현재 provider는 `KAKAO`다.
+- 카카오 프로필 이미지가 없으면 `profileImageUrl=null`, 나머지 사용자 필드는 non-null이다.
+
+### CSRF·토큰 갱신·로그아웃
+
+- API-003은 access token·CSRF 헤더 없이 호출하고 `POST`, `PUT`, `PATCH`, `DELETE`에는 `X-CSRF-Token`을 보낸다.
+- API-003의 `500 INTERNAL_ERROR`는 자동 재시도 1회 후 다시 실패하면 상태 변경 기능을 막고 새로고침을 안내한다.
+- API-004는 access token·body 없이 refresh Cookie와 CSRF 헤더를 사용한다.
+- 동시에 만료된 요청은 한 갱신 결과를 기다리며 성공 시 각각 1회 재시도한다.
+- 갱신 성공 시 두 token을 새로 발급하고 이전 refresh token을 폐기한다.
+- refresh 누락·만료·위조·폐기·재사용은 모두 `401 UNAUTHORIZED`이며 두 인증 Cookie를 만료시킨다.
+- 갱신 중 `500 INTERNAL_ERROR`는 Cookie·사용자 상태를 임의로 지우거나 자동 재시도하지 않는다.
+- 로그아웃 요청 시 진행 중인 API-004와 `Set-Cookie` 반영을 기다린 뒤 API-006을 호출한다.
+- 로그아웃을 시작한 뒤 새 갱신이나 대기 중 원 요청의 재시도를 시작하지 않는다.
+- API-006은 인증 Cookie가 없거나 만료돼도 멱등 `200 OK`이며 두 Cookie를 만료시킨다.
+- 유효한 refresh token은 서버에서도 폐기하고 성공 후 로컬 사용자 상태를 정리해 로그인 화면으로 이동한다.
+
+## 비동기 Job과 SSE
+
+관련 API: 상태 복구 API-015, 공통 스트림 API-016. 근거는 [Job 결정](../decisions/llm-jobs.md)을 따른다.
+
+- 최초·재첨삭, 키워드, 초기·추가 면접 질문, 답변 피드백은 시작 API의 `jobId`로 추적한다.
+- 같은 자기소개서에서 `PENDING`·`PROCESSING` Job은 하나만 허용한다.
+- 동일 작업의 중복 요청은 도메인 규칙에 따라 기존 Job을 반환하며 다른 종류는 `LLM_JOB_ALREADY_RUNNING`으로 처리한다.
+- 서버 자동 재시도는 1회이고 두 번 모두 실패하면 `FAILED`다.
+- 출력 구조·필수 값·타입·범위 검증 실패도 Job 실패이며 임의 기본값이나 일부 필드 저장으로 보정하지 않는다.
+- API-015는 상태·진행률·결과 참조·오류만 반환하며 SSE 장애·이벤트 유실·새로고침 복구에 사용한다.
+- `status=FAILED`는 정상 조회·SSE에서 받은 작업 결과이며 HTTP `ErrorResponse`와 구분한다.
+
+### 연결·스냅샷·이벤트
+
+1. API-016에 연결하면 `job.state`를 먼저 받는다.
+2. 첨삭이면 완료 문항 스냅샷 `review.questions`를 받는다.
+3. 새 문항 완료 시 문항 결과를 먼저 저장하고 해당 문항 이벤트 → 갱신된 `job.state` 순서로 받는다.
+4. 상태·진행률 변화는 같은 `job.state`로 받고 종료 후 결과 API를 재조회한다.
 
 ```text
-WRITING
-REVIEWING
-REVIEWED
-REVIEW_FAILED
+event: job.state
+data: {"jobType":"COVER_LETTER_REVIEW","status":"PROCESSING","progress":{"current":1,"total":3,"message":"첨삭 중"},"resultRef":null,"error":null}
+
+event: review.questions
+data: {"items":[{"questionId":"clq_01HZ...","order":1,"aiReport":"성과를 보강해주세요.","rewrittenAnswer":"수정 답변","rewrittenAnswerLength":5,"finalAnswer":"수정 답변","finalAnswerLength":5}]}
+
+event: interview.feedback.delta
+data: {"sequence":1,"contentDelta":"답변에서 API 설계 경험은 "}
 ```
 
-첨삭 실패 시 최초 첨삭과 재첨삭 모두 자기소개서 상태를 갱신한다.
-
-```text
-최초 첨삭 실패: REVIEWING -> REVIEW_FAILED
-재첨삭 실패: REVIEWING -> REVIEW_FAILED, 기존 latestReviewedVersionId 유지
-```
-
-### 문항별 첨삭 결과
-
-AI 첨삭 결과는 질문별로 독립 저장한다.
-
-각 첨삭 버전은 여러 개의 질문별 첨삭 결과를 가진다.
-
-
-## 공통 규칙
-
-### Base URL
-
-API 경로에는 별도의 `/api` prefix를 붙이지 않는다.
-
-```text
-/
-```
-
-### 인증
-
-인증은 HttpOnly Cookie 기반으로 처리한다.
-
-카카오 로그인 성공 후 백엔드는 Rewrite 서비스용 access token과 refresh token을 발급하고 `Set-Cookie`로 전달한다.
-
-```http
-Set-Cookie: access_token=...; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=1800
-Set-Cookie: refresh_token=...; HttpOnly; Secure; SameSite=Lax; Path=/auth; Max-Age=1209600
-```
-
-`access_token`은 30분, `refresh_token`은 14일 동안 유효하다. Refresh token은 rotation을 사용한다. Refresh 성공 시 새 access token과 새 refresh token을 모두 발급하고, 기존 refresh token은 폐기한다.
-
-프론트엔드는 인증이 필요한 요청에 cookie가 포함되도록 요청한다.
-
-```text
-credentials: include
-```
-
-JavaScript에서는 token 값을 직접 읽지 않는다.
-
-인증이 필요한 모든 리소스 접근은 현재 로그인 사용자의 소유자인지 검증한다.
-
-소유자 검증 대상:
-
-```text
-coverLetterId
-reviewVersionId
-keywordAnalysisId
-interviewSessionId
-interviewQuestionId
-threadId
-messageId
-jobId
-```
-
-중첩 리소스는 상위 리소스와의 관계도 함께 검증한다. 예를 들어 `reviewVersionId`는 해당 `coverLetterId`에 속해야 하고, `threadId`는 해당 사용자의 면접 세션에 속해야 한다.
-
-리소스가 존재하지 않거나 현재 사용자의 소유가 아니면 `NOT_FOUND`를 반환한다. 다른 사용자의 리소스 존재 여부를 노출하지 않기 위해 소유자 불일치에도 `FORBIDDEN`이 아니라 `NOT_FOUND`를 사용한다.
-
-`CoverLetter.deletedAt`이 있는 삭제된 자기소개서와 그 하위 리소스도 사용자-facing API에서는 `NOT_FOUND`를 반환한다.
-
-상태 변경 요청에는 CSRF 토큰을 포함해야 한다.
-
-```http
-X-CSRF-Token: csrf-token-value
-```
-
-CSRF 토큰이 필요한 HTTP method:
-
-```text
-POST
-PUT
-PATCH
-DELETE
-```
-
-API-003 CSRF 토큰 조회는 access token 인증과 CSRF 헤더 없이 호출한다. 상태 변경 API에서 토큰 누락·만료·불일치를 확인하면 `403 CSRF_TOKEN_INVALID`를 반환한다. 프론트엔드는 API-003으로 토큰을 다시 받은 뒤 원래 요청을 한 번만 재시도하고, 같은 오류가 반복되면 재시도를 중단한다.
-
-### Content Type
-
-```http
-Content-Type: application/json
-```
-
-스트리밍 API는 SSE(Server-Sent Events)를 사용한다.
-
-```http
-Accept: text/event-stream
-```
-
-응답:
-
-```http
-Content-Type: text/event-stream
-```
-
-### 성공 응답
-
-성공 응답은 공통 `data` envelope로 감싸지 않고 API별 응답 DTO를 최상위 JSON 객체로 직접 반환한다.
-
-단일 리소스는 객체를 직접 반환하고, 목록은 `items` 배열을 포함하는 객체로 반환한다. 페이지네이션 목록은 `items`, `page`, `size`, `totalItems`, `totalPages`를 같은 최상위 객체에 포함한다.
-
-무한 스크롤 목록은 cursor 기반으로 조회한다. 최초 요청에서는 `cursor`를 생략하고, 다음 목록이 있으면 응답의 불투명 문자열 `nextCursor`를 다음 요청의 `cursor`로 그대로 전달한다. 마지막 응답은 `nextCursor: null`을 반환한다. 프론트엔드는 cursor 내부 값을 해석하거나 생성하지 않는다.
-
-nullable 필드는 값이 없을 때 필드를 생략하지 않고 `null`을 반환한다. 배열은 nullable로 사용하지 않고 값이 없으면 빈 배열 `[]`을 반환한다.
-OpenAPI 응답 schema의 `required`는 필드의 존재 여부를 뜻한다. 따라서 nullable 응답 필드도 `required`에 포함하고 null 허용 여부를 별도로 표시한다.
-
-새 자기소개서 초안 생성은 `201 Created`를 반환한다. 일반 조회, 저장·수정·삭제와 기존 Job을 반환할 수 있는 LLM Job 시작 요청은 응답 객체와 함께 `200 OK`를 반환한다. SSE 연결은 `200 OK`, OAuth 흐름은 성공·실패 결과에 맞는 redirect 응답을 사용한다.
-
-### 날짜 형식
-
-서버 내부의 모든 시간 값은 `Instant`로 저장하고 처리한다.
-
-API 응답 DTO로 변환할 때는 `ZoneId.of("Asia/Seoul")` 기준으로 변환한 `LocalDateTime`을 사용한다. 따라서 날짜/시간 응답 값은 timezone offset이 없는 ISO 8601 local date-time 문자열이다.
-
-```json
-{
-  "createdAt": "2026-06-20T14:00:00"
-}
-```
-
-화면 표기 형식은 프론트엔드에서 변환한다.
-
-- 목록 등록일: `2026.06.20`
-- 버전 기록 시각: `2026.05.20 14:00`
-
-### 에러 응답
-
-```json
-{
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "입력값이 올바르지 않습니다.",
-    "details": [
-      {
-        "field": "title",
-        "reason": "자기소개서 제목은 최대 50자까지 입력할 수 있습니다."
-      }
-    ]
-  }
-}
-```
-
-`details`는 항상 배열로 반환하며 상세 정보가 없으면 빈 배열 `[]`을 사용한다. 프론트엔드는 `HTTP 상태 + error.code`를 분기 기준으로 사용하고, 사용자 문구는 `error.code` 기준으로 매핑한다.
-
-프론트엔드는 공통 오류를 중앙 interceptor에서 처리한다.
-
-- 인증 필요 API의 `401 UNAUTHORIZED`: API-004를 single-flight로 한 번만 호출하고 대기 중인 원 요청을 각각 한 번만 재시도한다. API-004가 `401`이거나 재시도한 원 요청이 다시 `401`이면 로그인 화면으로 이동하며 갱신을 반복하지 않는다.
-- 상태 변경 API의 `403 CSRF_TOKEN_INVALID`: API-003으로 토큰을 다시 받은 뒤 원 요청을 한 번만 재시도한다. 같은 오류가 반복되면 중단한다.
-- 네트워크 오류와 예상하지 못한 `5xx`: 공통 일시 오류를 표시한다. API별로 명시하지 않은 상태 변경 요청은 중복 실행 위험 때문에 자동 재전송하지 않는다.
-- 개별 API 문서에는 해당 화면에서 별도 분기가 필요한 validation, 리소스 없음, 상태 충돌 오류만 기록한다. 공통 `401`, `403`, `5xx`를 기계적으로 반복하지 않는다.
-- 프론트엔드는 서버 `error.message`를 그대로 노출하지 않고 알려진 `error.code`를 사용자 문구에 매핑한다. 알 수 없는 코드는 공통 오류 문구를 사용한다.
-
-공통 오류 코드와 HTTP 상태:
-
-| HTTP 상태 | 오류 코드 | 발생 조건 | 프론트엔드 처리 |
-|---:|---|---|---|
-| 400 Bad Request | `VALIDATION_ERROR` | 요청 필드의 형식·길이·범위 위반 | `details[].field`에 해당하는 입력 항목에 `reason`을 표시한다. |
-| 401 Unauthorized | `UNAUTHORIZED` | 인증 필요 API에서 access token이 없거나 만료됨 | API-004를 single-flight로 한 번 호출하고 원 요청을 한 번만 재시도한다. 실패하면 로그인 화면으로 이동한다. |
-| 403 Forbidden | `CSRF_TOKEN_INVALID` | 상태 변경 요청의 CSRF 토큰 누락·만료·불일치 | API-003으로 토큰을 재발급하고 원래 상태 변경 요청을 한 번만 재시도한다. |
-| 404 Not Found | `NOT_FOUND` | 리소스 없음·비소유·삭제 | 대상이 없거나 접근할 수 없음을 안내하고 해당 도메인의 이전 화면으로 이동한다. |
-| 409 Conflict | `CONFLICT` | 요청 시점의 리소스 상태가 작업 조건과 맞지 않음 | API별로 명시된 현재 상태 조회를 수행하고 가능한 화면으로 전환한다. |
-| 409 Conflict | `LLM_JOB_ALREADY_RUNNING` | 같은 자기소개서에서 다른 종류의 AI Job이 진행 중 | 다른 AI 작업이 진행 중임을 안내하고 새 요청을 중단한다. 오류 응답에 `jobId`가 없으면 기존 Job 복구를 가정하지 않는다. |
-| 409 Conflict | `COVER_LETTER_NOT_WRITING` | WRITING가 아닌 자기소개서에 임시저장을 요청함 | 자동저장을 중단하고 상세를 재조회해 읽기 전용 또는 현재 상태 화면으로 전환한다. |
-| 409 Conflict | `REVIEW_VERSION_NOT_LATEST` | 최신 버전이 아닌 첨삭 버전에 최종 답변 저장을 요청함 | 자동 재전송하지 않고 최신 버전과 상세를 다시 조회한다. |
-| 500 Internal Server Error | `INTERNAL_ERROR` | 예상하지 못한 서버 오류 | 공통 일시 오류를 표시하며 상태 변경 요청을 자동 재전송하지 않는다. |
-
-`CSRF_TOKEN_INVALID`는 모든 `POST`, `PUT`, `PATCH`, `DELETE`에 적용되는 공통 오류다. 프론트엔드는 서버의 `error.message`를 그대로 표시하지 않고 CSRF 토큰 재발급과 단일 재시도 흐름을 사용한다.
-
-LLM Job의 `error.code`는 프론트엔드 사용자 메시지 매핑 기준으로 사용한다. 프론트엔드는 provider 원문이나 `error.message`를 그대로 사용자에게 노출하지 않고, `error.code`별 사용자 친화 문구를 표시한다.
-
-공개 LLM Job error code는 프론트엔드의 다음 행동이 달라지는 최소 집합만 사용한다. timeout, provider 장애·요청 제한, 출력 형식 검증 실패처럼 프론트 처리가 같은 원인은 서버 로그에서는 구분하되 공개 응답에서는 `LLM_PROVIDER_ERROR`로 정규화한다.
-
-```text
-LLM_PROVIDER_ERROR
-LLM_CONTEXT_LENGTH_EXCEEDED
-LLM_CONTENT_FILTERED
-```
-
-권장 사용자 메시지:
-
-```text
-LLM_PROVIDER_ERROR: AI 처리에 실패했습니다. 잠시 후 다시 시도해주세요.
-LLM_CONTEXT_LENGTH_EXCEEDED: 입력 내용이 너무 길어 AI가 처리하지 못했습니다.
-LLM_CONTENT_FILTERED: 입력 내용 또는 생성 결과를 처리할 수 없습니다. 내용을 수정한 뒤 다시 시도해주세요.
-```
-
-프론트엔드가 알 수 없는 LLM Job `error.code`를 받은 경우에도 `error.message`를 그대로 표시하지 않는다. `LLM_PROVIDER_ERROR`와 같은 기본 AI 처리 실패 문구를 표시한다.
-
-### 글자 수 산정
-
-문자열 길이 제한과 `*Length` 응답 필드는 Unicode code point 수를 기준으로 계산한다.
-
-적용 대상:
-
-```text
-originalAnswerLength
-rewrittenAnswerLength
-finalAnswerLength
-originalAnswer
-rewrittenAnswer
-finalAnswer
-```
-
-프론트엔드의 실시간 글자 수 표시도 같은 기준을 사용해야 한다.
-
-
-## 도메인 모델
-
-### User
-
-```json
-{
-  "id": "user_01HZ...",
-  "nickname": "홍길동",
-  "profileImageUrl": "https://...",
-  "provider": "KAKAO",
-  "createdAt": "2026-06-20T14:00:00"
-}
-```
-
-### CoverLetter
-
-```json
-{
-  "id": "cl_01HZ...",
-  "title": "2026 상반기 백엔드 개발자 자기소개서",
-  "companyName": "Rewrite Corp",
-  "positionTitle": "백엔드 개발자",
-  "jobPostingUrl": "https://...",
-  "preferences": "Java/Spring 경험 우대...",
-  "status": "REVIEWED",
-  "createdAt": "2026-06-20T14:00:00",
-  "updatedAt": "2026-06-20T14:30:00",
-  "submittedAt": "2026-06-20T14:10:00",
-  "deletedAt": null,
-  "latestReviewedVersionId": "rv_01HZ..."
-}
-```
-
-자기소개서 삭제는 soft delete로 처리한다. `deletedAt`이 있는 자기소개서는 목록과 상세 조회에서 기본적으로 제외한다.
-
-삭제된 자기소개서와 그 하위 리소스는 사용자-facing API에서 모두 `NOT_FOUND`를 반환한다.
-
-적용 대상:
-
-```text
-CoverLetter
-CoverLetterQuestion
-ReviewVersion
-ReviewVersionQuestionResult
-KeywordAnalysis
-InterviewSession
-InterviewQuestion
-InterviewThread
-InterviewMessage
-LlmJob
-```
-
-MVP에서는 삭제된 자기소개서 목록 조회 API와 사용자-facing 복구 API를 제공하지 않는다.
-
-### CoverLetterQuestion
-
-```json
-{
-  "id": "clq_01HZ...",
-  "coverLetterId": "cl_01HZ...",
-  "order": 1,
-  "question": "지원 동기를 작성해주세요.",
-  "maxAnswerLength": 1000,
-  "originalAnswer": "제가 지원한 이유는..."
-}
-```
-
-제약:
-
-```text
-WRITING 임시저장: question, maxAnswerLength, originalAnswer는 nullable
-제출 시 question: trim 후 Unicode code point 기준 1~300자
-제출 시 maxAnswerLength: 100~5000
-제출 시 originalAnswer: trim 후 Unicode code point 기준 1~5000자
-```
-
-서버는 `question`과 `originalAnswer`의 앞뒤 공백을 제거한다. WRITING 저장에서는 누락·`null`·trim 후 빈 문자열을 `null`로 저장하고, 값이 있으면 최대 길이와 숫자 범위를 검증한다. API-014 제출 시에는 모든 필드의 필수값과 최소 길이·범위를 최종 검증한다.
-
-### ReviewVersion
-
-`version`은 화면 표시용 revision label이다. 최초 첨삭 시작 시 `v0.1`로 생성하고, 실패 후 재시도를 포함한 새 첨삭 Job마다 `v0.2`, `v0.3`처럼 patch 숫자를 1씩 증가시킨다. semantic versioning 의미는 없다.
-
-`ReviewVersion`은 첨삭 시도의 버전이다. 새 Job 시작 transaction에서 생성되며 실패·취소해도 삭제하지 않는다. 기존 데이터에서 Job 연결이 없는 버전은 완료된 버전으로 읽는다.
-
-`isLatest`는 가장 최근에 생성된 버전, `isLatestReviewed`와 `CoverLetter.latestReviewedVersionId`는 최신 성공 버전을 가리킨다. 두 boolean은 저장 필드가 아니다. 최종 작성본 저장과 키워드 분석·면접 입력은 최신 성공 버전만 사용한다.
-
-응답의 `status`는 연결된 첨삭 Job의 `PENDING | PROCESSING | COMPLETED | FAILED | CANCELED` 상태다. `ReviewVersion`에는 상태를 중복 저장하지 않는다.
-
-`createdAt`은 첨삭 버전이 생성된 시각이다. 첨삭 Job의 시작/완료 시각은 `LlmJob.createdAt`, `LlmJob.completedAt`으로 확인한다.
-
-```json
-{
-  "id": "rv_01HZ...",
-  "coverLetterId": "cl_01HZ...",
-  "version": "v0.1",
-  "requestInstruction": "직무 적합성을 더 강조해주세요.",
-  "createdAt": "2026-06-20T14:21:10"
-}
-```
-
-### ReviewVersionQuestionResult
-
-```json
-{
-  "questionResultId": "rvqr_01HZ...",
-  "questionId": "clq_01HZ...",
-  "order": 1,
-  "question": "지원 동기를 작성해주세요.",
-  "maxAnswerLength": 1000,
-  "originalAnswer": "제가 지원한 이유는...",
-  "originalAnswerLength": 530,
-  "aiReport": "STAR 관점에서 상황과 과제는 드러나지만 행동과 결과가 약합니다. 성과 수치를 추가하면 더 설득력 있습니다. 우대사항 중 Spring 경험과의 연결이 부족하므로 백엔드, API, 장애 대응 키워드를 보강하는 것이 좋습니다.",
-  "rewrittenAnswer": "저는 백엔드 개발자로서...",
-  "rewrittenAnswerLength": 820,
-  "finalAnswer": "저는 백엔드 개발자로서...",
-  "finalAnswerLength": 810
-}
-```
-
-`questionResultId`는 서버가 발급하는 opaque identifier이며, 하나의 `ReviewVersion` 안에서 유일하다. 클라이언트는 최종 작성본 일괄 저장 요청의 `answers[].questionResultId`에 이 값을 그대로 사용한다. `questionId`는 원본 자기소개서 문항 ID이고, `questionResultId`는 특정 첨삭 버전의 문항별 결과 ID다.
-
-`aiReport`는 프론트엔드에 그대로 렌더링할 단일 문자열이다. STAR, 구체성, 우대사항 적합성, 직무 키워드, 맞춤법, 문장 자연스러움, 중복 표현, 글자 수 준수 여부는 API 필드가 아니라 LLM 프롬프트의 평가 기준으로 관리한다.
-
-Diff는 API가 제공하지 않는다. 프론트엔드는 `originalAnswer`와 `rewrittenAnswer`를 비교해 화면에서 diff를 계산한다.
-
-제약:
-
-```text
-finalAnswer: trim 후 Unicode code point 기준 1~5000자
-```
-
-### LlmJob
-
-```json
-{
-  "id": "job_01HZ...",
-  "type": "COVER_LETTER_REVIEW",
-  "status": "PROCESSING",
-  "targetType": "COVER_LETTER",
-  "targetId": "cl_01HZ...",
-  "progress": {
-    "current": 1,
-    "total": 3,
-    "message": "1번 문항을 첨삭하고 있습니다."
-  },
-  "attempt": 1,
-  "maxAttempts": 2,
-  "partialResult": null,
-  "resultRef": null,
-  "error": null,
-  "createdAt": "2026-06-20T14:10:00",
-  "completedAt": null
-}
-```
-
-Job type:
-
-```text
-COVER_LETTER_REVIEW
-COVER_LETTER_RE_REVIEW
-KEYWORD_ANALYSIS
-INTERVIEW_INITIAL_QUESTION_GENERATION
-INTERVIEW_ADDITIONAL_QUESTION_GENERATION
-INTERVIEW_MESSAGE_FEEDBACK
-```
-
-Job status:
-
-```text
-PENDING
-PROCESSING
-COMPLETED
-FAILED
-CANCELED
-```
-
-LLM Job은 실패 시 서버에서 1회 자동 재시도한다. 최초 시도와 재시도를 포함해 `maxAttempts`는 2이다. 두 번 모두 실패하면 `FAILED` 상태가 된다.
-
-LLM 출력 파싱 실패, 필수 필드 누락, 타입 불일치, 범위 위반처럼 서버가 기대한 결과 구조로 검증할 수 없는 응답도 LLM Job 실패로 처리한다. 이 경우 가능한 필드만 부분 저장하거나 서버가 임의 기본값으로 보정하지 않는다. 자동 재시도 1회 후에도 구조 검증에 실패하면 `FAILED`로 저장하고, 공개 오류 코드는 프론트 처리가 같은 `LLM_PROVIDER_ERROR`로 정규화한다. 내부 로그와 관측 정보에는 출력 검증 실패 원인을 별도로 보존한다.
-
-같은 자기소개서에 대해 진행 중인 LLM Job은 동시에 하나만 허용한다. `PENDING` 또는 `PROCESSING` 상태의 Job이 있으면 새 LLM Job 시작 요청은 `CONFLICT`와 `LLM_JOB_ALREADY_RUNNING`을 반환한다.
-
-최초 면접 질문 생성 Job은 `type=INTERVIEW_INITIAL_QUESTION_GENERATION`, 추가 면접 질문 생성 Job은 `type=INTERVIEW_ADDITIONAL_QUESTION_GENERATION`으로 구분한다. 두 Job 모두 `requestRef.type=REVIEW_VERSION`, `requestRef.id=생성 기준 첨삭 버전 id`를 저장한다. 추가 생성 Job의 `progress.total`은 1이며 완료 결과는 생성된 `INTERVIEW_QUESTION`을 가리킨다.
-
-첨삭 Job(`COVER_LETTER_REVIEW`, `COVER_LETTER_RE_REVIEW`)은 문항별 호출을 병렬 실행하고, 문항의 `aiReport`와 `rewrittenAnswer`가 모두 완성된 결과만 Job과 연결된 임시 문항 결과로 영속 저장한다. API-012는 이 완료 문항을 진행 상세에 포함하고 API-016은 같은 결과를 `review.questions.items`로 전송한다.
-
-Job 상태 조회는 복구에 필요한 상태, 진행률, 결과 참조와 오류만 반환한다. 필드별 partial text와 토큰별 첨삭 delta는 저장하거나 전송하지 않는다.
-
-모든 문항이 성공하면 임시 결과를 이미 생성된 버전의 `ReviewVersionQuestionResult`로 확정한다. 최종 실패한 Job의 버전과 성공한 임시 문항 결과는 API-012·018에서 읽기 전용으로 반환한다.
-
-### KeywordAnalysis
-
-키워드 분석 결과는 자기소개서별 최신 결과만 유지한다. `sourceReviewVersionId`는 최신 결과가 어떤 첨삭 버전을 기준으로 생성되었는지 기록한다.
-
-`keywords`는 중요도 기준 상위 20개를 제공한다. `importance`는 1~100 범위의 정수다.
-
-재첨삭 완료만으로 기존 키워드 분석 결과를 삭제하지 않는다. 키워드 분석 결과가 있는 상태에서 사용자가 `AI 키워드 재분석`을 실행하면 같은 `KeywordAnalysis` 리소스를 `PROCESSING`으로 전환하고, 최신 성공 `ReviewVersion`(`CoverLetter.latestReviewedVersionId`)을 기준으로 다시 분석한다. 성공 시 기존 키워드 결과와 `sourceReviewVersionId`를 최신 분석 결과로 덮어쓴다.
-
-상태:
-
-```text
-PROCESSING
-COMPLETED
-FAILED
-```
-
-```json
-{
-  "id": "ka_01HZ...",
-  "coverLetterId": "cl_01HZ...",
-  "sourceReviewVersionId": "rv_01HZ...",
-  "status": "COMPLETED",
-  "keywords": [
-    {
-      "keyword": "백엔드",
-      "importance": 95
-    },
-    {
-      "keyword": "Spring",
-      "importance": 88
-    }
-  ],
-  "createdAt": "2026-06-20T15:00:00",
-  "completedAt": "2026-06-20T15:00:30"
-}
-```
-
-### InterviewSession
-
-면접 세션은 최초 질문 세트를 생성할 때 기준이 된 첨삭 버전을 `initialSourceReviewVersionId`로 기록한다. 이 값은 세션의 시작 기준을 나타내는 메타데이터이며, 세션 안의 모든 질문이 같은 첨삭 버전을 기준으로 생성되었다는 뜻은 아니다.
-
-사용자가 `새로운 질문 추가하기`를 실행하면 기존 면접 세션은 유지하고, 최신 성공 `ReviewVersion`(`CoverLetter.latestReviewedVersionId`)을 기준으로 면접 질문 1개를 추가 생성한다. 질문마다 생성 기준 버전이 다를 수 있으므로 `InterviewQuestion.sourceReviewVersionId`에 각 질문의 기준 첨삭 버전을 기록한다.
-
-상태:
-
-```text
-QUESTION_GENERATING
-ACTIVE
-FAILED
-```
-
-```json
-{
-  "id": "is_01HZ...",
-  "coverLetterId": "cl_01HZ...",
-  "initialSourceReviewVersionId": "rv_01HZ...",
-  "status": "ACTIVE",
-  "createdAt": "2026-06-20T16:00:00"
-}
-```
-
-### InterviewQuestion
-
-AI 면접 질문은 세션 시작 시 5개 생성하고, 사용자가 `새로운 질문 추가하기`를 실행할 때마다 1개씩 추가 생성한다. 모든 질문은 자기소개서 최종 작성본을 기반으로 생성하며 질문 종류를 구분하지 않는다.
-
-```json
-{
-  "id": "iq_01HZ...",
-  "interviewSessionId": "is_01HZ...",
-  "sourceReviewVersionId": "rv_01HZ...",
-  "order": 1,
-  "question": "프로젝트에서 맡은 역할을 더 구체적으로 설명해 주세요.",
-  "threadId": "it_01HZ..."
-}
-```
-
-꼬리질문은 별도 `InterviewQuestion`이 아니라 `InterviewMessage.followUpQuestion`으로 저장한다.
-
-모든 면접 질문은 생성 시 질문별 `InterviewThread`와 1:1로 연결되며 `threadId`는 필수값이다.
-
-### InterviewThread
-
-```json
-{
-  "id": "it_01HZ...",
-  "interviewSessionId": "is_01HZ...",
-  "interviewQuestionId": "iq_01HZ...",
-  "status": "ACTIVE",
-  "createdAt": "2026-06-20T16:05:00"
-}
-```
-
-### InterviewMessage
-
-최초 면접 질문은 `InterviewQuestion.question`으로 표시하고 message로 중복 저장하지 않는다. 사용자가 답변을 전송한 시점부터 `USER` 메시지를 저장하며, 사용자 답변 1개에 대해 assistant 메시지 1개를 생성한다. assistant 메시지는 피드백, 점수, 꼬리질문을 함께 포함하며, 꼬리질문을 별도 메시지로 분리 저장하지 않는다.
-
-```json
-{
-  "id": "im_01HZ...",
-  "threadId": "it_01HZ...",
-  "role": "ASSISTANT",
-  "content": "답변에서 API 설계 경험은 드러났지만 성과와 의사결정 근거가 부족합니다. 이어서, 그 API 설계에서 가장 중요하게 고려한 트레이드오프는 무엇이었나요?",
-  "feedback": {
-    "summary": "역할은 명확하지만 성과와 판단 근거가 부족합니다.",
-    "strengths": [
-      "담당 역할을 구체적으로 언급했습니다."
-    ],
-    "improvements": [
-      "성과 지표와 문제 해결 과정을 보강하세요."
-    ]
-  },
-  "score": 78,
-  "followUpQuestion": "그 API 설계에서 가장 중요하게 고려한 트레이드오프는 무엇이었나요?",
-  "createdAt": "2026-06-20T16:05:00"
-}
-```
-
-role:
-
-```text
-USER
-ASSISTANT
-```
+- `job.state`는 `jobType`, `status`, `progress`, `resultRef`, `error`를 항상 포함한다.
+- `progress`와 그 하위 필드는 항상 non-null이다.
+- `jobType`은 `COVER_LETTER_REVIEW`, `COVER_LETTER_RE_REVIEW`, `KEYWORD_ANALYSIS`, `INTERVIEW_INITIAL_QUESTION_GENERATION`, `INTERVIEW_ADDITIONAL_QUESTION_GENERATION`, `INTERVIEW_MESSAGE_FEEDBACK` 중 하나다.
+- `status`는 `PENDING`, `PROCESSING`, `COMPLETED`, `FAILED`, `CANCELED` 중 하나다.
+- 완료 `resultRef.type`은 `REVIEW_VERSION`, `KEYWORD_ANALYSIS`, `INTERVIEW_SESSION`, `INTERVIEW_QUESTION`, `INTERVIEW_MESSAGE` 중 하나다.
+- `resultRef`는 결과가 확정된 완료 Job에서만 non-null이고 그 외에는 `null`이다.
+- `error`는 실패 Job에서만 non-null이고 그 외에는 `null`이다.
+- 완료·실패·취소는 이벤트 이름 대신 `COMPLETED`, `FAILED`, `CANCELED`로 구분한다.
+- `review.questions.items`는 스냅샷이면 전체 완료 문항, 새 완료이면 해당 문항 하나, 없으면 `[]`다.
+- 문항은 `questionId`로 upsert하고 `order`로 정렬하며 최종 실패해도 성공 문항은 읽기 전용으로 유지한다.
+- 서버는 라우터 등록 후 스냅샷을 전송하고 그 사이 변경을 버퍼링해 발생 순서대로 전달한다.
+- `Last-Event-ID` 영속 replay는 제공하지 않으며 heartbeat는 SSE comment다.
+- 이미 종료된 Job에 연결하면 최종 상태를 전달하고 첨삭이면 문항 스냅샷까지 전달한 뒤 연결을 종료한다.
+- 실시간 처리 중 종료되면 최종 `job.state`를 전송하고 연결을 종료한다.
+- `CANCELED`이면 부분 결과를 폐기하고 원래 화면·목록을 재조회한다.
+
+### 면접 피드백 replay
+
+- 전체 OpenAI 응답을 검증한 뒤 완성된 `content`를 조각으로 전송하며 실제 token 스트리밍은 제공하지 않는다.
+- 검증 실패 시 delta를 보내지 않는다.
+- 조각 경계는 서버 세부사항이며 클라이언트는 `sequence` 순서로 `contentDelta`를 이어 붙인다.
+- `sequence`는 Job별로 1부터 증가한다.
+- `PROCESSING` 동안 delta를 메모리에 보관하고 재연결 시 `job.state` 다음에 `sequence=1`부터 replay한다.
+- 이미 반영한 sequence는 무시하며 버퍼는 영속 저장하지 않고 Job 종료 시 제거한다.
+- 버퍼가 없으면 불완전한 뒷부분을 표시하지 않고 진행 상태만 유지한다.
+- 완료 후 API-029의 저장된 assistant `content`·`score`로 임시 문장을 교체한다.
+- 실패 시 임시 문장을 제거하고 실패 상태를 표시한다.
+
+### 완료·오류 복구
+
+| Job | 완료 후 조회 |
+|---|---|
+| 최초·재첨삭 | API-012, 선택 버전은 API-018 |
+| 키워드 분석 | API-021 |
+| 초기 면접 질문 | API-025와 API-026 |
+| 추가 면접 질문 | API-026 |
+| 면접 답변 피드백 | API-029 |
+
+- 키워드·초기/추가 면접 질문 생성은 중간 도메인 이벤트를 제공하지 않는다.
+- SSE `onerror`에서 HTTP 오류를 추측하지 않고 API-015·도메인 조회로 인증·대상·진행 상태를 확인한다.
+- 장애가 지속되면 API-015 또는 도메인 polling으로 전환하며 `NOT_FOUND`면 polling·재연결을 중단한다.
+- 공개 Job 오류는 아래 3개만 사용하고 알 수 없는 code는 기본 AI 실패 문구로 처리한다.
+- 내부 실패 원인은 로그에 보존하며 provider 원문·`error.message`를 그대로 노출하지 않는다.
+
+| Job 오류 | 화면 처리 |
+|---|---|
+| `LLM_PROVIDER_ERROR` | timeout·provider 장애/제한·출력 검증 실패: AI 실패 안내와 도메인별 수동 재시도 |
+| `LLM_CONTEXT_LENGTH_EXCEEDED` | 입력 문맥이 너무 길다는 안내, 자동 재시도 금지 |
+| `LLM_CONTENT_FILTERED` | 내용 수정 안내, 자동 재시도 금지 |

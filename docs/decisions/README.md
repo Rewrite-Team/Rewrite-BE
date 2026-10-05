@@ -17,7 +17,7 @@ API 계약: `../api/README.md`
 | `llm-jobs.md` | LLM Job, SSE, partial result, 실패 처리 결정 |
 | `keyword-analysis.md` | 키워드 분석 결정 |
 | `interviews.md` | AI 면접 결정 |
-| `persistence.md` | DB/JPA 전환과 Flyway 후순위 결정 |
+| `persistence.md` | DB/JPA 전환 결정 |
 
 ## Decision Index
 

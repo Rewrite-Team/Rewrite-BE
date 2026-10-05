@@ -1633,7 +1633,11 @@ MVP에서 삭제는 사용자 화면에서 해당 자기소개서를 제거하�
 
 API-012 자기소개서 상세와 API-018 첨삭 버전 상세는 `coverLetter`, `reviewVersion`, `reviewJob`, `questions`로 구성된 같은 최상위 응답 구조를 사용한다. `coverLetter`는 내부 상태 대신 API-007과 같은 `displayStatus`를 반환한다.
 
-API-012는 `WRITING`, `REVIEWING`, `REVIEW_FAILED`, `REVIEWED` 모든 표시 상태에서 사용한다. `reviewVersion`은 첨삭 전에는 `null`, 진행·실패 중에는 현재 시도, 완료 후에는 최신 성공 버전이다. `reviewJob`은 진행 중이거나 가장 최근 실패한 첨삭 Job 요약이다. `REVIEWED`이면 최신 성공 버전 전체 결과를 직접 반환하고, API-018은 사용자가 히스토리에서 선택한 특정 버전을 조회할 때만 사용한다. API-018도 진행·실패 버전에는 해당 `reviewJob`을 반환한다.
+- API-012는 `WRITING`, `REVIEWING`, `REVIEW_FAILED`, `REVIEWED` 모든 표시 상태에서 사용한다.
+- `reviewVersion`은 첨삭 전에는 `null`, 진행·실패 중에는 현재 시도, 완료 후에는 최신 성공 버전이다.
+- `reviewJob`은 진행 중이거나 가장 최근 실패한 첨삭 Job 요약이다.
+- `REVIEWED`이면 최신 성공 버전 전체 결과를 직접 반환하고, API-018은 사용자가 히스토리에서 선택한 특정 버전을 조회할 때만 사용한다.
+- API-018도 진행·실패 버전에는 해당 `reviewJob`을 반환한다.
 
 ### 선택 이유
 
@@ -1648,11 +1652,20 @@ API-012는 `WRITING`, `REVIEWING`, `REVIEW_FAILED`, `REVIEWED` 모든 표시 상
 
 ### 결정
 
-API-007 목록 항목은 저장된 `CoverLetter.status`를 메인 화면의 `displayStatus=WRITING|REVIEWING|REVIEWED|REVIEW_FAILED`로 그대로 반환한다. 프론트엔드는 상태별 서버 필터를 사용하지 않고 현재 페이지의 모든 상태 항목을 함께 조회한다. 최초·재첨삭 시작·성공·실패 transaction이 `CoverLetter.status`를 직접 갱신한다. 메인 화면은 카드마다 연결하지 않고 API-030 `GET /cover-letters/stream` 연결 하나로 현재 사용자의 첨삭 상태 변경을 수신한다.
+- API-007 목록 항목은 저장된 `CoverLetter.status`를 메인 화면의 `displayStatus=WRITING|REVIEWING|REVIEWED|REVIEW_FAILED`로 그대로 반환한다.
+- 프론트엔드는 상태별 서버 필터를 사용하지 않고 현재 페이지의 모든 상태 항목을 함께 조회한다.
+- 최초·재첨삭 시작·성공·실패 transaction이 `CoverLetter.status`를 직접 갱신한다.
+- 메인 화면은 카드마다 연결하지 않고 API-030 `GET /cover-letters/stream` 연결 하나로 현재 사용자의 첨삭 상태 변경을 수신한다.
 
-연결 직후 soft delete되지 않은 모든 자기소개서의 현재 표시 상태를 `cover-letter.review-status.snapshot` 이벤트의 `items` 배열로 한 번에 전송한다. 이후 상태가 바뀐 자기소개서는 `cover-letter.review-status.changed` 단건 이벤트로 전송한다. 이벤트 이름으로 스냅샷과 변경을 구분하므로 `eventPhase`와 `changeType`은 사용하지 않는다. `PENDING → PROCESSING`은 표시 상태를 바꾸지 않으므로 메인 스트림에 노출하지 않는다.
+- 연결 직후 soft delete되지 않은 모든 자기소개서의 현재 표시 상태를 `cover-letter.review-status.snapshot` 이벤트의 `items` 배열로 한 번에 전송한다.
+- 이후 상태가 바뀐 자기소개서는 `cover-letter.review-status.changed` 단건 이벤트로 전송한다.
+- 이벤트 이름으로 스냅샷과 변경을 구분하므로 `eventPhase`와 `changeType`은 사용하지 않는다.
+- `PENDING → PROCESSING`은 표시 상태를 바꾸지 않으므로 메인 스트림에 노출하지 않는다.
 
-프론트엔드는 모든 이벤트에서 `displayStatus`와 `latestReviewedVersionId`를 목록 항목에 그대로 함께 반영하고 내부 상태를 조합하지 않는다. 최초·재첨삭 실패는 모두 `displayStatus=REVIEW_FAILED`다. 최초 첨삭 실패는 `latestReviewedVersionId=null`, 재첨삭 실패는 기존 성공 버전 ID를 유지한다. 서버는 연결을 이벤트 라우터에 등록한 뒤 스냅샷을 조회·전송하며, 그 사이 발생한 변경 이벤트를 연결별로 버퍼링해 스냅샷 다음에 발생 순서대로 전송한다.
+- 프론트엔드는 모든 이벤트에서 `displayStatus`와 `latestReviewedVersionId`를 목록 항목에 그대로 함께 반영하고 내부 상태를 조합하지 않는다.
+- 최초·재첨삭 실패는 모두 `displayStatus=REVIEW_FAILED`다.
+- 최초 첨삭 실패는 `latestReviewedVersionId=null`, 재첨삭 실패는 기존 성공 버전 ID를 유지한다.
+- 서버는 연결을 이벤트 라우터에 등록한 뒤 스냅샷을 조회·전송하며, 그 사이 발생한 변경 이벤트를 연결별로 버퍼링해 스냅샷 다음에 발생 순서대로 전송한다.
 
 ### 선택 이유
 
@@ -1712,7 +1725,10 @@ API-013 자기소개서 삭제 성공 응답은 `success=true`만 반환한다. 
 
 ### 결정
 
-API-014 최초 첨삭 제출 성공 응답은 `displayStatus`와 nullable `jobId`만 반환한다. 새 Job을 생성하거나 기존 진행 중 최초 첨삭 Job을 반환하면 `displayStatus=REVIEWING`과 Job ID를 반환하고, 이미 첨삭이 완료되었으면 `displayStatus=REVIEWED`, `jobId=null`을 반환한다. 재첨삭 실패로 `status=REVIEW_FAILED`이면서 기존 성공 버전이 남아 있으면 `CONFLICT`를 반환하고 API-024를 사용한다. 요청 본문은 사용하지 않는다.
+- API-014 최초 첨삭 제출 성공 응답은 `displayStatus`와 nullable `jobId`만 반환한다.
+- 새 Job을 생성하거나 기존 진행 중 최초 첨삭 Job을 반환하면 `displayStatus=REVIEWING`과 Job ID를 반환하고, 이미 첨삭이 완료되었으면 `displayStatus=REVIEWED`, `jobId=null`을 반환한다.
+- 재첨삭 실패로 `status=REVIEW_FAILED`이면서 기존 성공 버전이 남아 있으면 `CONFLICT`를 반환하고 API-024를 사용한다.
+- 요청 본문은 사용하지 않는다.
 
 ### 선택 이유
 
@@ -1727,11 +1743,15 @@ API-014 최초 첨삭 제출 성공 응답은 `displayStatus`와 nullable `jobId
 
 ### 결정
 
-API-009~011은 별도의 임시저장 API를 추가하지 않고 각 등록 step의 현재 폼 전체를 WRITING 스냅샷으로 저장한다. 요청 필드의 누락·`null`·trim 후 빈 문자열은 미입력값인 `null`로 정규화한다. 값이 있으면 최대 길이, 숫자 범위와 URL 형식을 저장 시 검증하지만 필수값 여부는 강제하지 않는다.
+- API-009~011은 별도의 임시저장 API를 추가하지 않고 각 등록 step의 현재 폼 전체를 WRITING 스냅샷으로 저장한다.
+- 요청 필드의 누락·`null`·trim 후 빈 문자열은 미입력값인 `null`로 정규화한다.
+- 값이 있으면 최대 길이, 숫자 범위와 URL 형식을 저장 시 검증하지만 필수값 여부는 강제하지 않는다.
 
-API-011의 `questions`가 누락·`null`·빈 배열이면 문항을 모두 삭제하며, 배열 내부 문항 필드도 WRITING에서는 nullable이다. 이를 위해 원본 문항 persistence의 `question`, `maxAnswerLength`, `originalAnswer`는 nullable을 허용한다.
+- API-011의 `questions`가 누락·`null`·빈 배열이면 문항을 모두 삭제하며, 배열 내부 문항 필드도 WRITING에서는 nullable이다.
+- 이를 위해 원본 문항 persistence의 `question`, `maxAnswerLength`, `originalAnswer`는 nullable을 허용한다.
 
-API-012는 `WRITING` 상태에서 미완성 기본 정보와 nullable 원본 문항을 그대로 반환한다. API-014만 모든 등록 필드와 문항의 필수값 완성 여부를 검증하며, 누락이 있으면 필드별 `VALIDATION_ERROR`를 반환하고 첨삭 Job을 생성하지 않는다.
+- API-012는 `WRITING` 상태에서 미완성 기본 정보와 nullable 원본 문항을 그대로 반환한다.
+- API-014만 모든 등록 필드와 문항의 필수값 완성 여부를 검증하며, 누락이 있으면 필드별 `VALIDATION_ERROR`를 반환하고 첨삭 Job을 생성하지 않는다.
 
 ### 선택 이유
 

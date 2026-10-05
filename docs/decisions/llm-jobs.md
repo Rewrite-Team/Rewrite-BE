@@ -951,13 +951,21 @@ LLM 출력은 사용자에게 직접 보이는 결과 데이터다. 구조가 �
 
 ### 결정
 
-API-016은 최초 첨삭과 재첨삭에 공통으로 연결 직후 `job.state`와 `review.questions`를 순서대로 전송한다. `job.state`는 항상 `jobType`, `status`, `progress`, `resultRef`, `error`의 같은 구조를 사용하고, `review.questions`는 완료 문항 `items`를 포함한다.
+- API-016은 최초 첨삭과 재첨삭에 공통으로 연결 직후 `job.state`와 `review.questions`를 순서대로 전송한다.
+- `job.state`는 항상 `jobType`, `status`, `progress`, `resultRef`, `error`의 같은 구조를 사용하고, `review.questions`는 완료 문항 `items`를 포함한다.
 
-문항의 `aiReport`와 `rewrittenAnswer`가 모두 완성된 시점에는 해당 문항 하나를 `items`에 담은 `review.questions`를 전송하고, 갱신된 진행률은 이어지는 `job.state`로 전달한다. 연결 직후 스냅샷과 실시간 문항 완료가 같은 배열 payload를 사용하므로 프론트엔드는 모두 `questionId` 기준 upsert로 처리한다. Job 완료·실패·취소도 별도 이벤트를 만들지 않고 최종 `job.state.status`로 전달한다.
+- 문항의 `aiReport`와 `rewrittenAnswer`가 모두 완성된 시점에는 해당 문항 하나를 `items`에 담은 `review.questions`를 전송하고, 갱신된 진행률은 이어지는 `job.state`로 전달한다.
+- 연결 직후 스냅샷과 실시간 문항 완료가 같은 배열 payload를 사용하므로 프론트엔드는 모두 `questionId` 기준 upsert로 처리한다.
+- Job 완료·실패·취소도 별도 이벤트를 만들지 않고 최종 `job.state.status`로 전달한다.
 
-서버는 연결을 먼저 등록하고 스냅샷 전송 중 발생한 변경 이벤트를 버퍼링한 뒤 이어서 전송한다. 이벤트는 중복될 수 있으며 클라이언트는 `questionId`로 upsert하고 `order`로 정렬한다. `Last-Event-ID` 기반 영속 replay는 제공하지 않고 재연결할 때 최신 스냅샷을 다시 전송한다. 연결 유지는 SSE comment heartbeat를 사용한다.
+- 서버는 연결을 먼저 등록하고 스냅샷 전송 중 발생한 변경 이벤트를 버퍼링한 뒤 이어서 전송한다.
+- 이벤트는 중복될 수 있으며 클라이언트는 `questionId`로 upsert하고 `order`로 정렬한다.
+- `Last-Event-ID` 기반 영속 replay는 제공하지 않고 재연결할 때 최신 스냅샷을 다시 전송한다.
+- 연결 유지는 SSE comment heartbeat를 사용한다.
 
-Job ID는 path에 있으므로 이벤트 데이터에 포함하지 않는다. 공통 스트림의 Job 종류는 `job.state.jobType`으로 식별한다. 연결·진행·종료 상태는 단계별 이벤트로 나누지 않고 모두 같은 `job.state`로 전달한다.
+- Job ID는 path에 있으므로 이벤트 데이터에 포함하지 않는다.
+- 공통 스트림의 Job 종류는 `job.state.jobType`으로 식별한다.
+- 연결·진행·종료 상태는 단계별 이벤트로 나누지 않고 모두 같은 `job.state`로 전달한다.
 
 ### 선택 이유
 
@@ -972,11 +980,21 @@ AI 리포트와 수정본은 한 문항의 완결된 결과로 함께 사용한�
 
 ### 결정
 
-API-016은 최초 첨삭·재첨삭, 키워드 분석, 초기·추가 면접 질문 생성, 면접 답변 피드백에 공통으로 사용한다. 모든 Job은 연결 직후와 상태·진행률 변경 시 `jobType`, `status`, `progress`, `resultRef`, `error`를 담은 같은 `job.state`를 전송한다. 첨삭 Job은 연결 직후 완료 문항 전체와 이후 완료 문항 하나를 모두 `review.questions.items` 배열로 전달한다. 면접 답변 피드백 Job의 `interview.feedback.delta`는 기존대로 1부터 증가하는 `sequence`와 `contentDelta`를 전송한다. 키워드 분석과 초기·추가 면접 질문 생성은 중간 도메인 이벤트 없이 `job.state`만 사용한다.
+- API-016은 최초 첨삭·재첨삭, 키워드 분석, 초기·추가 면접 질문 생성, 면접 답변 피드백에 공통으로 사용한다.
+- 모든 Job은 연결 직후와 상태·진행률 변경 시 `jobType`, `status`, `progress`, `resultRef`, `error`를 담은 같은 `job.state`를 전송한다.
+- 첨삭 Job은 연결 직후 완료 문항 전체와 이후 완료 문항 하나를 모두 `review.questions.items` 배열로 전달한다.
+- 면접 답변 피드백 Job의 `interview.feedback.delta`는 기존대로 1부터 증가하는 `sequence`와 `contentDelta`를 전송한다.
+- 키워드 분석과 초기·추가 면접 질문 생성은 중간 도메인 이벤트 없이 `job.state`만 사용한다.
 
-완료 `resultRef.type`은 Job에 따라 `REVIEW_VERSION`, `KEYWORD_ANALYSIS`, `INTERVIEW_SESSION`, `INTERVIEW_QUESTION`, `INTERVIEW_MESSAGE`를 사용한다. 키워드 분석 완료 후 API-021을, 초기 면접 질문 생성 완료 후 API-025와 API-026을, 추가 면접 질문 생성 완료 후 API-026을, 면접 피드백 완료 후 API-029를 다시 조회한다. 도메인 조회 응답은 진행 중이거나 최근 실패한 Job ID를 제공해 새로고침 후 SSE에 다시 연결할 수 있게 하며, SSE 연결 실패 시 polling fallback으로 사용한다.
+- 완료 `resultRef.type`은 Job에 따라 `REVIEW_VERSION`, `KEYWORD_ANALYSIS`, `INTERVIEW_SESSION`, `INTERVIEW_QUESTION`, `INTERVIEW_MESSAGE`를 사용한다.
+- 키워드 분석 완료 후 API-021을, 초기 면접 질문 생성 완료 후 API-025와 API-026을, 추가 면접 질문 생성 완료 후 API-026을, 면접 피드백 완료 후 API-029를 다시 조회한다.
+- 도메인 조회 응답은 진행 중이거나 최근 실패한 Job ID를 제공해 새로고침 후 SSE에 다시 연결할 수 있게 하며, SSE 연결 실패 시 polling fallback으로 사용한다.
 
-면접 피드백 delta는 검증이 끝난 전체 `content`를 화면 표시용 조각으로 나눈 결과다. `PROCESSING` 동안 서버 메모리에 delta를 보관하고 재연결 시 1번부터 replay한 뒤 새 delta를 이어서 전송한다. `Last-Event-ID` 기반 영속 replay는 제공하지 않으며 메모리 버퍼를 복구할 수 없으면 진행 상태만 표시한다. 완료된 전체 assistant 메시지는 API-029로 조회한다. 생성·검증·저장 순서는 Decision 098을 따른다.
+- 면접 피드백 delta는 검증이 끝난 전체 `content`를 화면 표시용 조각으로 나눈 결과다.
+- `PROCESSING` 동안 서버 메모리에 delta를 보관하고 재연결 시 1번부터 replay한 뒤 새 delta를 이어서 전송한다.
+- `Last-Event-ID` 기반 영속 replay는 제공하지 않으며 메모리 버퍼를 복구할 수 없으면 진행 상태만 표시한다.
+- 완료된 전체 assistant 메시지는 API-029로 조회한다.
+- 생성·검증·저장 순서는 Decision 098을 따른다.
 
 ### 선택 이유
 

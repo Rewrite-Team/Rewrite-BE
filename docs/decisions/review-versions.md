@@ -696,9 +696,12 @@ Decision 039에서 최종 작성본은 빈 문자열로 저장할 수 없다고 
 
 ### 결정
 
-최초 첨삭과 재첨삭은 문항별 OpenAI 호출을 병렬 실행한다. 각 호출에는 전체 자기소개서 문맥과 대상 문항을 전달하고, 문항의 `aiReport`와 `rewrittenAnswer`가 모두 완성되고 검증되면 Job과 연결된 임시 문항 결과로 DB에 저장한다.
+- 최초 첨삭과 재첨삭은 문항별 OpenAI 호출을 병렬 실행한다.
+- 각 호출에는 전체 자기소개서 문맥과 대상 문항을 전달하고, 문항의 `aiReport`와 `rewrittenAnswer`가 모두 완성되고 검증되면 Job과 연결된 임시 문항 결과로 DB에 저장한다.
 
-모든 문항 task가 종료되고 모든 임시 결과가 성공한 경우에만 이미 생성된 버전의 `ReviewVersionQuestionResult`로 한 transaction에서 확정한다. 버전의 생성 시점과 실패 후 보존 정책은 Decision 102를 따른다. 실패 Job의 임시 결과 노출 정책은 Decision 082를 따른다.
+- 모든 문항 task가 종료되고 모든 임시 결과가 성공한 경우에만 이미 생성된 버전의 `ReviewVersionQuestionResult`로 한 transaction에서 확정한다.
+- 버전의 생성 시점과 실패 후 보존 정책은 Decision 102를 따른다.
+- 실패 Job의 임시 결과 노출 정책은 Decision 082를 따른다.
 
 ### 선택 이유
 
@@ -713,9 +716,11 @@ Decision 039에서 최종 작성본은 빈 문자열로 저장할 수 없다고 
 
 ### 결정
 
-재첨삭 Job은 요청 transaction에서 요청 시점의 최신 성공 `ReviewVersion`을 `requestRef`로 고정하고, 각 문항의 `finalAnswer`를 임시 입력 스냅샷으로 함께 저장한다. 진행 상세의 `originalAnswer`는 이 실제 입력값을 반환한다.
+- 재첨삭 Job은 요청 transaction에서 요청 시점의 최신 성공 `ReviewVersion`을 `requestRef`로 고정하고, 각 문항의 `finalAnswer`를 임시 입력 스냅샷으로 함께 저장한다.
+- 진행 상세의 `originalAnswer`는 이 실제 입력값을 반환한다.
 
-새 Job 시작 시 이전 버전의 `aiReport`, `rewrittenAnswer`, `finalAnswer`를 진행 결과에 복사하지 않는다. 새 문항 결과가 완성될 때마다 해당 문항의 AI 필드와 `finalAnswer`를 새 결과로 채우며, `finalAnswer` 초깃값은 `rewrittenAnswer`와 같다.
+- 새 Job 시작 시 이전 버전의 `aiReport`, `rewrittenAnswer`, `finalAnswer`를 진행 결과에 복사하지 않는다.
+- 새 문항 결과가 완성될 때마다 해당 문항의 AI 필드와 `finalAnswer`를 새 결과로 채우며, `finalAnswer` 초깃값은 `rewrittenAnswer`와 같다.
 
 ### 선택 이유
 
@@ -730,9 +735,13 @@ Decision 039에서 최종 작성본은 빈 문자열로 저장할 수 없다고 
 
 ### 결정
 
-최초 첨삭과 재첨삭 Job이 최종 실패해도 API-012는 해당 Job에서 성공한 임시 문항 결과를 읽기 전용으로 반환한다. 실패하거나 완료되지 않은 문항은 AI 관련 필드를 `null`로 반환하고, 질문과 실제 Job 입력 같은 AI 비관련 필드는 그대로 반환한다. 임시 결과의 내부 staging ID는 노출하지 않으므로 `questionResultId=null`이다.
+- 최초 첨삭과 재첨삭 Job이 최종 실패해도 API-012는 해당 Job에서 성공한 임시 문항 결과를 읽기 전용으로 반환한다.
+- 실패하거나 완료되지 않은 문항은 AI 관련 필드를 `null`로 반환하고, 질문과 실제 Job 입력 같은 AI 비관련 필드는 그대로 반환한다.
+- 임시 결과의 내부 staging ID는 노출하지 않으므로 `questionResultId=null`이다.
 
-최초 첨삭과 재첨삭 실패 모두 `reviewVersion`은 실패한 현재 버전을 반환한다. 두 경우 모두 `reviewJob.status=FAILED`와 실패 정보를 반환하고 `questions`는 실패한 최신 Job의 입력 및 부분 결과를 기준으로 한다. 기존 성공 버전은 API-018로 계속 조회할 수 있다.
+- 최초 첨삭과 재첨삭 실패 모두 `reviewVersion`은 실패한 현재 버전을 반환한다.
+- 두 경우 모두 `reviewJob.status=FAILED`와 실패 정보를 반환하고 `questions`는 실패한 최신 Job의 입력 및 부분 결과를 기준으로 한다.
+- 기존 성공 버전은 API-018로 계속 조회할 수 있다.
 
 ### 선택 이유
 
@@ -779,11 +788,18 @@ API-019는 path의 `versionId`를 유지해 사용자가 열어 둔 버전이 �
 
 ### 결정
 
-API-014 또는 API-024에서 새 첨삭 Job을 생성할 때 같은 transaction에서 다음 `ReviewVersion`을 생성한다. 최초 시도는 `v0.1`이며, 실패 후 재시도를 포함해 새 Job마다 번호를 하나씩 증가시킨다. 중복 요청이 기존 진행 Job을 반환하거나 입력 검증에 실패한 경우에는 새 버전을 만들지 않는다.
+- API-014 또는 API-024에서 새 첨삭 Job을 생성할 때 같은 transaction에서 다음 `ReviewVersion`을 생성한다.
+- 최초 시도는 `v0.1`이며, 실패 후 재시도를 포함해 새 Job마다 번호를 하나씩 증가시킨다.
+- 중복 요청이 기존 진행 Job을 반환하거나 입력 검증에 실패한 경우에는 새 버전을 만들지 않는다.
 
-버전은 연결된 Job의 `PENDING | PROCESSING | COMPLETED | FAILED | CANCELED` 상태를 표시하고 실패해도 삭제하지 않는다. 기존 Job 연결이 없는 성공 버전은 `COMPLETED`로 읽는다. 성공한 문항의 임시 결과는 진행·실패 버전 상세에서 읽기 전용으로 보여주며, 모든 문항이 성공하면 이미 생성된 버전에 확정 문항 결과를 저장한다.
+- 버전은 연결된 Job의 `PENDING | PROCESSING | COMPLETED | FAILED | CANCELED` 상태를 표시하고 실패해도 삭제하지 않는다.
+- 기존 Job 연결이 없는 성공 버전은 `COMPLETED`로 읽는다.
+- 성공한 문항의 임시 결과는 진행·실패 버전 상세에서 읽기 전용으로 보여주며, 모든 문항이 성공하면 이미 생성된 버전에 확정 문항 결과를 저장한다.
 
-`isLatest`는 가장 최근에 시작한 첨삭 시도, `isLatestReviewed`와 `CoverLetter.latestReviewedVersionId`는 최신 성공 결과를 뜻한다. 재첨삭 입력, 최종 작성본 저장, 키워드 분석과 면접은 최신 성공 버전만 사용한다. 실패·취소 버전은 최종 작성본을 저장할 수 없다. 취소는 자기소개서 삭제 시 발생하므로 버전은 보존하지만 삭제된 자기소개서의 사용자-facing 조회는 기존대로 `NOT_FOUND`다.
+- `isLatest`는 가장 최근에 시작한 첨삭 시도, `isLatestReviewed`와 `CoverLetter.latestReviewedVersionId`는 최신 성공 결과를 뜻한다.
+- 재첨삭 입력, 최종 작성본 저장, 키워드 분석과 면접은 최신 성공 버전만 사용한다.
+- 실패·취소 버전은 최종 작성본을 저장할 수 없다.
+- 취소는 자기소개서 삭제 시 발생하므로 버전은 보존하지만 삭제된 자기소개서의 사용자-facing 조회는 기존대로 `NOT_FOUND`다.
 
 ### 선택 이유
 
