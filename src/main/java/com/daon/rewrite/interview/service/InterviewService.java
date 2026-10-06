@@ -185,7 +185,7 @@ public class InterviewService {
             throw new BusinessException(ErrorCode.CONFLICT);
         }
         validateReviewedCoverLetter(coverLetter);
-        String sourceReviewVersionId = selectSourceReviewVersionId(coverLetter, null);
+        String sourceReviewVersionId = findLatestReviewedVersionId(coverLetter);
         LlmJob runningJob = llmJobService.findRunningCoverLetterJob(coverLetter.getId());
         if (runningJob != null && runningJob.getType() == LlmJobType.INTERVIEW_ADDITIONAL_QUESTION_GENERATION) {
             return new AddInterviewQuestionResult(interviewSession, runningJob);
@@ -279,15 +279,12 @@ public class InterviewService {
         return threadId;
     }
 
-    private String selectSourceReviewVersionId(CoverLetter coverLetter, String sourceReviewVersionId) {
-        String normalizedSourceReviewVersionId = normalize(sourceReviewVersionId);
-        String selectedSourceReviewVersionId = normalizedSourceReviewVersionId == null
-                ? coverLetter.getLatestReviewedVersionId()
-                : normalizedSourceReviewVersionId;
+    private String findLatestReviewedVersionId(CoverLetter coverLetter) {
+        String latestReviewedVersionId = coverLetter.getLatestReviewedVersionId();
         reviewVersionRepository
-                .findByIdAndCoverLetterId(selectedSourceReviewVersionId, coverLetter.getId())
+                .findByIdAndCoverLetterId(latestReviewedVersionId, coverLetter.getId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
-        return selectedSourceReviewVersionId;
+        return latestReviewedVersionId;
     }
 
     private InterviewSession startQuestionGeneration(
@@ -308,11 +305,4 @@ public class InterviewService {
         ));
     }
 
-    private String normalize(String value) {
-        if (value == null) {
-            return null;
-        }
-        String normalized = value.strip();
-        return normalized.isEmpty() ? null : normalized;
-    }
 }
