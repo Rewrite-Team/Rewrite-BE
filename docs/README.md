@@ -101,6 +101,20 @@
 - 하나의 issue·PR·commit은 일관된 작은 구현·리뷰·검증 단위로 유지한다.
 - 다른 기능·큰 리팩터링·인프라·문서 정리는 가능한 한 별도 issue·PR로 나눈다.
 
+### 이슈용 브랜치
+
+- 브랜치 생성 요청을 받으면 `gh issue develop`로 GitHub에 브랜치를 생성하고 해당 이슈의 Development 항목에 연결한다.
+- 시작 브랜치를 별도로 지정하지 않으면 원격 `dev`를 사용하고, 이름은 기존 `<종류>/#<이슈 번호>` 형식을 유지한다.
+- 로컬에 같은 이름의 브랜치가 없으면 다음 명령으로 생성·연결한 원격 브랜치를 체크아웃한다.
+
+```bash
+gh issue develop <이슈 번호> --base dev --name '<브랜치 이름>' --checkout
+```
+
+- 같은 이름의 로컬 브랜치가 이미 있으면 `--checkout`을 생략해 GitHub 생성·연결을 먼저 수행한다. 이후 원격 브랜치를 fetch하고 기존 로컬 브랜치의 upstream으로 설정한 뒤 해당 브랜치로 전환하며 사용자 변경을 보존한다.
+- 생성 후 `gh issue develop <이슈 번호> --list`로 이슈 연결을 확인하고 로컬 upstream이 해당 원격 브랜치인지 확인한다.
+- PR 병합 후 브랜치 자동 삭제는 저장소의 `Automatically delete head branches` 설정에 따른다. 이슈 연결만으로 자동 삭제를 보장하지 않는다. 상세 조건은 [GitHub 안내](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/configuring-pull-request-merges/managing-the-automatic-deletion-of-branches)를 따른다.
+
 ### 이슈·PR·commit 작성
 
 | 작업 | 초안 전 확인 |

@@ -40,7 +40,6 @@ public class KakaoAuthController {
     private final KakaoLoginService loginService;
     private final AuthProperties properties;
 
-    // 사용자가 카카오 로그인 버튼 누르면 호출
     @GetMapping("/authorize")
     @ApiResponse(
             responseCode = "302",
@@ -85,17 +84,16 @@ public class KakaoAuthController {
         }
         try {
             KakaoAuthorizeResult result = loginService.authorize(frontendTarget);
-            return ResponseEntity.status(HttpStatus.FOUND)  // 302 Found 지정. 브라우저는 302 응답을 받으면 Location 헤더 주소로 이동
+            return ResponseEntity.status(HttpStatus.FOUND)
                     .location(result.authorizeUri())
-                    .header(HttpHeaders.SET_COOKIE, oauthNonceCookie(result.browserNonce(), 300).toString())    // OAuth 요청을 시작한 브라우저와 callback을 받은 브라우저가 같은지 검증하기 위한 nonce 쿠키를 설정
-                    .build();   // 비어있는 body
+                    .header(HttpHeaders.SET_COOKIE, oauthNonceCookie(result.browserNonce(), 300).toString()) // 로그인 시작 브라우저와 callback 브라우저를 결합한다.
+                    .build();
         } catch (RuntimeException e) {
             log.warn("Kakao login authorization failed", e);
             return redirect(loginFailureUri(frontendTarget, "KAKAO_LOGIN_FAILED"), clearOauthNonceCookie());
         }
     }
 
-    // 사용자가 로그인 완료 후 카카오의 브라우저 리다이렉트로 인한 호출
     @GetMapping("/callback")
     @ApiResponse(
             responseCode = "302",
@@ -132,9 +130,9 @@ public class KakaoAuthController {
             }
     )
     public ResponseEntity<Void> callback(
-            @RequestParam(required = false) String code,    // 카카오가 발급한 authorization code (사용자가 로그인 취소 시 code가 오지 않고 error가 옴)
-            @RequestParam(required = false) String error,   // OAuth 인증이 실패하거나 사용자가 취소했을 때 전달됨
-            @RequestParam(required = false) String state,   // 로그인 시작 시 서버가 발급한 OAuth state (required=false 라면 해당 값 누락 시 Spring MVC가 400 Bad Request 반환. 공통 로그인 실패 리다이렉트로 처리하기 위해 required=true 로 설정)
+            @RequestParam(required = false) String code,
+            @RequestParam(required = false) String error,
+            @RequestParam(required = false) String state, // state 누락도 400 대신 로그인 실패 리다이렉트로 처리한다.
             @CookieValue(name = OAUTH_NONCE_COOKIE, required = false) String browserNonce
     ) {
         KakaoLoginResult result = loginService.callback(code, error, state, browserNonce);
@@ -176,10 +174,9 @@ public class KakaoAuthController {
     }
 
     private static ResponseCookie oauthNonceCookie(String value, long maxAge) {
-        return AuthCookieFactory.cookie(OAUTH_NONCE_COOKIE, value, "/auth/kakao", maxAge); // nonce 는 /auth/kakao 에만 필요
+        return AuthCookieFactory.cookie(OAUTH_NONCE_COOKIE, value, "/auth/kakao", maxAge); // nonce는 /auth/kakao에만 필요하다.
     }
 
-    // 카카오 로그인 검증에 사용한 일회성 Nonce 쿠키를 삭제
     private static ResponseCookie clearOauthNonceCookie() {
         return oauthNonceCookie("", 0);
     }

@@ -23,9 +23,9 @@ class ReviewQuestionJobRunner {
     private final Executor executor;
 
     ReviewQuestionJobRunner(
-            ReviewClient reviewClient,  // 실제 AI 첨삭 요청, 문항 하나를 처리해 ReviewResult 반환
-            ReviewJobQuestionTransactionService transactionService, // 성공한 문항 결과, 실패 상태, 재시도 횟수를 DB에 저장, 각 작업을 별도 트랜잭션으로 처리
-            @Qualifier("reviewQuestionExecutor") Executor executor  // 문항을 어느 스레드에서 실행할지 결정, reviewQuestionExecutor 라는 전용 스레드 풀을 사용
+            ReviewClient reviewClient,
+            ReviewJobQuestionTransactionService transactionService,
+            @Qualifier("reviewQuestionExecutor") Executor executor
     ) {
         this.reviewClient = reviewClient;
         this.transactionService = transactionService;
@@ -33,25 +33,19 @@ class ReviewQuestionJobRunner {
     }
 
     Optional<ReviewClientException.Reason> run(String jobId, ReviewRequest request) {
-        // 문항별 비동기 작업 생성
         List<CompletableFuture<Optional<ReviewClientException.Reason>>> futures = request.questions().stream()
                 .map(question -> CompletableFuture.supplyAsync(
-                        () -> reviewQuestion(jobId, request, question),     // 각 작업은 reviewQuestion(...) 호출
+                        () -> reviewQuestion(jobId, request, question),
                         executor
                 ))
                 .toList();
 
-        // 등록한 모든 비동기 문항 작업이 끝날 때까지 현재 스레드를 기다림
+        // 한 문항이 실패해도 나머지 문항의 부분 결과를 보존하도록 모두 끝날 때까지 기다린다.
         CompletableFuture
                 .allOf(futures.toArray(CompletableFuture[]::new))
-                .join();  // allof() 가 반환한 Future 가 완료될 때까지 현재 스레드를 대기시킴
+                .join();
 
-        /**
-         * CompletableFuture<T> 의 join() 메서드는 다음과 같은 형태로, Future 가 가지고 있는 실제 결과 (T) 를 반환한다.
-         * public T join()
-         */
-
-        // 모든 문항의 결과를 확인해서 처음 발견된 실패 사유를 반환한다.
+        // 여러 문항이 실패하면 요청 문항 순서에서 첫 실패 사유를 대표로 사용한다.
         return futures.stream()
                 .map(CompletableFuture::join)
                 .flatMap(Optional::stream)
@@ -65,9 +59,8 @@ class ReviewQuestionJobRunner {
     ) {
         for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
             try {
-                // OpenAiReviewClient 에서 AI API 호출하며 첨삭 진행하고 ReviewResult 형식으로 결과를 정리하여 반환
+                // 외부 호출 중 DB 트랜잭션을 유지하지 않도록 문항 결과 저장을 별도 서비스에 맡긴다.
                 ReviewResult result = reviewClient.reviewQuestion(request, question.questionId());
-                // FirstReviewJobTransactionService 에서 생성한 '각 문항마다 AI응답을 받기 전 임시 처리 결과 객체 ReviewJobQuestionResult' 를 완료 처리, job의 progress 업데이트
                 transactionService.completeQuestion(jobId, result);
                 return Optional.empty();
             } catch (ReviewClientException exception) {

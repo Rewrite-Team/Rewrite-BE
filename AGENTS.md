@@ -28,6 +28,7 @@ Rewrite 서비스의 Java Spring Boot 백엔드다. 팀의 기존 문서·GitHub
 - 의미 있는 범위·동작·계약이 모호하면 해석·trade-off·영향을 설명하고 답변 후 진행한다.
 - 공개 API 계약 변경이나 기준의 모호·누락은 변경안·영향을 설명하고 사용자 승인 후 진행한다.
 - 명시적으로 요청하지 않은 branch·commit·push·issue·PR 생성은 하지 않는다.
+- 이슈용 브랜치는 GitHub에서 생성해 해당 이슈에 연결한 뒤 로컬에서 체크아웃한다. 절차는 [이슈용 브랜치](docs/README.md#이슈용-브랜치)를 따른다.
 - issue·PR·commit은 전체 초안의 별도 명시적 승인 후 생성하며 동일 초안은 재승인받지 않는다.
 - Docker·Compose·Testcontainers는 해당 작업에서 명시적으로 요청한 경우에만 사용한다.
 - 일반 로컬 검증에서 Docker를 시작하지 않으며 Docker 의존 검증은 비의존 테스트로 좁힌다.
