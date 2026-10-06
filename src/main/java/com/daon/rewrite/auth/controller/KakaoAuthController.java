@@ -4,8 +4,8 @@ import com.daon.rewrite.auth.config.AuthCookieFactory;
 import com.daon.rewrite.auth.config.AuthProperties;
 import com.daon.rewrite.auth.config.FrontendTarget;
 import com.daon.rewrite.auth.service.AuthTokenPair;
-import com.daon.rewrite.auth.service.KakaoAuthorizeResult;
-import com.daon.rewrite.auth.service.KakaoLoginResult;
+import com.daon.rewrite.auth.service.KakaoLoginService.AuthorizeResult;
+import com.daon.rewrite.auth.service.KakaoLoginService.LoginResult;
 import com.daon.rewrite.auth.service.KakaoLoginService;
 import com.daon.rewrite.global.openapi.ApiRedirectError;
 import com.daon.rewrite.global.openapi.RewriteApi;
@@ -83,7 +83,7 @@ public class KakaoAuthController {
             );
         }
         try {
-            KakaoAuthorizeResult result = loginService.authorize(frontendTarget);
+            AuthorizeResult result = loginService.authorize(frontendTarget);
             return ResponseEntity.status(HttpStatus.FOUND)
                     .location(result.authorizeUri())
                     .header(HttpHeaders.SET_COOKIE, oauthNonceCookie(result.browserNonce(), 300).toString()) // 로그인 시작 브라우저와 callback 브라우저를 결합한다.
@@ -135,7 +135,7 @@ public class KakaoAuthController {
             @RequestParam(required = false) String state, // state 누락도 400 대신 로그인 실패 리다이렉트로 처리한다.
             @CookieValue(name = OAUTH_NONCE_COOKIE, required = false) String browserNonce
     ) {
-        KakaoLoginResult result = loginService.callback(code, error, state, browserNonce);
+        LoginResult result = loginService.callback(code, error, state, browserNonce);
         return switch (result.status()) {
             case SUCCESS -> success(result.tokens(), result.frontendTarget());
             case CANCELED -> redirect(
