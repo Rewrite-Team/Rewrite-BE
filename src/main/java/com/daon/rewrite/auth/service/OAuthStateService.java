@@ -23,7 +23,7 @@ public class OAuthStateService {
     private final Clock clock;
 
     @Transactional
-    public OAuthStateIssue issue(FrontendTarget frontendTarget) {
+    public StateIssue issue(FrontendTarget frontendTarget) {
         // expiresAt <= 현재시간 인 OAuthLoginState 데이터 삭제
         // 별도 스케줄러 없이 로그인 요청 시점에 오래된 데이터를 정리하는 lazy cleanup 방식
         repository.deleteByExpiresAtLessThanEqual(Instant.now(clock));
@@ -34,7 +34,7 @@ public class OAuthStateService {
                 SecureTokenSupport.sha256(browserNonce),
                 Instant.now(clock).plus(STATE_TTL)
         ));
-        return new OAuthStateIssue(state, browserNonce);
+        return new StateIssue(state, browserNonce);
     }
 
 
@@ -77,5 +77,11 @@ public class OAuthStateService {
             return Optional.empty();
         }
         return FrontendTarget.from(state.substring(separatorIndex + 1));
+    }
+
+    public record StateIssue(
+            String state,
+            String browserNonce
+    ) {
     }
 }

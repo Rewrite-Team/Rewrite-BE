@@ -27,11 +27,11 @@ import com.daon.rewrite.auth.repository.UserRepository;
 import com.daon.rewrite.auth.service.AuthTokenPair;
 import com.daon.rewrite.auth.service.AuthTokenService;
 import com.daon.rewrite.auth.service.CsrfTokenService;
-import com.daon.rewrite.auth.service.KakaoAuthorizeResult;
-import com.daon.rewrite.auth.service.KakaoLoginResult;
+import com.daon.rewrite.auth.service.KakaoLoginService.AuthorizeResult;
+import com.daon.rewrite.auth.service.KakaoLoginService.LoginResult;
 import com.daon.rewrite.auth.service.KakaoLoginService;
 import com.daon.rewrite.auth.service.LoginPersistenceService;
-import com.daon.rewrite.auth.service.OAuthStateIssue;
+import com.daon.rewrite.auth.service.OAuthStateService.StateIssue;
 import com.daon.rewrite.auth.service.OAuthStateService;
 import jakarta.servlet.http.Cookie;
 import java.net.URI;
@@ -113,7 +113,7 @@ class AuthIntegrationTest {
 
     @Test
     void authorizeRedirectsWithBrowserNonceCookie() throws Exception {
-        when(kakaoLoginService.authorize(FrontendTarget.PRODUCTION)).thenReturn(new KakaoAuthorizeResult(
+        when(kakaoLoginService.authorize(FrontendTarget.PRODUCTION)).thenReturn(new AuthorizeResult(
                 URI.create("https://kauth.kakao.com/oauth/authorize?state=state"),
                 "browser-nonce"
         ));
@@ -132,7 +132,7 @@ class AuthIntegrationTest {
 
     @Test
     void authorizeAcceptsOnlyKnownFrontendTargets() throws Exception {
-        when(kakaoLoginService.authorize(FrontendTarget.LOCAL)).thenReturn(new KakaoAuthorizeResult(
+        when(kakaoLoginService.authorize(FrontendTarget.LOCAL)).thenReturn(new AuthorizeResult(
                 URI.create("https://kauth.kakao.com/oauth/authorize?state=state.local"),
                 "browser-nonce"
         ));
@@ -157,7 +157,7 @@ class AuthIntegrationTest {
     @Test
     void successfulCallbackSetsAuthCookiesAndClearsNonce() throws Exception {
         when(kakaoLoginService.callback(eq("code"), eq(null), eq("state"), eq("browser-nonce")))
-                .thenReturn(KakaoLoginResult.success(
+                .thenReturn(LoginResult.success(
                         new AuthTokenPair("access", "refresh"),
                         FrontendTarget.PRODUCTION
                 ));
@@ -185,7 +185,7 @@ class AuthIntegrationTest {
     @Test
     void localCallbackRedirectsToLocalFrontend() throws Exception {
         when(kakaoLoginService.callback(eq("code"), eq(null), eq("state"), eq("browser-nonce")))
-                .thenReturn(KakaoLoginResult.success(
+                .thenReturn(LoginResult.success(
                         new AuthTokenPair("access", "refresh"),
                         FrontendTarget.LOCAL
                 ));
@@ -201,7 +201,7 @@ class AuthIntegrationTest {
     @Test
     void failedCallbackDoesNotSetAuthCookies() throws Exception {
         when(kakaoLoginService.callback(any(), any(), any(), any()))
-                .thenReturn(KakaoLoginResult.failed(FrontendTarget.PRODUCTION));
+                .thenReturn(LoginResult.failed(FrontendTarget.PRODUCTION));
 
         var result = mockMvc.perform(get("/auth/kakao/callback")
                         .queryParam("state", "invalid"))
@@ -220,7 +220,7 @@ class AuthIntegrationTest {
     @Test
     void localCallbackFailureRedirectsToLocalLogin() throws Exception {
         when(kakaoLoginService.callback(any(), any(), any(), any()))
-                .thenReturn(KakaoLoginResult.failed(FrontendTarget.LOCAL));
+                .thenReturn(LoginResult.failed(FrontendTarget.LOCAL));
 
         mockMvc.perform(get("/auth/kakao/callback").queryParam("state", "invalid"))
                 .andExpect(status().isFound())
@@ -232,7 +232,7 @@ class AuthIntegrationTest {
 
     @Test
     void oauthStateCanBeConsumedOnlyOnceByIssuingBrowser() {
-        OAuthStateIssue issue = oauthStateService.issue(FrontendTarget.LOCAL);
+        StateIssue issue = oauthStateService.issue(FrontendTarget.LOCAL);
 
         assertThat(oauthStateService.consume(issue.state(), "other-browser")).isEmpty();
         assertThat(oauthStateService.consume(issue.state(), issue.browserNonce()))
@@ -242,7 +242,7 @@ class AuthIntegrationTest {
 
     @Test
     void oauthStateRejectsTamperedFrontendTarget() {
-        OAuthStateIssue issue = oauthStateService.issue(FrontendTarget.LOCAL);
+        StateIssue issue = oauthStateService.issue(FrontendTarget.LOCAL);
         String tamperedState = issue.state().replace(".local", ".production");
 
         assertThat(oauthStateService.consume(tamperedState, issue.browserNonce())).isEmpty();
@@ -268,7 +268,7 @@ class AuthIntegrationTest {
 
     @Test
     void concurrentCallbacksConsumeOAuthStateExactlyOnce() throws Exception {
-        OAuthStateIssue issue = oauthStateService.issue(FrontendTarget.PRODUCTION);
+        StateIssue issue = oauthStateService.issue(FrontendTarget.PRODUCTION);
         CountDownLatch start = new CountDownLatch(1);
         try (var executor = Executors.newFixedThreadPool(2)) {
             Future<Optional<FrontendTarget>> first = executor.submit(() -> {
