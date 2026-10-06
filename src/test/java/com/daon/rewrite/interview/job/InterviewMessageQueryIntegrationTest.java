@@ -2,9 +2,9 @@ package com.daon.rewrite.interview.job;
 
 import com.daon.rewrite.coverletter.entity.CoverLetter;
 import com.daon.rewrite.coverletter.repository.CoverLetterRepository;
-import com.daon.rewrite.interview.client.InterviewMessageFeedbackClient;
-import com.daon.rewrite.interview.client.InterviewMessageFeedbackMessage;
-import com.daon.rewrite.interview.client.InterviewQuestionGenerationClient;
+import com.daon.rewrite.interview.client.feedback.InterviewMessageFeedbackClient;
+import com.daon.rewrite.interview.client.feedback.InterviewMessageFeedbackMessage;
+import com.daon.rewrite.interview.client.question.InterviewQuestionGenerationClient;
 import com.daon.rewrite.interview.entity.InterviewMessage;
 import com.daon.rewrite.interview.entity.InterviewMessageRole;
 import com.daon.rewrite.interview.entity.InterviewQuestion;

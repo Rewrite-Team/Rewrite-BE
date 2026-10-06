@@ -1,8 +1,8 @@
 package com.daon.rewrite.interview.job;
 
-import com.daon.rewrite.interview.client.InterviewQuestionGenerationClient;
-import com.daon.rewrite.interview.client.InterviewQuestionGenerationClientException;
-import com.daon.rewrite.interview.client.InterviewQuestionGenerationResult;
+import com.daon.rewrite.interview.client.question.InterviewQuestionGenerationClient;
+import com.daon.rewrite.interview.client.question.InterviewQuestionGenerationClientException;
+import com.daon.rewrite.interview.client.question.InterviewQuestionGenerationResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

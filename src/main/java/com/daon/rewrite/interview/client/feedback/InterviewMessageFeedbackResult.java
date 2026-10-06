@@ -1,4 +1,4 @@
-package com.daon.rewrite.interview.client;
+package com.daon.rewrite.interview.client.feedback;
 
 import java.util.List;
 

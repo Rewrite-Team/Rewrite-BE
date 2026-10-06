@@ -1,4 +1,4 @@
-package com.daon.rewrite.interview.client;
+package com.daon.rewrite.interview.client.question;
 
 public class InterviewQuestionGenerationClientException extends RuntimeException {
 

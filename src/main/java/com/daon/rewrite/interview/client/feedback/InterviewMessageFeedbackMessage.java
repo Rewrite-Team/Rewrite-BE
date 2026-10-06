@@ -1,4 +1,4 @@
-package com.daon.rewrite.interview.client;
+package com.daon.rewrite.interview.client.feedback;
 
 import com.daon.rewrite.interview.entity.InterviewMessageRole;
 

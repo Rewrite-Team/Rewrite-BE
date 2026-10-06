@@ -1,4 +1,4 @@
-package com.daon.rewrite.interview.client;
+package com.daon.rewrite.interview.client.feedback;
 
 public class InterviewMessageFeedbackClientException extends RuntimeException {
 
