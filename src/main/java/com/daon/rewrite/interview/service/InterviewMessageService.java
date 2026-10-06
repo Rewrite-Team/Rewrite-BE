@@ -112,11 +112,7 @@ public class InterviewMessageService {
                 message.getId(),
                 message.getRole(),
                 message.getContent(),
-                message.getFeedbackSummary(),
-                message.getFeedbackStrengths(),
-                message.getFeedbackImprovements(),
                 message.getScore(),
-                message.getFollowUpQuestion(),
                 message.getCreatedAt()
         );
     }
