@@ -19,7 +19,7 @@ import com.daon.rewrite.reviewversion.repository.ReviewVersionRepository;
 import com.daon.rewrite.reviewversion.dto.ReviewVersionListResponse;
 import com.daon.rewrite.reviewversion.service.ReviewVersionCommandService;
 import com.daon.rewrite.reviewversion.service.ReviewVersionQueryService;
-import com.daon.rewrite.reviewversion.service.ReviewVersionService;
+import com.daon.rewrite.reviewversion.service.ReviewVersionCompletionService;
 import com.daon.rewrite.reviewversion.service.SaveFinalAnswerInput;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -48,7 +48,7 @@ class ReviewVersionLifecycleIntegrationTest {
     @Autowired private CoverLetterDetailQueryService detailQueryService;
     @Autowired private ReviewVersionCommandService versionCommandService;
     @Autowired private ReviewVersionQueryService versionQueryService;
-    @Autowired private ReviewVersionService versionService;
+    @Autowired private ReviewVersionCompletionService completionService;
     @Autowired private ReviewVersionRepository versionRepository;
     @Autowired private ReviewVersionQuestionResultRepository resultRepository;
     @Autowired private CoverLetterRepository coverLetterRepository;
@@ -183,7 +183,7 @@ class ReviewVersionLifecycleIntegrationTest {
         assertThat(resultRepository.findByReviewVersionIdOrderByQuestionOrderAsc(retryVersionId))
                 .hasSize(1)
                 .allMatch(result -> result.getOriginalAnswer().equals("보존할 최종 작성본"));
-        assertThat(versionService.completeReReview(retry.job().getId()).reviewVersion().getId())
+        assertThat(completionService.completeReReview(retry.job().getId()).reviewVersion().getId())
                 .isEqualTo(retryVersionId);
         assertThat(versionRepository.countByCoverLetterId(coverLetter.getId())).isEqualTo(3);
         assertThat(resultRepository.findByReviewVersionIdOrderByQuestionOrderAsc(retryVersionId)).hasSize(1);

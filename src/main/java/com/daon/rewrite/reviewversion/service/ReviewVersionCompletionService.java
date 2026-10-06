@@ -29,7 +29,7 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-public class ReviewVersionService {
+public class ReviewVersionCompletionService {
 
     private static final String QUESTION_RESULT_ID_PREFIX = "rvqr";
     private static final String COMPLETED_MESSAGE = "첨삭이 완료되었습니다.";
@@ -62,33 +62,7 @@ public class ReviewVersionService {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR);
         }
 
-        List<ReviewJobQuestionResult> stagedResults = findCompletedStagedResults(job);
-
-        Instant now = Instant.now(clock);
-        ReviewVersion reviewVersion = findJobVersion(job);
-
-        List<ReviewVersionQuestionResult> questionResults = stagedResults.stream()
-                .map(stagedResult -> ReviewVersionQuestionResult.createFromSnapshot(
-                    idGenerator.generate(QUESTION_RESULT_ID_PREFIX),
-                    reviewVersion,
-                    stagedResult.getQuestion(),
-                    stagedResult.getInputAnswer(),
-                    stagedResult.getAiReport(),
-                    stagedResult.getRewrittenAnswer()
-                ))
-                .toList();
-        questionResults = questionResultRepository.saveAll(questionResults);
-
-        coverLetter.completeReview(reviewVersion.getId(), now);
-        job.markCompleted(
-                job.getProgressTotal(),
-                COMPLETED_MESSAGE,
-                LlmJobResultRefType.REVIEW_VERSION,
-                reviewVersion.getId(),
-                now
-        );
-
-        return new CompleteReviewResult(reviewVersion, questionResults);
+        return completeReview(coverLetter, job);
     }
 
     @Transactional
@@ -124,6 +98,11 @@ public class ReviewVersionService {
                         coverLetter.getId()
                 )
                 .orElseThrow(() -> new BusinessException(ErrorCode.INTERNAL_ERROR));
+
+        return completeReview(coverLetter, job);
+    }
+
+    private CompleteReviewResult completeReview(CoverLetter coverLetter, LlmJob job) {
         List<ReviewJobQuestionResult> stagedResults = findCompletedStagedResults(job);
 
         Instant now = Instant.now(clock);

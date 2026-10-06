@@ -1,7 +1,7 @@
 package com.daon.rewrite.reviewversion.job;
 
 import com.daon.rewrite.reviewversion.client.ReviewClientException;
-import com.daon.rewrite.reviewversion.service.ReviewVersionService;
+import com.daon.rewrite.reviewversion.service.ReviewVersionCompletionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -15,7 +15,7 @@ public class FirstReviewJobWorker {
 
     private final FirstReviewJobTransactionService transactionService;
     private final ReviewQuestionJobRunner jobRunner;
-    private final ReviewVersionService reviewVersionService;
+    private final ReviewVersionCompletionService reviewVersionCompletionService;
 
     public void execute(String jobId) {
         try {
@@ -31,7 +31,7 @@ public class FirstReviewJobWorker {
                 return;
             }
             // 제출 시 생성한 버전에 성공 문항을 확정하고 최신 성공 버전을 갱신한다.
-            reviewVersionService.completeFirstReview(jobId);
+            reviewVersionCompletionService.completeFirstReview(jobId);
         } catch (RuntimeException exception) {
             try {
                 transactionService.failUnexpected(jobId);

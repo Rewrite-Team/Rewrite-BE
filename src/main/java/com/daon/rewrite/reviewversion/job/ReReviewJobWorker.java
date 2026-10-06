@@ -1,7 +1,7 @@
 package com.daon.rewrite.reviewversion.job;
 
 import com.daon.rewrite.reviewversion.client.ReviewClientException;
-import com.daon.rewrite.reviewversion.service.ReviewVersionService;
+import com.daon.rewrite.reviewversion.service.ReviewVersionCompletionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -15,7 +15,7 @@ public class ReReviewJobWorker {
 
     private final ReReviewJobTransactionService transactionService;
     private final ReviewQuestionJobRunner jobRunner;
-    private final ReviewVersionService reviewVersionService;
+    private final ReviewVersionCompletionService reviewVersionCompletionService;
 
     public void execute(String jobId) {
         try {
@@ -28,7 +28,7 @@ public class ReReviewJobWorker {
                 transactionService.fail(jobId, failureReason.get());
                 return;
             }
-            reviewVersionService.completeReReview(jobId);
+            reviewVersionCompletionService.completeReReview(jobId);
         } catch (RuntimeException exception) {
             try {
                 transactionService.failUnexpected(jobId);
