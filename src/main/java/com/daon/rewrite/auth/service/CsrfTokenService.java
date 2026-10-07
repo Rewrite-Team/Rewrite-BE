@@ -13,6 +13,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
+/**
+ * 상태 변경 요청의 X-CSRF-Token 헤더에 사용할 서명 토큰을 발급·검증한다.
+ * 서버에 토큰을 저장하지 않고 만료 시각과 HMAC 서명으로 검증하며, 사용자나 로그인 세션에 결합하지 않는다.
+ */
 @Service
 @Profile("auth-real")
 @RequiredArgsConstructor
@@ -26,13 +30,20 @@ public class CsrfTokenService {
     private final SecretKey secretKey;
     private final Clock clock;
 
-    // 토큰 형식: 만료 시각(epoch seconds).난수.HMAC 서명
+    /**
+     * 만료 시각(epoch seconds)·난수·Base64URL HMAC 서명을 점으로 연결한 토큰을 반환한다.
+     * 서명은 만료 시각과 난수를 함께 보호하며, 발급한 토큰은 30분 동안 재사용할 수 있다.
+     */
     public String issue() {
         String payload = Instant.now(clock).plus(TOKEN_TTL).getEpochSecond()
                 + "." + SecureTokenSupport.randomToken();
         return payload + "." + encode(sign(payload));
     }
 
+    /**
+     * 전달된 토큰의 형식과 만료 시각을 확인한 뒤 같은 payload로 계산한 서명을 비교한다.
+     * 입력 형식 오류·만료·서명 불일치는 false로 처리하고, 서명 계산 자체의 실패는 내부 오류로 전파한다.
+     */
     public boolean isValid(String token) {
         if (token == null || token.isBlank() || token.length() > MAX_TOKEN_LENGTH) {
             return false;

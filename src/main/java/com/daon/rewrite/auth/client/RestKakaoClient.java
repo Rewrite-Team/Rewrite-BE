@@ -12,6 +12,10 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
+/**
+ * 인가 코드를 카카오 access token으로 교환한 뒤 사용자 정보를 조회한다.
+ * 카카오 응답 검증과 오류 변환을 담당하며, 카카오 access token은 사용자 조회에만 사용한다.
+ */
 @Component
 @Profile("auth-real")
 public class RestKakaoClient implements KakaoClient {
@@ -27,21 +31,19 @@ public class RestKakaoClient implements KakaoClient {
 
 
     /**
-     * 카카오가 callback으로 준 인가코드 authorizationCode를 이용하여 카카오 사용자 정보를 조회하고 KakaoUser 로 변환
-     * @param authorizationCode 카카오가 callback으로 준 인가코드
-     * @return KakaoUser
+     * 통신·요청 오류를 KakaoClientException으로 변환해 로그인 서비스에 전달한다.
+     * 토큰이나 사용자 식별자·닉네임이 없는 응답도 같은 예외로 거부하며 프로필 이미지는 없어도 허용한다.
      */
     @Override
     public KakaoUser getUser(String authorizationCode) {
         try {
-            // authorizationCode 를 accessToken 으로 교환
             String kakaoAccessToken = exchangeToken(authorizationCode);
             KakaoUserResponse response = restClient
                     .get()
                     .uri(properties.kakao().userInfoUri())
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + kakaoAccessToken)    // Authorization: Bearer {카카오-access-token}
-                    .retrieve()     // 앞에서 구상한 GET 요청을 실행하고 응답 처리를 시작
-                    .body(KakaoUserResponse.class); // JSON 응답을 KakaoUserResponse 객체로 역직렬화
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + kakaoAccessToken)
+                    .retrieve()
+                    .body(KakaoUserResponse.class);
             return toUser(response);
         } catch (RestClientException | IllegalArgumentException e) {
             throw new KakaoClientException("Kakao login provider request failed", e);
@@ -53,7 +55,7 @@ public class RestKakaoClient implements KakaoClient {
         form.add("grant_type", "authorization_code");
         form.add("client_id", properties.kakao().clientId());
         form.add("client_secret", properties.kakao().clientSecret());
-        form.add("redirect_uri", properties.kakao().redirectUri()); // 인가 코드가 전달된 리다이렉트 URI
+        form.add("redirect_uri", properties.kakao().redirectUri());
         form.add("code", authorizationCode);
 
         KakaoTokenResponse response = restClient

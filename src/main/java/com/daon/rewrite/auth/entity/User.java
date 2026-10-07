@@ -13,6 +13,11 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+/**
+ * OAuth 계정을 Rewrite 내부 사용자 ID에 연결하는 계정이다.
+ * provider와 providerUserId 조합으로 같은 외부 계정을 식별하고, 내부 ID는 인증 주체와 리소스 소유권 기준으로 사용한다.
+ * 재로그인 시에는 계정 식별자를 유지하면서 카카오의 최신 닉네임·프로필 이미지로 갱신한다.
+ */
 @Getter
 @Entity
 @Table(
@@ -48,7 +53,6 @@ public class User {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    // 직접 생성자를 호출하지 않고 정적 팩토리 메서드를 사용
     private User(
             String id,
             AuthProvider provider,

@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/** 서버의 refresh token 폐기와 브라우저의 두 인증 Cookie 만료를 연결하는 로그아웃 진입점. */
 @RestController
 @Profile("auth-real")
 @RequestMapping("/auth")
@@ -49,6 +50,7 @@ public class LogoutController {
             @CookieValue(name = AuthCookieFactory.REFRESH_TOKEN_COOKIE, required = false) String refreshToken
     ) {
         logoutService.logout(refreshToken);
+        // 토큰이 없거나 이미 만료된 경우에도 브라우저의 인증 Cookie는 동일하게 정리한다.
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, AuthCookieFactory.clearAccessToken().toString())
                 .header(HttpHeaders.SET_COOKIE, AuthCookieFactory.clearRefreshToken().toString())

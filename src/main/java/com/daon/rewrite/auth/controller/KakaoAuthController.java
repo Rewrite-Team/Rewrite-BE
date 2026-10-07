@@ -28,6 +28,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.util.UriComponentsBuilder;
 
+/**
+ * 카카오 로그인 결과를 브라우저의 Cookie와 redirect 응답으로 연결하는 HTTP 경계.
+ * state·nonce 검증과 로그인 처리는 {@link KakaoLoginService}에 맡기고, 모든 callback 결과에서 nonce Cookie를 만료한다.
+ */
 @RestController
 @Slf4j
 @Profile("auth-real")
@@ -77,6 +81,7 @@ public class KakaoAuthController {
     ) {
         FrontendTarget frontendTarget = FrontendTarget.from(target).orElse(null);
         if (frontendTarget == null) {
+            // 허용하지 않은 target을 redirect 주소로 사용하지 않고 운영 로그인 화면으로 돌려보낸다.
             return redirect(
                     loginFailureUri(FrontendTarget.PRODUCTION, "KAKAO_LOGIN_FAILED"),
                     clearOauthNonceCookie()
@@ -136,6 +141,7 @@ public class KakaoAuthController {
             @CookieValue(name = OAUTH_NONCE_COOKIE, required = false) String browserNonce
     ) {
         LoginResult result = loginService.callback(code, error, state, browserNonce);
+        // 서비스가 반환한 복귀 환경과 결과를 사용해 성공 Cookie 발급 또는 오류 redirect를 선택한다.
         return switch (result.status()) {
             case SUCCESS -> success(result.tokens(), result.frontendTarget());
             case CANCELED -> redirect(
@@ -174,7 +180,8 @@ public class KakaoAuthController {
     }
 
     private static ResponseCookie oauthNonceCookie(String value, long maxAge) {
-        return AuthCookieFactory.cookie(OAUTH_NONCE_COOKIE, value, "/auth/kakao", maxAge); // nonce는 /auth/kakao에만 필요하다.
+        // state는 카카오를 왕복하고 nonce는 이 경로의 Cookie로 남겨 시작 브라우저와 callback을 함께 검증한다.
+        return AuthCookieFactory.cookie(OAUTH_NONCE_COOKIE, value, "/auth/kakao", maxAge);
     }
 
     private static ResponseCookie clearOauthNonceCookie() {

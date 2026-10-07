@@ -13,6 +13,12 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+/**
+ * Rewrite 인증 갱신에 사용하는 토큰의 서버 측 기록이다.
+ * 원문은 Cookie로 전달하고 DB에는 SHA-256 해시와 발급·만료·폐기 시각을 저장한다.
+ * 발급 서비스는 14일 만료를 지정하며, 갱신 시 기존 기록을 폐기하고 새 토큰 기록을 만든다.
+ * 로그아웃도 기존 기록을 폐기하므로 만료 전이라도 revokedAt이 있으면 재사용할 수 없다.
+ */
 @Getter
 @Entity
 @Table(name = "refresh_tokens")
@@ -28,7 +34,7 @@ public class RefreshToken {
             name = "user_id",
             nullable = false,
             updatable = false,
-            foreignKey = @ForeignKey(name = "fk_refresh_tokens_user")   // DB 외래 키 제약조건 이름 설정
+            foreignKey = @ForeignKey(name = "fk_refresh_tokens_user")
     )
     private User user;
 
@@ -38,8 +44,6 @@ public class RefreshToken {
     @Column(name = "expires_at", nullable = false, updatable = false)
     private Instant expiresAt;
 
-    // 토큰이 폐기된 시각, 아직 유효하면 null
-    // Refresh 요청, 로그아웃 시 토큰 폐기
     @Column(name = "revoked_at")
     private Instant revokedAt;
 

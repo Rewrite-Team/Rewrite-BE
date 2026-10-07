@@ -10,6 +10,10 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
+/**
+ * Security 필터에서 검증한 JWT의 사용자 ID로 DB의 현재 프로필을 조회한다.
+ * 인증 정보가 없거나 해당 사용자가 DB에 없으면 도메인 처리 전에 인증 실패로 종료한다.
+ */
 @Component
 @Profile("auth-real")
 @RequiredArgsConstructor
@@ -19,15 +23,12 @@ public class AuthenticatedCurrentUserProvider implements CurrentUserProvider {
 
     @Override
     public CurrentUser currentUser() {
-        // Spring Security가 저장해 둔 현재 사용자의 인증 정보를 가져옴
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        // 인증 객체가 없거나 인증되지 않은 객체인 경우 HTTP 401 Unauthorized응답으로 변환
         if (authentication == null || !authentication.isAuthenticated()) {
             throw new BusinessException(ErrorCode.UNAUTHORIZED);
         }
 
-        // Spring Security 의 기본 JwtAuthenticationToken 은 JWT의 sub를 이름으로 사용
-        // 토큰 발습 시 .subject(userId) 를 넣었으므로 authentication.getName() = JWT의 sub = userId
+        // AuthTokenService가 JWT의 sub에 넣은 사용자 ID를 JwtAuthenticationToken의 name으로 읽는다.
         User user = userRepository.findById(authentication.getName())
                 .orElseThrow(() -> new BusinessException(ErrorCode.UNAUTHORIZED));
         return new CurrentUser(

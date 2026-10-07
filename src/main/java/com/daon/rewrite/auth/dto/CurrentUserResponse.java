@@ -17,6 +17,7 @@ public record CurrentUserResponse(
 
     private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
 
+    // 내부 Instant를 API의 Asia/Seoul 기준 offset 없는 날짜·시간으로 변환한다.
     public static CurrentUserResponse from(CurrentUser user) {
         return new CurrentUserResponse(
                 user.id(),

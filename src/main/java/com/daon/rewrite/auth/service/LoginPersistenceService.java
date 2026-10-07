@@ -14,6 +14,10 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * 카카오 조회 결과를 Rewrite 사용자에 반영하고 로그인에 사용할 인증 토큰을 준비한다.
+ * 외부 카카오 요청이 끝난 뒤 호출되어 사용자 생성·프로필 갱신과 refresh token 저장을 함께 처리한다.
+ */
 @Service
 @Profile("auth-real")
 @RequiredArgsConstructor
@@ -25,7 +29,11 @@ public class LoginPersistenceService {
     private final IdGenerator idGenerator;
     private final Clock clock;
 
-    // 카카오 조회가 끝난 뒤 사용자 변경과 refresh token 저장을 같은 트랜잭션에서 처리한다.
+    /**
+     * provider와 provider 사용자 ID로 기존 사용자를 찾고, 있으면 프로필을 갱신하며 없으면 생성한다.
+     * 사용자 변경과 새 refresh token 해시 저장을 같은 트랜잭션에서 커밋한다.
+     * 반환한 토큰 원문은 컨트롤러가 인증 Cookie로 전달한다.
+     */
     @Transactional
     public AuthTokenPair login(KakaoUser kakaoUser) {
         Instant now = Instant.now(clock);

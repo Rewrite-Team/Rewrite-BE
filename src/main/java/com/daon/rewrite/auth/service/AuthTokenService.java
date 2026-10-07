@@ -14,6 +14,10 @@ import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.stereotype.Service;
 
+/**
+ * Rewrite 인증에 사용하는 access JWT와 난수 refresh token을 생성한다.
+ * refresh token의 DB 저장·폐기는 로그인·갱신·로그아웃 서비스가, Cookie 발급은 컨트롤러가 담당한다.
+ */
 @Service
 @Profile("auth-real")
 @RequiredArgsConstructor
@@ -26,6 +30,10 @@ public class AuthTokenService {
     private final AuthProperties properties;
     private final Clock clock;
 
+    /**
+     * 사용자 ID를 subject로 담은 30분 수명의 access JWT를 발급한다.
+     * issuer·audience·purpose는 인증 설정의 JWT 검증 조건과 맞춘다.
+     */
     public String issueAccessToken(String userId) {
         Instant now = Instant.now(clock);
         JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).type("JWT").build();
@@ -36,7 +44,7 @@ public class AuthTokenService {
                 .expiresAt(now.plus(ACCESS_TOKEN_TTL))
                 .subject(userId)
                 .id(SecureTokenSupport.randomToken())
-                .claim("purpose", "access") // 인증에는 access 용도의 JWT만 허용한다.
+                .claim("purpose", "access")
                 .build();
         return jwtEncoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
     }

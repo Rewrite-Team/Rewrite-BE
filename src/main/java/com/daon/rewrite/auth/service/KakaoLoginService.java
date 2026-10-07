@@ -12,6 +12,11 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 import org.springframework.web.util.UriComponentsBuilder;
 
+/**
+ * 카카오 로그인 시작과 callback의 state 검증·사용자 조회·Rewrite 로그인 처리를 연결한다.
+ * 외부 호출은 {@link KakaoClient}에, 사용자·토큰 저장은 {@link LoginPersistenceService}에 맡긴다.
+ * 결과에 따른 Cookie·redirect 응답은 컨트롤러가 작성한다.
+ */
 @Slf4j
 @Service
 @Profile("auth-real")
@@ -23,43 +28,47 @@ public class KakaoLoginService {
     private final LoginPersistenceService loginPersistenceService;
     private final AuthProperties properties;
 
+    /**
+     * 복귀할 프론트엔드 환경을 state에 결합하고 카카오 인가 URL을 만든다.
+     * state는 URL query로 전달하고, 함께 반환한 nonce는 컨트롤러가 로그인 시작 브라우저의 Cookie에 담는다.
+     */
     public AuthorizeResult authorize(FrontendTarget frontendTarget) {
         StateIssue issue = stateService.issue(frontendTarget);
         URI authorizeUri = UriComponentsBuilder.fromUriString(properties.kakao().authorizeUri())
                 .queryParam("client_id", properties.kakao().clientId())
                 .queryParam("redirect_uri", properties.kakao().redirectUri())
                 .queryParam("response_type", "code")
-                .queryParam("state", issue.state()) // CSRF 공격으로부터 카카오 로그인 요청을 보호하기 위해 사용하는 사용자의 로그인 요청에 대한 고유한 값
+                .queryParam("state", issue.state())
                 .build()
                 .encode()
                 .toUri();
         return new AuthorizeResult(authorizeUri, issue.browserNonce());
     }
 
+    /**
+     * 성공·취소·실패 판단에 앞서 {@link OAuthStateService}가 state와 브라우저 nonce를 검증하고 일회성으로 소비한다.
+     * 검증 전에는 운영 환경을 사용하고, 검증 후에는 state에 결합된 환경으로 결과를 돌려보낸다.
+     * 성공하면 Rewrite 인증 토큰을 반환하며, 내부 처리 오류는 원인을 로그에 남긴 뒤 일반 로그인 실패로 변환한다.
+     */
     public LoginResult callback(String code, String error, String state, String browserNonce) {
         FrontendTarget frontendTarget = FrontendTarget.PRODUCTION;
         try {
             var consumedTarget = stateService.consume(state, browserNonce);
             if (consumedTarget.isEmpty()) {
-                // state 와 browserNonce 를 정상적으로 소비하지 못했다면 실패 결과를 반환
                 return LoginResult.failed(frontendTarget);
             }
             frontendTarget = consumedTarget.orElseThrow();
-            // 사용자가 로그인 취소
+            // state 검증을 통과한 access_denied 응답만 사용자 취소로 구분한다.
             if ("access_denied".equals(error) && isBlank(code)) {
                 return LoginResult.canceled(frontendTarget);
             }
-            // 위의 로그인 취소 조건을 통과하지 못하는 요청에 대해 성공 callback 형태가 맞는지 확인
             if (!isBlank(error) || isBlank(code)) {
                 return LoginResult.failed(frontendTarget);
             }
-            // 카카오에서 전달받은 authorization code를 사용해 카카오 사용자 정보를 가져옴
+            // 카카오 사용자 조회를 마친 뒤 LoginPersistenceService가 사용자 변경과 토큰 저장의 트랜잭션을 담당한다.
             KakaoUser kakaoUser = kakaoClient.getUser(code);
-            // 조회한 카카오 사용자 정보로 Rewrite 서비스 로그인 처리
-            // 기존 사용자 검색 - 없으면 사용자 생성 - Rewrite access token 생성 - Rewrite refresh token Tㅐㅇ성 - AuthTokenPair 반환
             return LoginResult.success(loginPersistenceService.login(kakaoUser), frontendTarget);
         } catch (RuntimeException e) {
-            // callback 처리중 발생하는 내부 오류를 컨트롤러까지 그대로 던지지 않고 일반 로그인 실패로 변환
             log.warn("Kakao login callback failed", e);
             return LoginResult.failed(frontendTarget);
         }

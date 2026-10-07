@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/** 현재 사용자 조회를 profile별 {@link CurrentUserProvider}에 위임하고 API 응답으로 변환한다. */
 @RestController
 @RequestMapping("/user")
 @RequiredArgsConstructor
