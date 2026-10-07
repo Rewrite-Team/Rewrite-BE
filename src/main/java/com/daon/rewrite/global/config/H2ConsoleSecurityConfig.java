@@ -14,43 +14,44 @@ import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 
+/**
+ * db-h2에서 H2 Console만 내부 도구 계정의 Basic Auth로 보호한다.
+ * 일반 API보다 먼저 선택되는 전용 체인이므로 개발용 인증 생략이나 사용자 JWT 정책과 분리된다.
+ */
 @Configuration
 @Profile("db-h2")
 @EnableConfigurationProperties(InternalToolsProperties.class)
 public class H2ConsoleSecurityConfig {
 
+    /**
+     * 설정에서 받은 계정을 메모리에 등록하고 H2_CONSOLE 역할이 있는 요청만 허용한다.
+     * Console의 form 요청을 위해 이 경로에서만 CSRF를 생략하고, 화면 구성에 필요한 같은 Origin의 iframe을 허용한다.
+     * 인증은 HTTP 세션에 저장하지 않고 Basic Auth로 처리한다.
+     */
     @Bean
     @Order(1)
     SecurityFilterChain h2ConsoleSecurityFilterChain(
             HttpSecurity http,
             InternalToolsProperties properties
     ) throws Exception {
-        // Spring Security 의 비밀번호 인코더를 생성한다.
         var passwordEncoder = PasswordEncoderFactories.createDelegatingPasswordEncoder();
-        // 환경변수로 내부 도구 계정을 만든다.
         var h2ConsoleUser = User.withUsername(properties.username())
                 .password(passwordEncoder.encode(properties.password()))
-                .roles("H2_CONSOLE")        // ROLE_H2_CONSOLE 권한 부여
+                .roles("H2_CONSOLE")
                 .build();
-        // InMemoryUserDetailsManager : 내부 도구 계정 보관
         var users = new InMemoryUserDetailsManager(h2ConsoleUser);
-        // DaoAuthenticationProvider : 입력된 ID와 비밀번호 검증
         var authenticationProvider = new DaoAuthenticationProvider(users);
-        // PasswordEncoder : 입력 비밀번호와 인코딩된 비밀번호 비교
         authenticationProvider.setPasswordEncoder(passwordEncoder);
 
         return http
-                // H2 Console 하위 경로에만 필터 체인 적용
+                // CSRF·iframe 예외가 일반 API에 적용되지 않도록 Console 경로로 한정한다.
                 .securityMatcher("/h2-console/**")
                 .authenticationProvider(authenticationProvider)
-                // /h2-console/**의 모든 요청은 ROLE_H2_CONSOLE 권한이 있어야 통과
                 .authorizeHttpRequests(authorize -> authorize
                         .anyRequest().hasRole("H2_CONSOLE")
                 )
                 .httpBasic(basic -> basic.realmName("rewrite-internal-tools"))
-                // pring Security CSRF를 비활성화
                 .csrf(AbstractHttpConfigurer::disable)
-                // 기본 Spring Security 설정은 iframe을 차단하므로 H2 화면이 제대로 표시되지 않는다. 따라서 iframe 혀용 설정
                 .headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()))
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)

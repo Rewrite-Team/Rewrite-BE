@@ -16,6 +16,10 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.http.MediaType;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+/**
+ * 도메인별 시작 API가 반환한 Job을 상태 조회와 SSE로 추적하는 공통 HTTP 진입점.
+ * 조회는 LlmJobService에, 연결 등록·초기 상태 전송·후속 이벤트는 LlmJobStreamService에 맡긴다.
+ */
 @RestController
 @RequiredArgsConstructor
 public class LlmJobController {

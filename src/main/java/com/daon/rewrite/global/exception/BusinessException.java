@@ -5,6 +5,7 @@ import lombok.Getter;
 
 import java.util.List;
 
+/** 서비스에서 분류한 오류 코드와 입력별 상세 사유를 HTTP 오류 응답 경계로 전달한다. */
 @Getter
 public class BusinessException extends RuntimeException {
 
