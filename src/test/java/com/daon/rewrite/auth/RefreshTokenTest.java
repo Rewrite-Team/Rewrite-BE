@@ -7,6 +7,7 @@ import com.daon.rewrite.auth.entity.User;
 import java.time.Instant;
 import org.junit.jupiter.api.Test;
 
+/** DB 없이 엔티티가 판단하는 만료 시각의 경계와 폐기 후 활성 여부를 검증한다. */
 class RefreshTokenTest {
 
     @Test

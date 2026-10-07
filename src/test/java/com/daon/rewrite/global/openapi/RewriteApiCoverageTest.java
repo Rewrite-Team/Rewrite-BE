@@ -27,6 +27,10 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 
+/**
+ * 등록한 controller의 매핑과 {@code @RewriteApi}를 직접 읽어 API 목록·ID·경로·문서 규칙의 누락을 검증한다.
+ * Spring context 없이 annotation 선언을 검사하며 생성된 OpenAPI와 보안 필터 동작은 통합 테스트가 확인한다.
+ */
 class RewriteApiCoverageTest {
 
     private static final List<Class<?>> CONTROLLERS = List.of(

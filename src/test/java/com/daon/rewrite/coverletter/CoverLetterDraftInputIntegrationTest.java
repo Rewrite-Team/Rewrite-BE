@@ -26,6 +26,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+/** 등록 step의 불완전 입력 허용·정규화와 검증 실패 시 기존 저장값 보존을 실제 DB에서 확인한다. */
 @SpringBootTest
 @ActiveProfiles("test")
 class CoverLetterDraftInputIntegrationTest {
@@ -34,6 +35,7 @@ class CoverLetterDraftInputIntegrationTest {
     @Autowired private CoverLetterRepository coverLetterRepository;
     @Autowired private CoverLetterQuestionRepository questionRepository;
 
+    // 입력 저장 검증에 외부 첨삭 실행이 섞이지 않도록 비동기 Worker를 대체한다.
     @MockitoBean private FirstReviewJobWorker firstReviewJobWorker;
     @MockitoBean private ReReviewJobWorker reReviewJobWorker;
 
@@ -244,6 +246,7 @@ class CoverLetterDraftInputIntegrationTest {
                 .toList();
     }
 
+    // 실패 전후의 값뿐 아니라 문항 ID·updatedAt도 비교해 행 교체나 부분 저장이 없었는지 확인한다.
     private StoredDraft storedDraft(String coverLetterId) {
         CoverLetter coverLetter = coverLetterRepository.findById(coverLetterId).orElseThrow();
         return new StoredDraft(

@@ -1,3 +1,5 @@
+# test group은 auth-dev를 활성화하고 이 파일은 테스트 전용 인메모리 DB와 외부 AI 설정용 값을 제공한다.
+# PostgreSQL 호환 모드 H2를 사용하며 context 생성·종료 시 schema를 만들고 삭제한다.
 spring:
 
   datasource:
@@ -25,5 +27,6 @@ spring:
       api-key: test-key
       chat:
         options:
-          model: gpt-5-nano  # GPT-5 models do not support temperature parameter
-          temperature: 1 # temperature 미 설정 시 기본값 0.7 이 들어가면서 error 발생. 해당 모델은 temperature: 1 만 가능
+          model: gpt-5-nano
+          # 애플리케이션과 같은 호출 옵션을 명시한다. 실제 외부 호출 대체는 각 테스트의 mock이 담당한다.
+          temperature: 1

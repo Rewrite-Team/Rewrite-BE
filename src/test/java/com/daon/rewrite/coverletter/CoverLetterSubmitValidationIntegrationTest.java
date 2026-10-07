@@ -31,6 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 
+/** step 저장에서 허용한 미완성 값과 제출 시 필수값 검증을 구분하고, 제출 실패의 DB 부수효과를 확인한다. */
 @SpringBootTest
 @ActiveProfiles("test")
 class CoverLetterSubmitValidationIntegrationTest {
@@ -41,6 +42,7 @@ class CoverLetterSubmitValidationIntegrationTest {
     @Autowired private LlmJobRepository jobRepository;
     @Autowired private ReviewVersionRepository versionRepository;
 
+    // 제출 성공 후에도 Job을 PENDING에 유지해 요청 트랜잭션의 검증·생성 결과만 확인한다.
     @MockitoBean private FirstReviewJobWorker firstReviewJobWorker;
     @MockitoBean private ReReviewJobWorker reReviewJobWorker;
 
@@ -173,6 +175,7 @@ class CoverLetterSubmitValidationIntegrationTest {
                 .containsExactly(tuple("기존 질문", 100, "기존 답변"));
     }
 
+    // 검증 실패가 입력·상태·시각 변경이나 Job·버전 생성을 남기지 않았는지 함께 확인한다.
     private void assertNoSubmissionSideEffects(CoverLetter before) {
         CoverLetter after = coverLetterRepository.findById(before.getId()).orElseThrow();
         assertThat(after.getStatus()).isEqualTo(CoverLetterStatus.WRITING);

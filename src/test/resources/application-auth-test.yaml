@@ -1,3 +1,5 @@
+# auth-test group은 auth-real을 활성화해 실제 JWT·CSRF 구성과 인증 controller를 테스트한다.
+# 이 파일은 전용 인메모리 DB와 테스트 설정값을 제공하며 외부 호출을 자동으로 모의하지 않는다.
 spring:
   datasource:
     url: jdbc:h2:mem:rewrite-auth-test;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
@@ -22,6 +24,8 @@ spring:
           temperature: 1
 
 rewrite:
+  # 고정 서명 키·프론트엔드 주소·카카오 client 정보는 인증 테스트용 값이다.
+  # AuthIntegrationTest는 KakaoLoginService를 모의해 카카오 로그인 외부 호출을 대체한다.
   auth:
     issuer: rewrite
     audience: rewrite-web

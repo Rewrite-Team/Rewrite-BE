@@ -1,3 +1,5 @@
+# local-postgres와 prod가 공유하는 DB 설정이다. 인증 방식은 각 group의 auth profile이 결정한다.
+# 접속 정보는 환경변수로 받으며 이 파일은 PostgreSQL 서버를 시작하거나 데이터를 이관하지 않는다.
 spring:
   datasource:
     url: ${DB_URL}
@@ -7,4 +9,5 @@ spring:
 
   jpa:
     hibernate:
+      # 애플리케이션 시작 시 Hibernate가 entity와 기존 schema를 비교해 갱신한다.
       ddl-auto: update

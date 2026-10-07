@@ -16,6 +16,10 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+/**
+ * standalone MockMvc에 컨트롤러와 공통 예외 처리만 등록해 저장소 실패의 HTTP 응답을 검증한다.
+ * 내부 오류가 나면 쿠키 삭제 응답을 내리지 않는지 확인하며, 인증·CSRF 필터 검증은 통합 테스트에서 다룬다.
+ */
 class LogoutControllerTest {
 
     @Test

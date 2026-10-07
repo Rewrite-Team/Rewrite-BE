@@ -39,6 +39,10 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+/**
+ * 저장된 메시지의 공개 JSON과 다음 피드백 요청에 전달할 문맥을 확인한다.
+ * 고정 ID fixture는 각 테스트의 트랜잭션 롤백으로 정리한다.
+ */
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
@@ -59,6 +63,7 @@ class InterviewMessageQueryIntegrationTest {
     @Autowired private InterviewMessageFeedbackJobTransactionService feedbackTransactionService;
     @Autowired private EntityManager entityManager;
 
+    // 자동 Job 실행·외부 호출을 배제하고 조회 및 실제 입력 준비 서비스까지만 검증한다.
     @MockitoBean private InterviewMessageFeedbackJobEventListener feedbackEventListener;
     @MockitoBean private InterviewQuestionGenerationJobEventListener questionEventListener;
     @MockitoBean private InterviewMessageFeedbackClient feedbackClient;
@@ -77,11 +82,13 @@ class InterviewMessageQueryIntegrationTest {
         InterviewMessage latest = InterviewMessage.userAnswer(
                 "im_30", thread, "응답 시간을 측정했습니다.", NOW.plusSeconds(60)
         );
+        // 저장 순서를 뒤섞고 같은 시각의 메시지도 두어 createdAt·id 조회 순서를 확인한다.
         messageRepository.saveAll(List.of(latest, assistant, first));
         LlmJob job = jobRepository.save(LlmJob.pendingInterviewMessageFeedback(
                 "job_message_query", thread.getInterviewSession().getCoverLetter().getId(),
                 latest.getId(), NOW.plusSeconds(120)
         ));
+        // 변경을 DB에 반영한 뒤 영속성 컨텍스트를 비워 저장된 값을 다시 조회하게 한다.
         entityManager.flush();
         entityManager.clear();
 
@@ -153,6 +160,7 @@ class InterviewMessageQueryIntegrationTest {
         assertThat(stored.getFeedbackImprovements()).containsExactly("결과 지표 보완");
         assertThat(stored.getFollowUpQuestion()).isEqualTo("어떤 지표로 결과를 확인했나요?");
 
+        // LLM 호출 전 입력 준비만 직접 실행해 이전 assistant의 전체 content가 문맥에 포함되는지 확인한다.
         InterviewMessageFeedbackWork work = feedbackTransactionService.start(job.getId());
 
         assertThat(work).isNotNull();
@@ -165,6 +173,7 @@ class InterviewMessageQueryIntegrationTest {
         verifyNoInteractions(feedbackClient, questionClient, feedbackEventListener, questionEventListener);
     }
 
+    // 조회·피드백 입력 준비에 필요한 ACTIVE 세션·질문·thread의 최소 관계만 구성한다.
     private InterviewThread createThread() {
         CoverLetter coverLetter = coverLetterRepository.save(
                 CoverLetter.create("cl_message_query", "user_dev_001", NOW)

@@ -12,6 +12,10 @@ import com.daon.rewrite.global.exception.GlobalExceptionHandler;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+/**
+ * standalone MockMvc에 컨트롤러와 공통 예외 처리만 등록해 토큰 발급 실패의 HTTP 오류 계약을 검증한다.
+ * 인증 필터와 실제 서명 처리는 통합 테스트·서비스 테스트에서 다룬다.
+ */
 class CsrfTokenControllerTest {
 
     @Test

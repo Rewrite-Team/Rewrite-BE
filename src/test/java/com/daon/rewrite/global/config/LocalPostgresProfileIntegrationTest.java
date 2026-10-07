@@ -19,6 +19,10 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
+/**
+ * local-postgres의 profile 조합과 개발용 사용자·보안 체인, 인증 없는 API·Swagger 접근을 검증한다.
+ * 접속 설정은 인메모리 H2로 덮어써 PostgreSQL 서버 없이 실행하며 PostgreSQL의 SQL 호환성은 검증하지 않는다.
+ */
 @SpringBootTest(properties = {
         "spring.datasource.url=jdbc:h2:mem:rewrite-local-postgres-test;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1",
         "spring.datasource.driver-class-name=org.h2.Driver",
