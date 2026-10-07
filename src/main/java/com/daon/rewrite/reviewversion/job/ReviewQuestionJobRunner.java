@@ -13,6 +13,11 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 
+/**
+ * 전체 자기소개서 문맥을 공유하는 문항별 호출을 reviewQuestionExecutor에 제출한다.
+ * 각 문항은 LLM 호출·출력 검증 실패에 한해 최대 1회 재시도하고, 성공 결과는 문항별 트랜잭션으로 저장한다.
+ * 저장 오류 등 나머지 예외는 Worker의 예상 밖 오류 처리 경계로 전파한다.
+ */
 @Service
 class ReviewQuestionJobRunner {
 
@@ -32,6 +37,10 @@ class ReviewQuestionJobRunner {
         this.executor = executor;
     }
 
+    /**
+     * 문항 task의 종료를 기다린 뒤 요청 문항 순서에서 첫 실패 사유를 반환한다. 분류된 실패가 없으면 empty다.
+     * 호출 완료 순서와 대표 오류 선정 순서는 독립적이며, Job 전체의 성공·실패 확정은 Worker가 담당한다.
+     */
     Optional<ReviewClientException.Reason> run(String jobId, ReviewRequest request) {
         List<CompletableFuture<Optional<ReviewClientException.Reason>>> futures = request.questions().stream()
                 .map(question -> CompletableFuture.supplyAsync(
@@ -59,8 +68,9 @@ class ReviewQuestionJobRunner {
     ) {
         for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
             try {
-                // 외부 호출 중 DB 트랜잭션을 유지하지 않도록 문항 결과 저장을 별도 서비스에 맡긴다.
+                // 전체 문맥으로 대상 문항 하나를 생성·검증한 뒤에만 저장 트랜잭션을 연다.
                 ReviewResult result = reviewClient.reviewQuestion(request, question.questionId());
+                // 실행 중 취소된 Job의 늦은 응답은 저장 서비스가 무시하고 전체 확정 단계에서도 취소를 확인한다.
                 transactionService.completeQuestion(jobId, result);
                 return Optional.empty();
             } catch (ReviewClientException exception) {

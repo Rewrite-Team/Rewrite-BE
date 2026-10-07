@@ -23,6 +23,11 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 
+/**
+ * 재첨삭의 시작·실패 전이를 자기소개서와 Job의 행 잠금 안에서 처리한다.
+ * 답변 입력은 요청 트랜잭션에서 저장한 최신 성공 버전의 finalAnswer 스냅샷을 사용한다.
+ * 이번 시도의 실패는 이전 성공 버전과 성공한 임시 문항 결과를 보존한다.
+ */
 @Service
 @RequiredArgsConstructor
 class ReReviewJobTransactionService {
@@ -40,6 +45,10 @@ class ReReviewJobTransactionService {
     private final ReviewJobQuestionResultRepository questionResultRepository;
     private final Clock clock;
 
+    /**
+     * 요청 시 고정한 문항 입력·요구사항과 현재 자기소개서의 공통 문맥을 읽고 PROCESSING으로 전환한다.
+     * Worker 실행 시 최신 버전을 다시 선택하지 않으며, 이미 시작했거나 종료된 Job이면 null을 반환한다.
+     */
     @Transactional
     public ReviewWork start(String jobId) {
         CoverLetterJobLockService.LockedCoverLetterJob locked = coverLetterJobLockService.lock(jobId);
@@ -58,6 +67,7 @@ class ReReviewJobTransactionService {
                 || job.getRequestRefId() == null) {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR);
         }
+        // requestRef는 입력 버전의 출처이고, 실제 LLM 입력은 Job 생성 때 함께 저장한 문항 스냅샷이다.
         List<ReviewJobQuestionResult> questionResults = questionResultRepository
                 .findByLlmJobIdOrderByQuestionOrderAsc(job.getId());
         if (questionResults.isEmpty() || questionResults.size() != job.getProgressTotal()) {
@@ -84,6 +94,7 @@ class ReReviewJobTransactionService {
         ));
     }
 
+    /** 이번 Job·표시 상태만 실패로 전환한다. latestReviewedVersionId와 성공 문항 결과는 유지한다. */
     @Transactional
     public void fail(String jobId, ReviewClientException.Reason reason) {
         CoverLetterJobLockService.LockedCoverLetterJob locked = coverLetterJobLockService.lock(jobId);
@@ -105,6 +116,7 @@ class ReReviewJobTransactionService {
         coverLetter.failReview(now);
     }
 
+    /** 예상 밖 오류는 내부 오류로 기록하며, 취소·완료·실패 등 이미 종료된 Job은 변경하지 않는다. */
     @Transactional
     public void failUnexpected(String jobId) {
         CoverLetterJobLockService.LockedCoverLetterJob locked = coverLetterJobLockService.lock(jobId);

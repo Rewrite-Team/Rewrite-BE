@@ -34,6 +34,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * 최신 성공 버전의 최종 작성본 저장과 그 버전을 입력으로 하는 재첨삭 요청을 처리한다.
+ * 자기소개서 잠금 안에서 버전·진행 Job을 확인해 저장과 재첨삭 입력 확정의 순서를 맞춘다.
+ * 외부 LLM 호출은 여기서 수행하지 않고 커밋 후 Job 이벤트로 실행한다.
+ */
 @Service
 @RequiredArgsConstructor
 public class ReviewVersionCommandService {
@@ -55,6 +60,10 @@ public class ReviewVersionCommandService {
     private final Clock clock;
     private final ApplicationEventPublisher eventPublisher;
 
+    /**
+     * 요청한 버전이 저장 시점에도 최신 성공 버전인지 확인하고 모든 문항의 최종 작성본을 함께 갱신한다.
+     * 전체 입력의 누락·중복·소속과 문자열을 먼저 검증해 부분 저장을 막으며 새 버전도 만들지 않는다.
+     */
     @Transactional
     public void saveMyFinalAnswers(
             String coverLetterId,
@@ -83,6 +92,11 @@ public class ReviewVersionCommandService {
 
     }
 
+    /**
+     * 요청 시점의 최신 성공 버전과 문항별 finalAnswer를 새 Job의 입력으로 고정한다.
+     * Job·다음 버전·입력 스냅샷을 함께 저장하고 자기소개서를 REVIEWING으로 전환한다.
+     * 같은 재첨삭이 진행 중이면 기존 Job을 반환하며 새 요구사항은 반영하지 않는다.
+     */
     @Transactional
     public RequestReReviewResult requestMyReReview(String coverLetterId, String requestInstruction) {
         CurrentUser currentUser = currentUserProvider.currentUser();
@@ -95,6 +109,7 @@ public class ReviewVersionCommandService {
         }
 
         LlmJob runningJob = llmJobService.findRunningCoverLetterJob(coverLetter.getId());
+        // 새 요구사항 검증보다 먼저 기존 작업을 반환해 중복 요청으로 실행 중인 입력이 바뀌지 않게 한다.
         if (runningJob != null && runningJob.getType() == LlmJobType.COVER_LETTER_RE_REVIEW) {
             return new RequestReReviewResult(coverLetter, runningJob);
         }
@@ -118,6 +133,7 @@ public class ReviewVersionCommandService {
                 now,
                 latestResults.size()
         ));
+        // 실패·취소 버전도 보존하므로 성공 횟수가 아닌 전체 시도 수로 다음 표시 번호를 정한다.
         long nextPatch = reviewVersionRepository.countByCoverLetterId(coverLetter.getId()) + 1;
         reviewVersionRepository.save(ReviewVersion.started(
                 idGenerator.generate(REVIEW_VERSION_ID_PREFIX),
@@ -127,6 +143,7 @@ public class ReviewVersionCommandService {
                 job,
                 now
         ));
+        // 이후 최종 작성본을 수정해도 실행 대기 중인 재첨삭의 답변 입력은 이 스냅샷을 사용한다.
         jobQuestionResultRepository.saveAll(latestResults.stream()
                 .map(result -> ReviewJobQuestionResult.processing(
                         idGenerator.generate(JOB_QUESTION_RESULT_ID_PREFIX),
@@ -141,6 +158,7 @@ public class ReviewVersionCommandService {
         return new RequestReReviewResult(coverLetter, job);
     }
 
+    // 선택 요구사항은 공백 제거 후 비어 있으면 없음으로 처리하고, 있으면 code point 기준 1000자로 제한한다.
     private String validateAndNormalizeRequestInstruction(String requestInstruction) {
         String normalized = normalize(requestInstruction);
         if (normalized == null || normalized.isEmpty()) {
@@ -158,6 +176,10 @@ public class ReviewVersionCommandService {
         return normalized;
     }
 
+    /**
+     * 입력 배열이 해당 버전의 모든 문항 결과를 정확히 한 번씩 포함하는지 확인한다.
+     * 답변은 앞뒤 공백 제거 후 1~5000 code point로 검증하며 문항별 오류를 모아 예외에 담는다.
+     */
     private Map<String, String> validateAndNormalize(
             List<ReviewVersionQuestionResult> questionResults,
             List<SaveFinalAnswerInput> inputs

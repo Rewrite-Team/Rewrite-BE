@@ -31,6 +31,11 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * 자기소개서 초안 생성, 등록 단계별 임시저장, 최초 첨삭 제출과 soft delete를 처리한다.
+ * 변경 요청은 소유자의 활성 CoverLetter를 먼저 잠그며, 원본 편집은 WRITING에서만 허용한다.
+ * 임시저장은 미완성 폼을 보존하고, 제출 시 입력 완성도를 검증한 뒤 Job·버전·자기소개서 상태를 함께 저장한다.
+ */
 @Service
 @RequiredArgsConstructor
 public class CoverLetterService {
@@ -51,6 +56,7 @@ public class CoverLetterService {
     private final Clock clock;
     private final ApplicationEventPublisher eventPublisher;
 
+    /** 입력을 받기 전부터 이어서 작성할 ID를 확보하도록 현재 사용자의 빈 WRITING 초안을 저장한다. */
     @Transactional
     public CoverLetter create() {
         CurrentUser currentUser = currentUserProvider.currentUser();
@@ -63,6 +69,11 @@ public class CoverLetterService {
         return coverLetterRepository.save(coverLetter);
     }
 
+    /**
+     * 현재 사용자의 삭제되지 않은 초안·첨삭 자기소개서를 상태 필터 없이 생성 시각 내림차순으로 조회한다.
+     * page는 1 이상, size는 목록 최대 크기 이내인지 검증하고 JPA의 0부터 시작하는 페이지로 변환한다.
+     * 전체 페이지를 넘는 page는 빈 목록으로 반환한다.
+     */
     @Transactional(readOnly = true)
     public Page<CoverLetter> findMyCoverLetters(int page, int size) {
         validateListQuery(page, size);
@@ -80,6 +91,10 @@ public class CoverLetterService {
         );
     }
 
+    /**
+     * CoverLetter → 진행 Job 순서로 잠그고, Job 취소와 자기소개서 삭제 표시를 같은 트랜잭션에 반영한다.
+     * 하위 데이터는 보존하며 사용자 조회 경로가 deletedAt을 기준으로 접근을 차단한다.
+     */
     @Transactional
     public void deleteMyCoverLetter(String coverLetterId) {
         CurrentUser currentUser = currentUserProvider.currentUser();
@@ -95,6 +110,10 @@ public class CoverLetterService {
         coverLetter.markDeleted(now);
     }
 
+    /**
+     * 기본 정보 step의 전체 폼을 정규화해 교체한다. 미입력 필드는 null로 저장할 수 있다.
+     * 제출과 같은 CoverLetter 잠금을 사용하므로 먼저 제출된 초안에 늦게 도착한 자동저장은 거부한다.
+     */
     @Transactional
     public void saveBasicInfo(
             String coverLetterId,
@@ -128,6 +147,7 @@ public class CoverLetterService {
 
     }
 
+    /** 우대사항 step을 교체 저장하며, WRITING에서는 빈 입력도 미완성 값으로 보존한다. */
     @Transactional
     public void savePreferences(String coverLetterId, String preferences) {
         CurrentUser currentUser = currentUserProvider.currentUser();
@@ -144,6 +164,11 @@ public class CoverLetterService {
 
     }
 
+    /**
+     * 문항 step의 전체 목록을 검증한 뒤 기존 행을 새 문항 ID로 교체하고 배열 순서대로 1부터 순서를 부여한다.
+     * null·빈 목록이면 전체 삭제하며, 입력 오류가 있으면 기존 문항을 교체하지 않는다.
+     * 문항 필수값의 완성 여부는 제출 시 확인하므로 임시저장 중에는 nullable 필드를 허용한다.
+     */
     @Transactional
     public void saveQuestions(String coverLetterId, List<SaveQuestionInput> questions) {
         CurrentUser currentUser = currentUserProvider.currentUser();
@@ -156,7 +181,6 @@ public class CoverLetterService {
         }
 
         List<SaveQuestionInput> normalizedQuestions = inputPolicy.normalizeQuestions(questions);
-        // 해당 자기소개서에 기존에 저장돼 있던 문항들을 전부 삭제
         coverLetterQuestionRepository.deleteByCoverLetter(coverLetter);
 
         List<CoverLetterQuestion> savedQuestions = new ArrayList<>();
@@ -176,70 +200,51 @@ public class CoverLetterService {
         coverLetter.touch(Instant.now(clock));
     }
 
-    /*
-    자기소개서 제출을 처리하고, 필요하면 최초 AI 첨삭 Job 생성
-
-    [성공 케이스 3가지]
-    상황                      상태          반환Job
-    최초 제출 또는 실패 후 재시도	 REVIEWING	  새 Job
-    최초 첨삭 중 중복 제출	     REVIEWING	  기존 Job
-    이미 최초 첨삭 완료	         REVIEWED	  null
+    /**
+     * 최초 제출 또는 최신 성공 버전이 없는 최초 실패 후 재시도는 새 Job·버전을 만들고 REVIEWING을 반환한다.
+     * 같은 최초 첨삭 중 중복 제출은 REVIEWING과 기존 Job을 반환한다.
+     * 이미 첨삭 완료된 자기소개서는 REVIEWED와 null Job을 반환한다.
+     * 새 작업은 저장된 원본의 필수값 검증 후 생성하며, 검증 실패나 기존 Job 재사용에는 새 버전을 만들지 않는다.
+     * Job·버전·REVIEWING 전환을 함께 커밋하고 AI 완료를 기다리지 않고 반환하며, worker 실행은 커밋 후 이벤트 리스너로 이어진다.
      */
     @Transactional
     public SubmitCoverLetterResult submit(String coverLetterId) {
-        // 현재 사용자 조회
         CurrentUser currentUser = currentUserProvider.currentUser();
-        // 자기소개서 조회 (coverLetterId + 현재 사용자 소유 + 삭제x)
+        // Job이 아직 없는 경우에도 동시 제출이 둘 다 새 Job을 만들지 않도록 자기소개서를 먼저 잠근다.
         CoverLetter coverLetter = coverLetterRepository
                 .findActiveByIdAndOwnerIdForUpdate(coverLetterId, currentUser.id())
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
 
-        // 이미 진행 중인 LLM job(PENDING, PROCESSING) 조회
         LlmJob runningJob = llmJobService.findRunningCoverLetterJob(coverLetter.getId());
 
-        // 이미 Job이 진행 중이라면
         if (runningJob != null) {
-            // 동일한 최초 첨삭 Job이 이미 진행 중이라면, 새 Job을 만들지 않고 기존 Job 반환
-            // 버튼 중복 클릭, 네트워크 재시도에 대한 멱등 처리.
+            // 버튼 중복 클릭·네트워크 재전송에는 같은 최초 첨삭만 재사용하며, 다른 종류의 진행 Job은 충돌로 처리한다.
             if (coverLetter.getStatus() == CoverLetterStatus.REVIEWING
                     && runningJob.getType() == LlmJobType.COVER_LETTER_REVIEW) {
                 return new SubmitCoverLetterResult(coverLetter, runningJob);
             }
-            // 다른 종류의 Job 이 진행중이라면, 409 Conflict 반환
             throw new BusinessException(ErrorCode.LLM_JOB_ALREADY_RUNNING);
         }
 
-        // 이미 첨삭 결과가 있는 경우 이미 최초 첨삭이 완료된 것이기에 새 Job을 만들지 않는다.
+        // 성공 이력이 있는 재첨삭 실패는 기존 최종 작성본을 기준으로 재첨삭 API에서 재시도해야 한다.
         if (coverLetter.getLatestReviewedVersionId() != null) {
-            // 성공 버전이 있는데 REVIEW_FAILED 라면, 최초 첨삭 API 가 아니라 재첨삭 API를 사용해야 하므로 CONFLICT 반환
             if (coverLetter.getStatus() != CoverLetterStatus.REVIEWED) {
                 throw new BusinessException(ErrorCode.CONFLICT);
             }
             return new SubmitCoverLetterResult(coverLetter, null);
         }
 
-        // 자기소개서는 REVIEWING인데 진행 중 Job이 발견되지 않은 비정상적인 상태 조합 방어
+        // REVIEWING에 대응하는 진행 Job이 없으면 정상적인 수동 재시도로 취급할 수 없다.
         if (coverLetter.getStatus() == CoverLetterStatus.REVIEWING) {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR);
         }
 
-        // 저장된 문항을 등록 순서대로 조회
         List<CoverLetterQuestion> questions = coverLetterQuestionRepository
                 .findByCoverLetterIdOrderByQuestionOrderAsc(coverLetter.getId());
-        // 제출 필수값 최종 검증
         inputPolicy.validateSubmit(coverLetter, questions);
 
         Instant now = Instant.now(clock);
-        /*
-         아래 상태의 LlmJob 저장
-         type: COVER_LETTER_REVIEW
-         status: PENDING
-         targetType: COVER_LETTER
-         targetId: 자기소개서 ID
-         progressCurrent: 0
-         progressTotal: 문항 수
-         maxAttempts: 2
-         */
+        // 결과 완성 전부터 시도 이력을 남기므로 새 Job과 빈 첨삭 버전을 같은 트랜잭션에서 생성한다.
         LlmJob job = llmJobRepository.save(LlmJob.pendingReview(
                 idGenerator.generate(LLM_JOB_ID_PREFIX),
                 coverLetter.getId(),
@@ -256,21 +261,11 @@ public class CoverLetterService {
                 now
         ));
 
-        /*
-         자소서 상태를 REVIEWING으로 변경
-         최초 제출이면 submittedAt 설정 및 updatedAt 갱신
-         */
         coverLetter.startReview(now);
 
-        /*
-         * IMPROVE
-         *  현재 구조에서는 LlmJobCreatedEvent가 애플리케이션 메모리 안에서만 전달된다. 따라서 커밋 직후 종료되면 인메모리 이벤트가 유실될 수 있다.
-         *  서버 재시작 중 Job 유실 방지나 Worker 수평 확장이 필요해지는 시점에 "Outbox 패턴 + 메시지큐 + 독립 Worker" 구조로 전환 필요
-         */
-        // 비동기 첨삭을 시작하는 이벤트 발행 (ReviewJobEventListener.java의 리스너가 FirstReviewJobWorker.execute(jobId) 실행)
+        // ReviewJobEventListener가 커밋 후 최초 첨삭 worker를 실행한다. 메모리 이벤트의 재전달은 보장하지 않는다.
         eventPublisher.publishEvent(new LlmJobCreatedEvent(job.getId()));
 
-        // AI 첨삭 완료를 기다리지 않고 REVIEWING과 jobId를 바로 반환
         return new SubmitCoverLetterResult(coverLetter, job);
     }
 

@@ -20,6 +20,10 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * 버전 목록 조회, 재첨삭 시작과 최종 작성본 저장을 각각 조회·명령 서비스에 연결한다.
+ * 선택한 버전의 상세는 현재 상세와 같은 {@link CoverLetterDetailQueryService}와 응답 구조를 사용한다.
+ */
 @RestController
 @RequiredArgsConstructor
 public class ReviewVersionController {

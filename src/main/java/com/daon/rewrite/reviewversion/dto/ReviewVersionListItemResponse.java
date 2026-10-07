@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 
+/** 실패한 최신 시도와 편집 가능한 최신 성공 결과를 두 플래그로 구분하는 버전 목록 항목. */
 @Schema(requiredProperties = {"id", "version", "status", "isLatest", "isLatestReviewed", "createdAt"})
 public record ReviewVersionListItemResponse(
         String id,

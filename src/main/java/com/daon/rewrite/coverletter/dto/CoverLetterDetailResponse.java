@@ -12,6 +12,10 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
 
+/**
+ * 현재 자기소개서와 선택한 첨삭 버전의 상세 조회가 공유하는 응답 구조.
+ * 서비스가 상태에 맞춰 선택한 원본·임시·확정 문항을 같은 형태로 변환하며, 날짜는 서울 기준으로 표시한다.
+ */
 @Schema(requiredProperties = {"coverLetter", "reviewVersion", "reviewJob", "questions"})
 public record CoverLetterDetailResponse(
         CoverLetterResponse coverLetter,
@@ -60,6 +64,7 @@ public record CoverLetterDetailResponse(
         }
     }
 
+    /** isLatest는 최신 시도, isLatestReviewed는 최종 작성본을 편집할 수 있는 최신 성공 버전이다. */
     @Schema(name = "CoverLetterDetailReviewVersionResponse", requiredProperties = {"id", "version", "status", "isLatest", "isLatestReviewed", "requestInstruction", "createdAt"})
     public record ReviewVersionResponse(
             String id,
@@ -127,6 +132,10 @@ public record CoverLetterDetailResponse(
         }
     }
 
+    /**
+     * 확정 전 문항은 questionResultId와 아직 생성되지 않은 AI 결과가 null일 수 있다.
+     * originalAnswer는 해당 첨삭의 입력이며, 재첨삭이면 이전 최신 성공 버전의 finalAnswer다.
+     */
     @Schema(requiredProperties = {"questionResultId", "questionId", "order", "question", "maxAnswerLength", "originalAnswer", "originalAnswerLength", "aiReport", "rewrittenAnswer", "rewrittenAnswerLength", "finalAnswer", "finalAnswerLength"})
     public record QuestionResponse(
             @Schema(nullable = true)

@@ -14,6 +14,7 @@ public record CoverLetterListResponse(
         long totalItems,
         int totalPages
 ) {
+    // Spring Page의 내부 번호 대신 HTTP 요청의 1부터 시작하는 page를 응답에 유지한다.
     public static CoverLetterListResponse from(
             Page<CoverLetter> pageResult,
             int requestedPage,

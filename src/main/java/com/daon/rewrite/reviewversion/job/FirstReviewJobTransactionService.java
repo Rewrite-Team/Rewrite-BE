@@ -25,6 +25,11 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 
+/**
+ * 최초 첨삭의 입력 준비·PROCESSING 전환과 실패 상태 저장을 짧은 트랜잭션으로 수행한다.
+ * 자기소개서와 Job을 잠근 뒤 상태를 확인해 중복 시작과 취소 후 상태 덮어쓰기를 막는다.
+ * 성공한 임시 문항 결과와 요청 시 생성한 버전은 전체 Job이 실패해도 보존한다.
+ */
 @Service
 @RequiredArgsConstructor
 class FirstReviewJobTransactionService {
@@ -45,31 +50,30 @@ class FirstReviewJobTransactionService {
     private final IdGenerator idGenerator;
     private final Clock clock;
 
+    /**
+     * 원문 답변을 문항별 임시 입력에 저장하고 외부 호출에 필요한 값만 반환한다.
+     * 입력 준비와 PROCESSING 전환은 함께 커밋되며, 이미 시작했거나 종료된 Job이면 null을 반환한다.
+     */
     @Transactional
     public ReviewWork start(String jobId) {
-        // jobId에 연결된 LlmJob 과 CoverLetter를 조회하면서 PESSIMISTIC_WRITE를 획득
         CoverLetterJobLockService.LockedCoverLetterJob locked = coverLetterJobLockService.lock(jobId);
-        // Job type이 COVER_LETTER_REVIEW인지, Job targetType 이 COVER_LETTER 인지 확인
         LlmJob job = validateFirstReviewJob(locked.job());
-        // PENDING Job 만 처리
         if (job.getStatus() != LlmJobStatus.PENDING) {
             return null;
         }
 
         CoverLetter coverLetter = locked.coverLetter();
-        // 정상적인 상황에서 자소서 상태는 REVIEWING 이어야 함
         if (coverLetter.getStatus() != CoverLetterStatus.REVIEWING) {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR);
         }
 
-        // 자소서 문항을 questionOrder 오름차순으로 가져옴
         List<CoverLetterQuestion> questions = questionRepository
                 .findByCoverLetterIdOrderByQuestionOrderAsc(coverLetter.getId());
         if (questions.isEmpty()) {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR);
         }
 
-        // AI응답을 받기 전 임시 처리 결과 객체인 ReviewJobQuestionResult 을 각 문항마다 생성
+        // 최초 첨삭은 처리 시작 시 originalAnswer와 문항 정보를 고정해 진행·실패 화면에서도 실제 입력을 복구한다.
         jobQuestionResultRepository.saveAll(questions.stream()
                 .map(question -> ReviewJobQuestionResult.processing(
                         idGenerator.generate(JOB_QUESTION_RESULT_ID_PREFIX),
@@ -78,7 +82,6 @@ class FirstReviewJobTransactionService {
                         question.getOriginalAnswer()
                 ))
                 .toList());
-        // Job 상태를 PENDING -> PROCESSING 으로 변경
         job.startProcessing(STARTED_MESSAGE);
         return new ReviewWork(new ReviewRequest(
                 coverLetter.getTitle(),
@@ -98,6 +101,7 @@ class FirstReviewJobTransactionService {
         ));
     }
 
+    /** 완료 문항 수를 유지한 채 Job·자기소개서를 함께 실패로 전환한다. 이미 종료된 Job은 변경하지 않는다. */
     @Transactional
     public void fail(String jobId, ReviewClientException.Reason reason) {
         CoverLetterJobLockService.LockedCoverLetterJob locked = coverLetterJobLockService.lock(jobId);
@@ -119,6 +123,7 @@ class FirstReviewJobTransactionService {
         coverLetter.failReview(now);
     }
 
+    /** 분류된 LLM 실패 외의 오류를 내부 오류로 기록하며, 이미 확정된 종료 상태는 유지한다. */
     @Transactional
     public void failUnexpected(String jobId) {
         fail(jobId, UNEXPECTED_ERROR_CODE, UNEXPECTED_ERROR_MESSAGE);

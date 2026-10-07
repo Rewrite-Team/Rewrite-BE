@@ -5,6 +5,10 @@ import org.springframework.stereotype.Component;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.json.JsonMapper;
 
+/**
+ * 전체 자기소개서와 대상 문항을 OpenAI에 전달하고 문항별 첨삭 결과로 변환한다.
+ * 대상 ID·필수 문자열·최대 글자 수를 검증한 결과만 반환하며 저장이나 재시도는 Job 계층에 맡긴다.
+ */
 @Component
 public class OpenAiReviewClient implements ReviewClient {
 
@@ -33,6 +37,10 @@ public class OpenAiReviewClient implements ReviewClient {
         this.chatClient = chatClientBuilder.build();
     }
 
+    /**
+     * 응답의 JSON 변환 실패는 출력 검증 실패로, 호출 중 그 밖의 예외는 provider 실패로 구분한다.
+     * 변환 뒤에도 대상 문항 일치와 문자열 내용을 검증해 형식만 맞는 잘못된 결과를 거부한다.
+     */
     @Override
     public ReviewResult reviewQuestion(ReviewRequest request, String targetQuestionId) {
         ReviewResult response;
@@ -58,6 +66,10 @@ public class OpenAiReviewClient implements ReviewClient {
                 + JSON_MAPPER.writeValueAsString(request);
     }
 
+    /**
+     * 리포트와 수정본은 앞뒤 공백 제거 후 비어 있지 않아야 하고, 수정본 길이는 대상 문항 제한을 따른다.
+     * 글자 수는 Java UTF-16 길이 대신 Unicode code point 기준으로 비교한다.
+     */
     private ReviewResult validateAndNormalize(
             ReviewRequest request,
             String targetQuestionId,

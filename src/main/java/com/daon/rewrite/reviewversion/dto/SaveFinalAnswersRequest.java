@@ -17,6 +17,7 @@ public record SaveFinalAnswersRequest(
         List<AnswerRequest> answers
 ) {
 
+    // 누락 항목을 제거하거나 기본값으로 채우지 않고 서비스가 전체 문항과 필드별 오류를 검증하도록 전달한다.
     public List<SaveFinalAnswerInput> toInputs() {
         if (answers == null) {
             return null;

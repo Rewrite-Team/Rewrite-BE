@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.List;
 
+/** 요청 배열 전체를 현재 문항 목록으로 저장하며, 배열 순서가 서버의 문항 순서가 된다. */
 public record SaveQuestionsRequest(
         @ArraySchema(
                 arraySchema = @Schema(
@@ -17,6 +18,7 @@ public record SaveQuestionsRequest(
         List<QuestionRequest> questions
 ) {
 
+    // 누락 배열·요소를 그대로 넘겨 입력 정책이 전체 교체 의미와 필드별 오류를 함께 판단하게 한다.
     public List<SaveQuestionInput> toInputs() {
         if (questions == null) {
             return null;

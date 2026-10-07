@@ -2,6 +2,7 @@ package com.daon.rewrite.coverletter.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 
+/** 미완성 등록 폼도 전체 교체 저장할 수 있는 입력. 필수값 검증은 제출 시 서비스가 수행한다. */
 public record SaveBasicInfoRequest(
         @Schema(
                 description = "자기소개서 제목. 값이 있으면 trim 후 최대 50자",
