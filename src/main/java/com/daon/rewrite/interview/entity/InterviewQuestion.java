@@ -14,6 +14,11 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+/**
+ * 첨삭 최종 작성본을 기준으로 생성한 예상 질문이다. 질문 생성 트랜잭션에서 대응하는 thread도 함께 저장한다.
+ * 추가 질문은 기존 마지막 다음 순서를 사용하고, 질문마다 실제 생성 기준 버전을 기록한다.
+ * 최초 질문 본문은 여기서 관리하며 assistant 메시지로 중복 저장하지 않는다.
+ */
 @Getter
 @Entity
 @NoArgsConstructor(access = AccessLevel.PROTECTED)

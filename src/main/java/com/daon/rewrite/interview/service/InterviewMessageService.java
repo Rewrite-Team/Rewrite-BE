@@ -29,6 +29,11 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 
+/**
+ * 질문별 대화 메시지를 조회하고 사용자 답변과 피드백 생성 Job을 함께 저장한다.
+ * 답변은 요청 트랜잭션에서 보존하며, assistant 메시지는 worker가 전체 피드백을 검증하고 완료할 때 저장한다.
+ * 피드백 생성 실패에도 USER 메시지는 유지하므로 조회 결과와 Job 상태로 화면을 복구한다.
+ */
 @Service
 @RequiredArgsConstructor
 public class InterviewMessageService {
@@ -47,6 +52,11 @@ public class InterviewMessageService {
     private final Clock clock;
     private final ApplicationEventPublisher eventPublisher;
 
+    /**
+     * 부모 자기소개서의 소유권·삭제 여부를 확인하고 thread의 메시지를 생성 시각·ID 오름차순으로 반환한다.
+     * 최신 USER 메시지에 연결된 최신 피드백 Job을 찾아 대기·진행·실패 상태를 함께 복구한다.
+     * 최초 질문은 InterviewQuestion에 있으므로 사용자가 아직 답하지 않은 thread의 빈 메시지 목록도 정상이다.
+     */
     @Transactional(readOnly = true)
     public InterviewMessageListResult findMyInterviewMessages(String threadId) {
         CurrentUser currentUser = currentUserProvider.currentUser();
@@ -73,6 +83,11 @@ public class InterviewMessageService {
         return new InterviewMessageListResult(job == null ? null : job.getId(), items);
     }
 
+    /**
+     * 답변을 정규화·검증하고 CoverLetter를 잠근 뒤 같은 자기소개서의 진행 Job이 없는지 확인한다.
+     * USER 메시지와 그 ID를 입력 참조로 가진 새 피드백 Job을 같은 트랜잭션에서 저장해 둘 중 하나만 남는 것을 막는다.
+     * 충돌이면 메시지를 저장하지 않으며, 성공하면 커밋 후 worker 실행을 예약하고 메시지·Job 식별 정보를 반환한다.
+     */
     @Transactional
     public SendInterviewMessageResult sendMyInterviewMessage(String threadId, String content) {
         CurrentUser currentUser = currentUserProvider.currentUser();
@@ -102,11 +117,13 @@ public class InterviewMessageService {
                 userMessage.getId(),
                 now
         ));
+        // 피드백 worker는 이 USER 메시지까지의 대화 이력을 읽고, 성공 결과를 같은 thread의 assistant 한 개로 확정한다.
         eventPublisher.publishEvent(new LlmJobCreatedEvent(job.getId()));
 
         return new SendInterviewMessageResult(userMessage, job);
     }
 
+    /** 표시용 content·score를 전달하며 내부 구조화 피드백과 별도 꼬리질문 필드는 조회 결과에서 제외한다. */
     private InterviewMessageItemResult toItemResult(InterviewMessage message) {
         return new InterviewMessageItemResult(
                 message.getId(),
@@ -117,6 +134,7 @@ public class InterviewMessageService {
         );
     }
 
+    /** 최신 USER 답변의 Job만 찾는다. 이전 답변의 실패 이력을 현재 처리할 Job으로 되돌리지 않는다. */
     private LlmJob findLatestFeedbackJob(String userMessageId) {
         if (userMessageId == null) {
             return null;
@@ -135,6 +153,7 @@ public class InterviewMessageService {
         return job;
     }
 
+    /** 앞뒤 공백을 제거한 답변에 필수값과 Unicode code point 기준 길이 제한을 적용한다. */
     private String validateAndNormalizeContent(String content) {
         String normalized = content == null ? null : content.strip();
         if (normalized == null || normalized.isEmpty()) {

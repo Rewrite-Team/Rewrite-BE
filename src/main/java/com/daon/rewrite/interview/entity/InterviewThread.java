@@ -16,6 +16,10 @@ import lombok.NoArgsConstructor;
 
 import java.time.Instant;
 
+/**
+ * 예상 질문 하나에 대응하는 독립 대화방으로, 질문과 같은 트랜잭션에서 1:1로 생성한다.
+ * 생성 시 질문과 대화방이 같은 세션에 속하는지 확인하고, 메시지와 피드백은 이 thread 단위로 유지한다.
+ */
 @Getter
 @Entity
 @NoArgsConstructor(access = AccessLevel.PROTECTED)

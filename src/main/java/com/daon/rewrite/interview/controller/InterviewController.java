@@ -15,6 +15,10 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * 자기소개서별 면접 세션 조회·시작과 세션의 질문 조회·추가 생성을 서비스에 연결한다.
+ * 질문 생성은 Job으로 추적하고, 질문 목록은 생성된 질문과 대화방을 함께 조회한다.
+ */
 @RestController
 @RequiredArgsConstructor
 public class InterviewController {

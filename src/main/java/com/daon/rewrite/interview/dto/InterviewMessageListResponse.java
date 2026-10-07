@@ -9,6 +9,10 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
 
+/**
+ * 저장된 메시지의 표시 문장·점수와 최신 사용자 답변의 미해결 피드백 Job을 반환한다.
+ * ASSISTANT의 content에는 피드백·꼬리질문이 연결되어 있으며 내부 분석 필드는 응답에 포함하지 않는다.
+ */
 @Schema(requiredProperties = {"jobId", "items"})
 public record InterviewMessageListResponse(
         @Schema(nullable = true)

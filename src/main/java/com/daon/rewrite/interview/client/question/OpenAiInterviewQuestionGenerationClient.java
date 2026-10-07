@@ -9,6 +9,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+/**
+ * 전체 자기소개서 문맥을 OpenAI에 전달하고 요청 개수·빈 질문·문자열 중복을 검증한다.
+ * 자기소개서와의 관련성이나 질문의 의미상 중복은 프롬프트로 요청하며 코드에서 별도로 판정하지 않는다.
+ */
 @Component
 public class OpenAiInterviewQuestionGenerationClient implements InterviewQuestionGenerationClient {
 
@@ -35,6 +39,10 @@ public class OpenAiInterviewQuestionGenerationClient implements InterviewQuestio
         this.chatClient = chatClientBuilder.build();
     }
 
+    /**
+     * 프롬프트 구성·호출·응답 변환 중 발생한 JacksonException은 출력 검증 실패로 분류한다.
+     * 그 밖의 예외는 provider 실패로 분류하고 객체 변환 후에는 질문 목록의 내용을 검증한다.
+     */
     @Override
     public List<InterviewQuestionGenerationResult> generate(InterviewQuestionGenerationRequest request) {
         OpenAiInterviewQuestionGenerationResponse response;
@@ -58,6 +66,10 @@ public class OpenAiInterviewQuestionGenerationClient implements InterviewQuestio
                 + JSON_MAPPER.writeValueAsString(request);
     }
 
+    /**
+     * 서비스가 전달한 양수 questionCount와 응답 개수가 정확히 일치해야 한다.
+     * 기존 질문과 생성 질문 전체를 검사하며 한 항목이라도 잘못되면 전체 생성 결과를 반환하지 않는다.
+     */
     private List<InterviewQuestionGenerationResult> validateAndNormalize(
             OpenAiInterviewQuestionGenerationResponse response,
             InterviewQuestionGenerationRequest request
@@ -81,6 +93,11 @@ public class OpenAiInterviewQuestionGenerationClient implements InterviewQuestio
                 .toList();
     }
 
+    /**
+     * 앞뒤 공백 제거 후 정확히 같은 문자열이면 기존 질문·이번 생성 질문 사이 모두 중복으로 처리한다.
+     * seenQuestions에는 검증을 통과한 새 질문도 추가해 응답 내부 중복까지 확인한다.
+     * 질문 본문에는 별도의 문자 수 상한을 적용하지 않는다.
+     */
     private InterviewQuestionGenerationResult normalize(
             OpenAiInterviewQuestionGenerationResponse.Question result,
             Set<String> seenQuestions

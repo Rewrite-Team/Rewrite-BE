@@ -7,6 +7,11 @@ import tools.jackson.databind.json.JsonMapper;
 
 import java.util.List;
 
+/**
+ * 원본 질문과 전체 대화 이력을 OpenAI에 전달하고 완성된 응답 전체를 검증한 뒤 반환한다.
+ * 프롬프트는 첫 USER 답변을 원본 질문, 이후 답변을 이전 ASSISTANT의 꼬리질문 기준으로 평가하도록 요청한다.
+ * 토큰 스트리밍은 사용하지 않으며 Job 계층이 검증된 content를 화면용 조각으로 전송한다.
+ */
 @Component
 public class OpenAiInterviewMessageFeedbackClient implements InterviewMessageFeedbackClient {
 
@@ -36,6 +41,10 @@ public class OpenAiInterviewMessageFeedbackClient implements InterviewMessageFee
         this.chatClient = chatClientBuilder.build();
     }
 
+    /**
+     * 프롬프트 구성·호출·응답 변환 중 발생한 JacksonException은 출력 검증 실패로 분류한다.
+     * 그 밖의 예외는 provider 실패로 분류하고 객체 변환 후에는 피드백 각 필드의 내용을 검증한다.
+     */
     @Override
     public InterviewMessageFeedbackResult generate(InterviewMessageFeedbackRequest request) {
         OpenAiInterviewMessageFeedbackResponse response;
@@ -59,6 +68,11 @@ public class OpenAiInterviewMessageFeedbackClient implements InterviewMessageFee
                 + JSON_MAPPER.writeValueAsString(request);
     }
 
+    /**
+     * 표시 문장·요약·꼬리질문과 강점·개선점 각 항목이 공백 제거 후 비어 있지 않고 점수가 1~100이어야 한다.
+     * 모든 필드를 통과해야 결과를 반환하며 content와 구조화 필드의 의미상 일치까지 검사하지는 않는다.
+     * 사용자 답변의 2000자 제한은 서비스에서 검증하며 이 출력에는 별도의 문자 수 상한을 적용하지 않는다.
+     */
     private InterviewMessageFeedbackResult validateAndNormalize(
             OpenAiInterviewMessageFeedbackResponse response
     ) {
@@ -89,6 +103,7 @@ public class OpenAiInterviewMessageFeedbackClient implements InterviewMessageFee
         );
     }
 
+    /** 강점과 개선점은 각각 한 항목 이상 필요하며 빈 항목을 제거해 통과시키지 않는다. */
     private List<String> normalizeRequiredList(List<String> values) {
         if (values == null || values.isEmpty()) {
             throw InterviewMessageFeedbackClientException.outputValidationFailed();

@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 
+/** 자기소개서 요약은 항상 포함하고, 아직 면접을 시작하지 않았으면 interviewSession을 null로 반환한다. */
 @Schema(requiredProperties = {"coverLetter", "interviewSession"})
 public record CurrentInterviewResponse(
         CoverLetterResponse coverLetter,
@@ -46,6 +47,10 @@ public record CurrentInterviewResponse(
         }
     }
 
+    /**
+     * 세션 상태와 복구할 질문 생성 Job을 함께 표현한다. 추가 질문 생성·실패 중에도 세션은 ACTIVE일 수 있다.
+     * jobId의 선택은 조회 서비스가 담당하며 답변 피드백 Job은 포함하지 않는다.
+     */
     @Schema(requiredProperties = {"id", "initialSourceReviewVersionId", "status", "jobId", "createdAt"})
     public record InterviewSessionResponse(
             String id,
