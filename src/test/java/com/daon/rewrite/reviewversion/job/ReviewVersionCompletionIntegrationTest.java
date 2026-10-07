@@ -39,6 +39,10 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+/**
+ * 문항별 결과 저장 이후의 전체 확정 트랜잭션을 독립적으로 검증한다.
+ * 직접 SQL은 정상 도메인 호출로 만들기 어려운 참조 누락·다른 자기소개서 연결 상태를 재현한다.
+ */
 @SpringBootTest
 @ActiveProfiles("test")
 class ReviewVersionCompletionIntegrationTest {
@@ -57,6 +61,7 @@ class ReviewVersionCompletionIntegrationTest {
     @Autowired private ReReviewJobTransactionService reReviewTransactions;
     @Autowired private JdbcTemplate jdbcTemplate;
 
+    // 자동 Worker·외부 호출을 막고 시작·전체 확정 서비스를 테스트에서 직접 호출한다.
     @MockitoBean private ReviewJobEventListener eventListener;
     @MockitoBean private ReviewClient reviewClient;
 
@@ -209,6 +214,7 @@ class ReviewVersionCompletionIntegrationTest {
         assertThat(resultRepository.findByReviewVersionIdOrderByQuestionOrderAsc(attempt.versionId())).isEmpty();
     }
 
+    // 재첨삭에는 편집된 finalAnswer를 가진 성공 기준 버전까지 준비해 유효한 시작 조건을 만든다.
     private ReviewAttempt createAttempt(LlmJobType type) {
         CoverLetter coverLetter = coverLetterService.create();
         coverLetterService.saveBasicInfo(coverLetter.getId(), "백엔드 지원", "회사", "개발자", null);
@@ -251,6 +257,7 @@ class ReviewVersionCompletionIntegrationTest {
         return stagedResultRepository.findByLlmJobIdOrderByQuestionOrderAsc(attempt.jobId());
     }
 
+    // LLM·문항 Runner 대신 완료 상태의 임시 결과를 직접 저장해 전체 확정 단계만 검증한다.
     private void completeStagedResults(ReviewAttempt attempt) {
         List<ReviewJobQuestionResult> results = stagedResults(attempt);
         results.forEach(result -> result.complete(
@@ -267,6 +274,7 @@ class ReviewVersionCompletionIntegrationTest {
                 : completionService.completeReReview(attempt.jobId());
     }
 
+    // 거부·중복 완료 전후의 상태를 값으로 비교하며 버전 수와 확정 문항 ID까지 보존되는지 확인한다.
     private CompletionState storedState(ReviewAttempt attempt) {
         CoverLetter coverLetter = coverLetterRepository.findById(attempt.coverLetterId()).orElseThrow();
         LlmJob job = jobRepository.findById(attempt.jobId()).orElseThrow();

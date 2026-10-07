@@ -72,6 +72,11 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * auth-test 프로필의 실제 인증 필터·JWT와 H2 DB를 함께 검증한다.
+ * 테스트 전체를 트랜잭션으로 묶지 않아 서비스가 커밋한 상태를 후속 요청과 별도 스레드에서 확인한다.
+ * 경합 테스트의 latch는 요청 시작 대기만 조율하며, DB 잠금 획득 순서는 고정하지 않는다.
+ */
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("auth-test")
@@ -101,11 +106,13 @@ class AuthIntegrationTest {
     @Autowired
     private SecretKey authSecretKey;
 
+    // 리다이렉트 응답은 mock으로 제어하고, state 소비·로그인 저장·토큰 처리는 실제 서비스로 검증한다.
     @MockitoBean
     private KakaoLoginService kakaoLoginService;
 
     @BeforeEach
     void cleanDatabase() {
+        // 사용자 외래 키를 가진 refresh token을 먼저 지워 이전 테스트의 커밋 데이터를 정리한다.
         refreshTokenRepository.deleteAll();
         oauthLoginStateRepository.deleteAll();
         userRepository.deleteAll();
@@ -254,6 +261,7 @@ class AuthIntegrationTest {
     void legacyOAuthStateWithoutTargetUsesProduction() throws Exception {
         String state = "legacy-state";
         String browserNonce = "legacy-browser-nonce";
+        // 현재 발급기는 target 접미부를 붙이므로, 이전 형식의 해시 행을 직접 저장해 호환 경로를 검증한다.
         oauthLoginStateRepository.save(OAuthLoginState.create(
                 HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
                         .digest(state.getBytes(StandardCharsets.UTF_8))),
@@ -266,6 +274,7 @@ class AuthIntegrationTest {
                 .contains(FrontendTarget.PRODUCTION);
     }
 
+    /** 별도 서비스 트랜잭션에서 같은 state를 소비해도 한 요청만 복귀 환경을 얻는지 확인한다. */
     @Test
     void concurrentCallbacksConsumeOAuthStateExactlyOnce() throws Exception {
         StateIssue issue = oauthStateService.issue(FrontendTarget.PRODUCTION);
@@ -414,6 +423,7 @@ class AuthIntegrationTest {
                     .andExpect(jsonPath("$.error.details").isArray());
         }
 
+        // 같은 서명 키로 발급 시각만 과거로 옮겨, 서명은 유효하지만 만료된 토큰을 만든다.
         String expiredCsrfToken = new CsrfTokenService(
                 authSecretKey,
                 Clock.fixed(Instant.now().minusSeconds(1801), ZoneOffset.UTC)
@@ -483,6 +493,7 @@ class AuthIntegrationTest {
                 Instant.now()
         ));
         String expiredToken = authTokenService.issueRefreshToken();
+        // 원문 형식은 정상인 토큰을 만료된 DB 행에 연결해 미등록 토큰과 만료 토큰을 구분한다.
         refreshTokenRepository.save(RefreshToken.create(
                 authTokenService.hashRefreshToken(expiredToken),
                 user,
@@ -494,6 +505,7 @@ class AuthIntegrationTest {
         );
         String csrfToken = csrfTokenService.issue();
 
+        // 첫 갱신을 성공시켜 아래 반복문의 재사용 토큰을 실제로 폐기된 상태로 만든다.
         mockMvc.perform(post("/auth/refresh")
                         .cookie(new Cookie("refresh_token", reusable.refreshToken()))
                         .header("X-CSRF-Token", csrfToken))
@@ -533,12 +545,14 @@ class AuthIntegrationTest {
                 .andExpect(jsonPath("$.error.code").value("CSRF_TOKEN_INVALID"))
                 .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE));
 
+        // HTTP 거절뿐 아니라 갱신 서비스가 기존 토큰을 소비하지 않았는지도 확인한다.
         RefreshToken token = refreshTokenRepository.findById(
                 authTokenService.hashRefreshToken(loginTokens.refreshToken())
         ).orElseThrow();
         assertThat(token.getRevokedAt()).isNull();
     }
 
+    /** 필터를 통과한 두 갱신 요청의 응답과 DB 상태를 함께 확인해 추가 토큰이 중복 생성되지 않는지 검증한다. */
     @Test
     void concurrentRefreshRequestsRotateTheSameTokenExactlyOnce() throws Exception {
         AuthTokenPair loginTokens = loginPersistenceService.login(
@@ -665,12 +679,14 @@ class AuthIntegrationTest {
                 .andExpect(jsonPath("$.error.code").value("CSRF_TOKEN_INVALID"))
                 .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE));
 
+        // CSRF 오류 응답에서 끝나야 하므로 기존 refresh token의 폐기 시각도 비어 있어야 한다.
         RefreshToken token = refreshTokenRepository.findById(
                 authTokenService.hashRefreshToken(loginTokens.refreshToken())
         ).orElseThrow();
         assertThat(token.getRevokedAt()).isNull();
     }
 
+    /** 같은 토큰의 로그아웃 요청이 겹쳐도 모두 성공하며, 최종 저장 상태는 폐기되어 있어야 한다. */
     @Test
     void concurrentLogoutRequestsAreBothSuccessfulAndRevokeTokenOnce() throws Exception {
         AuthTokenPair loginTokens = loginPersistenceService.login(
@@ -834,6 +850,7 @@ class AuthIntegrationTest {
                 .getStatus();
     }
 
+    /** 실제 JWT 키로 서명하되 claim을 직접 지정해 서명 오류와 claim 검증 실패를 구분하는 fixture다. */
     private String encodeToken(
             String issuer,
             List<String> audience,
@@ -853,6 +870,7 @@ class AuthIntegrationTest {
         return jwtEncoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
     }
 
+    /** 도메인 처리 없이 네 가지 상태 변경 HTTP 메서드에 대한 인증·CSRF 필터만 통과시키는 진입점이다. */
     @RestController
     static class CsrfProbeController {
 

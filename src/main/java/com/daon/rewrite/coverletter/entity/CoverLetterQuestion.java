@@ -11,6 +11,11 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+/**
+ * 등록 step3에서 저장한 원본 문항·답변이다. WRITING의 미완성 입력을 보존하도록 내용 필드는 nullable이다.
+ * 문항 목록 교체 시 ID와 순서를 새로 부여하며, 제출 이후에는 첨삭 입력의 기준 원본으로 유지한다.
+ * 진행 중인 첨삭 결과는 ReviewJobQuestionResult, 확정 결과는 ReviewVersionQuestionResult가 보관한다.
+ */
 @Getter
 @Entity
 @NoArgsConstructor(access = AccessLevel.PROTECTED)

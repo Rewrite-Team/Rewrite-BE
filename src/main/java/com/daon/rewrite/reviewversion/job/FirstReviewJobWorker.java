@@ -8,6 +8,10 @@ import org.springframework.stereotype.Service;
 
 import java.util.Optional;
 
+/**
+ * 최초 첨삭의 시작 → 문항별 실행·저장 → 전체 확정 또는 실패 전환을 조정한다.
+ * DB 트랜잭션은 각 서비스 호출에 한정하므로 외부 LLM 응답을 기다리는 동안 시작 시의 행 잠금을 유지하지 않는다.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -33,6 +37,7 @@ public class FirstReviewJobWorker {
             // 제출 시 생성한 버전에 성공 문항을 확정하고 최신 성공 버전을 갱신한다.
             reviewVersionCompletionService.completeFirstReview(jobId);
         } catch (RuntimeException exception) {
+            // 시작·문항 저장·전체 확정의 예상 밖 오류는 별도 트랜잭션으로 실패 처리하고 원인을 로그에 남긴다.
             try {
                 transactionService.failUnexpected(jobId);
             } catch (RuntimeException failureException) {

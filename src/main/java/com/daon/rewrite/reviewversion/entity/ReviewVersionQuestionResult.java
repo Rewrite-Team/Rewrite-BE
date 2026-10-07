@@ -13,6 +13,11 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+/**
+ * 전체 첨삭이 성공한 버전의 문항별 입력·AI 리포트·수정본·최종 작성본이다.
+ * originalAnswer는 그 첨삭의 실제 입력이며, 재첨삭에서는 이전 성공 버전의 finalAnswer에 해당한다.
+ * AI 수정본과 입력은 보존하고, 사용자의 후속 편집은 finalAnswer만 갱신한다.
+ */
 @Getter
 @Entity
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -96,6 +101,7 @@ public class ReviewVersionQuestionResult {
         this.finalAnswerLength = rewrittenAnswerLength;
     }
 
+    /** 문항의 제출 원본을 originalAnswer로 삼아 결과를 만든다. */
     public static ReviewVersionQuestionResult create(
             String id,
             ReviewVersion reviewVersion,
@@ -113,6 +119,10 @@ public class ReviewVersionQuestionResult {
         );
     }
 
+    /**
+     * Job에 고정된 입력 답변을 받아 확정 결과를 만든다.
+     * 문항의 제출 원본을 다시 읽지 않아 재첨삭 결과에서도 실제 입력 기준을 유지한다.
+     */
     public static ReviewVersionQuestionResult createFromSnapshot(
             String id,
             ReviewVersion reviewVersion,
@@ -124,6 +134,7 @@ public class ReviewVersionQuestionResult {
         return new ReviewVersionQuestionResult(id, reviewVersion, question, originalAnswer, aiReport, rewrittenAnswer);
     }
 
+    // 최신 성공 버전 여부와 전체 입력 검증은 ReviewVersionCommandService가 담당하고 여기서는 최종본과 길이만 갱신한다.
     public void updateFinalAnswer(String finalAnswer) {
         this.finalAnswer = finalAnswer;
         this.finalAnswerLength = countCodePoints(finalAnswer);

@@ -25,6 +25,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+/**
+ * OAuth state·Kakao 조회·로그인 저장을 mock으로 제어해 callback의 분류와 실패 변환을 검증한다.
+ * state 검증에 실패하면 외부 조회를 시작하지 않는 경계와, 검증된 target이 결과에 전달되는지 확인한다.
+ */
 @ExtendWith(MockitoExtension.class)
 class KakaoLoginServiceTest {
 

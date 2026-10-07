@@ -21,6 +21,11 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
+/**
+ * prod의 auth-real 보안 필터와 인증 controller를 활성화하되 DB는 인메모리 H2로 대체한다.
+ * 공개 문서 접근·대표 업무 API의 인증 필요 여부와 전체 API·OAuth redirect·응답 schema 계약을 검증한다.
+ * 카카오 로그인 endpoint는 생성 문서에서 확인하며 이 테스트에서 외부 카카오 호출은 수행하지 않는다.
+ */
 @SpringBootTest(properties = {
         "spring.datasource.url=jdbc:h2:mem:rewrite-prod-profile-test;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1",
         "spring.datasource.driver-class-name=org.h2.Driver",
@@ -220,6 +225,7 @@ class OpenApiSecurityIntegrationTest {
                                     }
                                 }))));
 
+        // 생성 문서의 응답 schema에서 출발해 참조·배열·합성 schema를 순회한다. 같은 component는 한 번만 확장한다.
         while (!pending.isEmpty()) {
             JsonNode schema = pending.removeFirst();
             if (schema.has("$ref")) {
@@ -248,6 +254,7 @@ class OpenApiSecurityIntegrationTest {
             }
         }
 
+        // required는 필드 존재 여부이며 nullable은 값의 허용 범위다. 공개 응답의 두 계약을 따로 확인한다.
         Set<String> nullableProperties = new HashSet<>();
         for (String name : responseSchemas) {
             components.path(name).path("properties").propertyStream().forEach(property -> {

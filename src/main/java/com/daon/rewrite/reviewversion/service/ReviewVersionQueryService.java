@@ -15,6 +15,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Comparator;
 
+/**
+ * 삭제되지 않은 자기소개서의 소유자를 확인하고 첨삭 시도 이력을 생성 순서대로 조회한다.
+ * 최신 시도와 최신 성공 결과를 따로 표시해 실패한 새 시도가 기존 성공 결과를 대체한 것으로 보이지 않게 한다.
+ */
 @Service
 @RequiredArgsConstructor
 public class ReviewVersionQueryService {
@@ -23,12 +27,17 @@ public class ReviewVersionQueryService {
     private final CoverLetterRepository coverLetterRepository;
     private final ReviewVersionRepository reviewVersionRepository;
 
+    /**
+     * 같은 생성 시각의 버전은 표시 번호로 정렬하며 실패·취소 상태로 버전을 걸러내지 않는다.
+     * isLatest는 가장 최근 시도, isLatestReviewed는 자기소개서가 가리키는 최신 성공 버전이다.
+     */
     @Transactional(readOnly = true)
     public List<ReviewVersionSummary> findMyReviewVersions(String coverLetterId) {
         CoverLetter coverLetter = findMyActiveCoverLetter(coverLetterId);
         List<ReviewVersion> versions = reviewVersionRepository.findByCoverLetterIdOrderByCreatedAtAsc(coverLetter.getId());
         versions.sort(Comparator.comparing(ReviewVersion::getCreatedAt)
                 .thenComparingInt(version -> Integer.parseInt(version.getVersion().substring(3))));
+        // 버전은 시도마다 순차 생성하고 삭제하지 않으므로 전체 개수에 해당하는 번호가 최신 시도다.
         String latestVersion = "v0." + versions.size();
         return versions
                 .stream()

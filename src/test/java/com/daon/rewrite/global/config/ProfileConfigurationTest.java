@@ -7,6 +7,10 @@ import org.springframework.boot.test.context.ConfigDataApplicationContextInitial
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.core.env.Environment;
 
+/**
+ * 설정 파일을 읽어 실행 목적별 profile 조합과 최종 DB·인증 관련 설정값을 검증한다.
+ * 애플리케이션 자동 구성을 로드하지 않아 실제 DB 연결이나 보안 필터 동작 없이 설정 합성만 확인한다.
+ */
 class ProfileConfigurationTest {
 
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()

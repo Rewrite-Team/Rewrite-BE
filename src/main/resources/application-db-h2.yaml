@@ -1,3 +1,5 @@
+# local group에서 사용하는 파일 DB다. 애플리케이션을 다시 시작해도 ./data/rewrite에 데이터를 유지한다.
+# PostgreSQL 모드는 H2의 문법 호환 설정이며 실제 PostgreSQL 검증을 대신하지 않는다.
 spring:
   datasource:
     url: jdbc:h2:file:./data/rewrite;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;AUTO_SERVER=TRUE
@@ -7,8 +9,10 @@ spring:
 
   jpa:
     hibernate:
+      # 애플리케이션 시작 시 entity 선언에 맞춰 기존 파일 DB의 schema를 갱신한다.
       ddl-auto: update
 
   h2:
     console:
+      # db-h2 전용 보안 체인이 내부 도구 계정으로 접근을 제한한다.
       enabled: true

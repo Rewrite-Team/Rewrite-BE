@@ -29,6 +29,11 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 
+/**
+ * 피드백 입력 준비와 assistant 메시지 저장·Job 종료를 각 트랜잭션으로 처리한다.
+ * requestRef는 평가할 USER 메시지이며, 성공 resultRef는 새로 저장한 ASSISTANT 메시지다.
+ * 종료된 Job은 변경하지 않아 중복 assistant 생성과 취소 후 늦은 응답 저장을 막는다.
+ */
 @Service
 @RequiredArgsConstructor
 class InterviewMessageFeedbackJobTransactionService {
@@ -50,6 +55,10 @@ class InterviewMessageFeedbackJobTransactionService {
     private final IdGenerator idGenerator;
     private final Clock clock;
 
+    /**
+     * 요청 USER가 해당 thread의 마지막 메시지인지 확인하고 원본 질문과 그 답변까지의 시간순 이력을 만든다.
+     * 소속 자기소개서·ACTIVE 세션/thread를 확인한 뒤 PROCESSING으로 전환하며, PENDING이 아니면 null을 반환한다.
+     */
     @Transactional
     public InterviewMessageFeedbackWork start(String jobId) {
         CoverLetterJobLockService.LockedCoverLetterJob locked = coverLetterJobLockService.lock(jobId);
@@ -81,6 +90,7 @@ class InterviewMessageFeedbackJobTransactionService {
         ));
     }
 
+    /** 검증된 전체 content·점수·내부 피드백을 assistant 메시지 하나로 저장하고 Job 완료를 함께 확정한다. */
     @Transactional
     public void complete(String jobId, InterviewMessageFeedbackResult result) {
         LlmJob job = findInterviewMessageFeedbackJobForUpdate(jobId);
@@ -113,6 +123,7 @@ class InterviewMessageFeedbackJobTransactionService {
         );
     }
 
+    /** USER 답변과 세션·thread를 유지하고 Job만 실패로 기록한다. 실패한 응답은 assistant로 저장하지 않는다. */
     @Transactional
     public void fail(String jobId, InterviewMessageFeedbackClientException.Reason reason) {
         LlmJob job = findInterviewMessageFeedbackJobForUpdate(jobId);
@@ -129,6 +140,7 @@ class InterviewMessageFeedbackJobTransactionService {
         );
     }
 
+    /** 입력 준비·전송·최종 저장의 예상 밖 오류를 기록하며 이미 종료된 Job의 상태는 유지한다. */
     @Transactional
     public void failUnexpected(String jobId) {
         LlmJob job = findInterviewMessageFeedbackJobForUpdate(jobId);

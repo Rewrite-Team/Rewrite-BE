@@ -33,6 +33,11 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * 비동기 키워드 분석의 입력 준비·결과 교체·실패 상태를 각 트랜잭션으로 처리한다.
+ * 요청 단계에서 생성하거나 재사용한 자기소개서별 분석 리소스에 결과를 저장한다.
+ * 완료·실패 시 Job의 종료 상태를 확인해 취소 후 늦게 도착한 응답과 중복 처리를 무시한다.
+ */
 @Service
 @RequiredArgsConstructor
 class KeywordAnalysisJobTransactionService {
@@ -57,6 +62,11 @@ class KeywordAnalysisJobTransactionService {
     private final IdGenerator idGenerator;
     private final Clock clock;
 
+    /**
+     * 자기소개서와 Job을 잠그고 입력값을 준비한 뒤 PENDING을 PROCESSING으로 전환한다.
+     * 이미 시작했거나 종료된 Job이면 null을 반환한다.
+     * 기준 버전 ID는 API 요청에서 선택한 값이며, 그 버전의 finalAnswer 본문은 이 시점에 읽는다.
+     */
     @Transactional
     public KeywordAnalysisWork start(String jobId) {
         CoverLetterJobLockService.LockedCoverLetterJob locked = coverLetterJobLockService.lock(jobId);
@@ -104,6 +114,7 @@ class KeywordAnalysisJobTransactionService {
         ));
     }
 
+    /** 검증된 결과 목록으로 기존 키워드를 교체하고 분석 상태·Job 완료·결과 참조를 함께 확정한다. */
     @Transactional
     public void complete(String jobId, List<KeywordAnalysisResult> results) {
         LlmJob job = findKeywordAnalysisJobForUpdate(jobId);
@@ -120,6 +131,7 @@ class KeywordAnalysisJobTransactionService {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR);
         }
 
+        // 같은 분석 ID·keywordOrder를 다시 사용하므로 기존 행의 삭제를 새 행 저장보다 먼저 반영한다.
         keywordRepository.deleteByKeywordAnalysisId(keywordAnalysis.getId());
         keywordRepository.flush();
         List<KeywordAnalysisKeyword> keywords = new ArrayList<>();
@@ -146,6 +158,7 @@ class KeywordAnalysisJobTransactionService {
         );
     }
 
+    /** 분류된 분석 실패를 Job과 분석 리소스에 함께 기록한다. 기존 키워드 행의 교체는 완료 시에만 한다. */
     @Transactional
     public void fail(String jobId, KeywordAnalysisClientException.Reason reason) {
         LlmJob job = findKeywordAnalysisJobForUpdate(jobId);
@@ -169,6 +182,10 @@ class KeywordAnalysisJobTransactionService {
         keywordAnalysis.fail(now);
     }
 
+    /**
+     * 예상 밖 오류를 Job에 기록하고, 분석 리소스가 존재하며 PROCESSING이면 함께 실패로 바꾼다.
+     * 입력 준비 도중 분석 리소스의 상태·존재 검증에서 실패한 경우도 이 경계에서 처리한다.
+     */
     @Transactional
     public void failUnexpected(String jobId) {
         LlmJob job = findKeywordAnalysisJobForUpdate(jobId);

@@ -16,50 +16,46 @@ import java.util.TreeMap;
 import org.springdoc.core.customizers.OperationCustomizer;
 import org.springframework.web.method.HandlerMethod;
 
-/*
-Springdoc의 OperationCustomizer는 Controller mapping 하나가 OpenAPI의 operation으로 변환될 때 호출되는 확작 지점
-Controller -> Springdoc이 operation 객체 생성 -> OperationCustomizer 가 operation 객체를 변환
+/**
+ * Springdoc이 controller·DTO에서 만든 operation에 @RewriteApi의 사용 맥락과 오류 정책을 결합한다.
+ * Swagger의 설명과 x-rewrite 메타데이터를 같은 선언에서 만들고, JSON 오류와 redirect 오류를 구분해 응답에 반영한다.
+ * HTTP 응답 자체를 처리하는 코드가 아니라 생성 OpenAPI를 보완하는 확장 지점이다.
  */
 public class RewriteApiOperationCustomizer implements OperationCustomizer {
 
-    // 현재 OpenAPI문서에 등록된 ErrorResponse schema를 사용하라는 OpenAPI 문서 내부의 참조 경로
+    // OpenApiConfig가 등록하는 공통 오류 모델을 참조한다.
     private static final String ERROR_RESPONSE_SCHEMA = "#/components/schemas/ErrorResponse";
 
     /**
-     *
-     * @param operation     Springdoc이 Controller와 DTO를 분석해서 생성한 OpenAPI operation
-     * @param handlerMethod operation을 만든 실제 Controller메서드(annotation정보를 조회할 수 있다.)
-     * @return
+     * {@code @RewriteApi}가 없는 메서드는 Springdoc 결과를 유지하고, 있는 메서드만 Rewrite 문서 규칙을 적용한다.
+     * 메타데이터를 합성한 뒤 성공 상태를 보정하고 API별·공통 오류 응답을 추가한다.
      */
     @Override
     public Operation customize(Operation operation, HandlerMethod handlerMethod) {
-        // Controller 메서드에 선언된 @RewriteApi를 가져온다
         RewriteApi api = handlerMethod.getMethodAnnotation(RewriteApi.class);
         if (api == null) {
             return operation;
         }
 
-        // 전체 오류 목록 생성
         List<ErrorCase> errorCases = errorCases(api);
 
-        // Operation 문서 설정
         operation.setOperationId(api.operationId());
         operation.setSummary(api.id() + " · " + api.summary());
         operation.setTags(List.of(api.tag()));
         operation.setDescription(description(api, errorCases));
-        // x-rewrite-* 구조화 데이터 추가 (OpenAPI 문서의 완성도를 높이기 위해 테스트에서 문서 누락을 자동으로 검사하게 만든다.)
         addExtensions(operation, api, errorCases);
-        // 성공 HTTP 상태 보정
         configureSuccessResponse(operation, api);
-        // 오류 response 와 example 추가
         addErrorResponses(operation, errorCases);
 
         return operation;
     }
 
+    /**
+     * API별 JSON·redirect 오류와 선택된 공통 401·403·500 오류를 코드 기준으로 합친다.
+     * 명시한 오류 조건·처리 방법이 있으면 공통 정의가 덮어쓰지 않도록 우선한다.
+     */
     private List<ErrorCase> errorCases(RewriteApi api) {
         Map<String, ErrorCase> cases = new LinkedHashMap<>();
-        // 일반 JSON 오류 반환
         Arrays.stream(api.errors())
                 .map(error -> new ErrorCase(
                         error.code().getStatus().value(),
@@ -73,7 +69,6 @@ public class RewriteApiOperationCustomizer implements OperationCustomizer {
                 ))
                 .forEach(error -> cases.put(error.code(), error));
 
-        // Redirect 오류 반환
         Arrays.stream(api.redirectErrors())
                 .map(error -> new ErrorCase(
                         error.status(),
@@ -87,7 +82,6 @@ public class RewriteApiOperationCustomizer implements OperationCustomizer {
                 ))
                 .forEach(error -> cases.put(error.code(), error));
 
-        // authenticated = true인 API에 공통 401 자동 추가
         if (api.authenticated()) {
             cases.putIfAbsent(ErrorCode.UNAUTHORIZED.getCode(), new ErrorCase(
                     ErrorCode.UNAUTHORIZED.getStatus().value(),
@@ -100,7 +94,6 @@ public class RewriteApiOperationCustomizer implements OperationCustomizer {
                     true
             ));
         }
-        // csrfProtected = true인 API에 공통 403 자동 추가
         if (api.csrfProtected()) {
             cases.putIfAbsent(ErrorCode.CSRF_TOKEN_INVALID.getCode(), new ErrorCase(
                     ErrorCode.CSRF_TOKEN_INVALID.getStatus().value(),
@@ -113,7 +106,6 @@ public class RewriteApiOperationCustomizer implements OperationCustomizer {
                     true
             ));
         }
-        // 공통 500 자동 추가
         if (api.includeInternalError()) {
             cases.putIfAbsent(ErrorCode.INTERNAL_ERROR.getCode(), new ErrorCase(
                     ErrorCode.INTERNAL_ERROR.getStatus().value(),
@@ -130,7 +122,7 @@ public class RewriteApiOperationCustomizer implements OperationCustomizer {
         return List.copyOf(cases.values());
     }
 
-    // Swagger UI에서 API를 펼쳤을 때 표시할 Markdown 설명을 생성
+    // Swagger에서 API를 펼쳤을 때 사용 맥락과 오류 대응을 함께 읽을 수 있는 Markdown 설명을 만든다.
     private String description(RewriteApi api, List<ErrorCase> errorCases) {
         return """
                 > 인증: %s · CSRF: %s
@@ -164,7 +156,7 @@ public class RewriteApiOperationCustomizer implements OperationCustomizer {
         );
     }
 
-    // 설명용 오류 표
+    // API 설명의 오류 표는 HTTP 상태 순으로 표시한다.
     private String errorTable(List<ErrorCase> errorCases) {
         StringBuilder table = new StringBuilder("| HTTP | 오류 코드 | 발생 조건 | 처리 |\n")
                 .append("|---:|---|---|---|\n");
@@ -184,12 +176,12 @@ public class RewriteApiOperationCustomizer implements OperationCustomizer {
         return table.toString();
     }
 
-    // 표 깨짐 방지
+    // 조건·처리 문장의 구분자나 개행이 Markdown 표 구조를 바꾸지 않게 한다.
     private String markdownCell(String value) {
         return value.replace("|", "\\|").replace("\n", "<br>");
     }
 
-    // API 정보를 OpenAPI vendor extension으로 추가 (기계가 읽는 구조화 정보)
+    // 화면용 Markdown과 같은 정보를 도구·테스트가 읽을 수 있는 구조화된 x-rewrite 확장으로도 제공한다.
     private void addExtensions(Operation operation, RewriteApi api, List<ErrorCase> errorCases) {
         operation.addExtension("x-rewrite-api-id", api.id());
         operation.addExtension("x-rewrite-purpose", api.purpose());
@@ -214,6 +206,10 @@ public class RewriteApiOperationCustomizer implements OperationCustomizer {
         return extension;
     }
 
+    /**
+     * 200 외 성공 상태가 선언된 API는 추론된 200 응답을 선언 상태로 옮긴다.
+     * 해당 상태의 명시적 응답이 있으면 그 응답의 헤더·스키마를 유지하고 성공 설명을 설정한다.
+     */
     private void configureSuccessResponse(Operation operation, RewriteApi api) {
         if (api.successStatus() == 200) {
             return;
@@ -228,6 +224,7 @@ public class RewriteApiOperationCustomizer implements OperationCustomizer {
         operation.getResponses().addApiResponse(Integer.toString(api.successStatus()), success);
     }
 
+    // 같은 HTTP 상태의 여러 오류를 하나의 응답으로 모으고 오류 코드별 예시는 그 안에서 구분한다.
     private void addErrorResponses(Operation operation, List<ErrorCase> errorCases) {
         Map<Integer, List<ErrorCase>> casesByStatus = new TreeMap<>();
         errorCases.forEach(error -> casesByStatus
@@ -240,6 +237,10 @@ public class RewriteApiOperationCustomizer implements OperationCustomizer {
         ));
     }
 
+    /**
+     * 기존 응답의 헤더와 설명을 유지하면서 같은 상태의 오류 설명을 합친다.
+     * JSON 오류에만 ErrorResponse 참조와 코드별 named example을 붙이고, redirect 오류는 설명에 추가한다.
+     */
     private ApiResponse errorResponse(ApiResponse existing, List<ErrorCase> errorCases) {
         ApiResponse response = existing == null ? new ApiResponse() : existing;
         String errorDescription = errorResponseDescription(errorCases);
@@ -284,6 +285,10 @@ public class RewriteApiOperationCustomizer implements OperationCustomizer {
                 .value(Map.of("error", body));
     }
 
+    /**
+     * VALIDATION_ERROR에만 선언된 대표 field·reason 쌍을 details 예시로 사용한다.
+     * 둘 중 하나만 지정한 문서는 생성 시 거부하고, 둘 다 없으면 빈 details로 표현한다.
+     */
     private List<Map<String, String>> validationDetails(ErrorCase error) {
         if (!ErrorCode.VALIDATION_ERROR.getCode().equals(error.code())) {
             return List.of();

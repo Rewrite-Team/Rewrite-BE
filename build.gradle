@@ -8,6 +8,7 @@ plugins {
 group = 'com.daon'
 version = '0.0.1-SNAPSHOT'
 
+// 로컬과 CI의 컴파일·테스트에서 같은 Java 21 toolchain을 사용한다.
 java {
 	toolchain {
 		languageVersion = JavaLanguageVersion.of(21)
@@ -35,8 +36,10 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-security'
 	implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
 	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.0'
+	// 실행 profile이 접속할 DB를 선택하며 두 드라이버를 런타임에 제공한다.
 	runtimeOnly 'com.h2database:h2'
 	runtimeOnly 'org.postgresql:postgresql'
+	// Lombok은 컴파일 시 코드를 생성하고 애플리케이션 런타임 의존성에서는 제외한다.
 	compileOnly 'org.projectlombok:lombok'
 	annotationProcessor 'org.projectlombok:lombok'
 	testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
@@ -47,6 +50,7 @@ dependencies {
 	testAnnotationProcessor 'org.projectlombok:lombok'
 }
 
+// Spring AI 모듈의 버전은 위 springAiVersion의 BOM으로 함께 맞춘다.
 dependencyManagement {
 	imports {
 		mavenBom "org.springframework.ai:spring-ai-bom:${springAiVersion}"
@@ -55,11 +59,13 @@ dependencyManagement {
 
 tasks.named('test') {
 	useJUnitPlatform()
+	// 테스트 실행 후 커버리지 보고서를 생성해 로컬 확인과 CI 집계에 사용한다.
 	finalizedBy tasks.named('jacocoTestReport')
 }
 
 tasks.named('jacocoTestReport') {
 	reports {
+		// XML은 CI의 line coverage 집계에, HTML은 내려받아 확인할 보고서에 사용한다.
 		xml.required = true
 		csv.required = false
 		html.required = true

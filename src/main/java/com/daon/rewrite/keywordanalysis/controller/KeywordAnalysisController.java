@@ -12,6 +12,10 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * 키워드 분석 시작 요청과 최신 상태·결과 조회를 서비스에 연결한다.
+ * 시작 응답의 jobId는 공통 Job SSE에, 완료된 키워드 목록은 최신 조회 응답에 사용한다.
+ */
 @RestController
 @RequiredArgsConstructor
 public class KeywordAnalysisController {

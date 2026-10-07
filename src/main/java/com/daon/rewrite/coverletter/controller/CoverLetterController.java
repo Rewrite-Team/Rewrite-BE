@@ -34,6 +34,10 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.http.MediaType;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+/**
+ * 자기소개서의 작성·제출·삭제 요청을 {@link CoverLetterService}로 연결한다.
+ * 현재 상세의 결과 선택은 {@link CoverLetterDetailQueryService}가, 목록 카드의 상태 스트림은 {@link CoverLetterReviewStatusStreamService}가 담당한다.
+ */
 @RestController
 @RequiredArgsConstructor
 public class CoverLetterController {

@@ -14,6 +14,10 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * 질문별 대화방의 메시지 조회와 사용자 답변 전송을 서비스에 연결한다.
+ * 답변 전송은 USER 메시지와 피드백 Job을 반환하고, 확정 피드백은 메시지 조회로 읽는다.
+ */
 @RestController
 @RequiredArgsConstructor
 public class InterviewMessageController {

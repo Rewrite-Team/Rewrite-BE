@@ -37,6 +37,12 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * 초기 5개·추가 1개 질문 생성의 입력 준비와 결과 확정을 담당한다.
+ * requestRef는 요청 시 선택한 생성 기준 ReviewVersion이며, 질문마다 그 기준 버전 ID를 남긴다.
+ * 완료 resultRef는 초기 생성이면 세션, 추가 생성이면 새 질문을 가리킨다.
+ * 종료된 Job의 결과·실패 처리는 무시해 중복 완료와 취소 후 상태 덮어쓰기를 막는다.
+ */
 @Service
 @RequiredArgsConstructor
 class InterviewQuestionGenerationJobTransactionService {
@@ -65,6 +71,10 @@ class InterviewQuestionGenerationJobTransactionService {
     private final IdGenerator idGenerator;
     private final Clock clock;
 
+    /**
+     * 자기소개서와 Job을 잠그고 기준 버전의 finalAnswer·기존 질문을 읽은 뒤 PROCESSING으로 전환한다.
+     * 기준 버전 ID는 요청 시 고정되며 답변 본문은 이 시점에 읽는다. PENDING이 아닌 Job은 null을 반환한다.
+     */
     @Transactional
     public InterviewQuestionGenerationWork start(String jobId) {
         CoverLetterJobLockService.LockedCoverLetterJob locked = coverLetterJobLockService.lock(jobId);
@@ -85,6 +95,7 @@ class InterviewQuestionGenerationJobTransactionService {
         GenerationMode generationMode = resolveGenerationMode(job);
         validateStartState(job, interviewSession, existingQuestions, generationMode);
 
+        // 추가 질문의 기준은 이번 Job에 고정한 버전이므로 세션의 초기 생성 기준과 다를 수 있다.
         ReviewVersion sourceReviewVersion = reviewVersionRepository.findByIdAndCoverLetterId(
                         sourceReviewVersionId(job),
                         coverLetter.getId()
@@ -116,6 +127,10 @@ class InterviewQuestionGenerationJobTransactionService {
         ));
     }
 
+    /**
+     * 검증된 질문과 각 질문의 thread를 같은 트랜잭션에서 생성하고 Job 완료를 확정한다.
+     * 초기 생성은 세션을 ACTIVE로 바꾸며, 추가 생성은 기존 ACTIVE 세션에 새 질문만 덧붙인다.
+     */
     @Transactional
     public void complete(String jobId, List<InterviewQuestionGenerationResult> results) {
         LlmJob job = findInterviewQuestionGenerationJobForUpdate(jobId);
@@ -133,6 +148,7 @@ class InterviewQuestionGenerationJobTransactionService {
         GenerationMode generationMode = resolveGenerationMode(job);
         validateCompletionState(job, interviewSession, existingQuestions, results, generationMode);
         String sourceReviewVersionId = sourceReviewVersionId(job);
+        // 추가 질문은 기존 마지막 order 뒤에 붙여 기존 질문과 대화의 순서를 유지한다.
         int firstQuestionOrder = generationMode == GenerationMode.INITIAL
                 ? 1
                 : existingQuestions.getLast().getQuestionOrder() + 1;
@@ -178,6 +194,7 @@ class InterviewQuestionGenerationJobTransactionService {
         );
     }
 
+    /** QUESTION_GENERATING 세션만 FAILED로 바꾸므로 추가 생성 실패는 ACTIVE 세션과 기존 질문·대화를 유지한다. */
     @Transactional
     public void fail(String jobId, InterviewQuestionGenerationClientException.Reason reason) {
         LlmJob job = findInterviewQuestionGenerationJobForUpdate(jobId);
@@ -198,6 +215,7 @@ class InterviewQuestionGenerationJobTransactionService {
                 .ifPresent(InterviewSession::fail);
     }
 
+    /** 예상 밖 오류도 같은 세션 보존 규칙으로 처리하며, 이미 종료된 Job의 상태는 유지한다. */
     @Transactional
     public void failUnexpected(String jobId) {
         LlmJob job = findInterviewQuestionGenerationJobForUpdate(jobId);
@@ -250,6 +268,7 @@ class InterviewQuestionGenerationJobTransactionService {
         throw new BusinessException(ErrorCode.INTERNAL_ERROR);
     }
 
+    // 최초 생성은 질문이 없는 QUESTION_GENERATING 세션, 추가 생성은 질문이 있는 ACTIVE 세션만 허용한다.
     private void validateStartState(
             LlmJob job,
             InterviewSession interviewSession,
@@ -271,6 +290,7 @@ class InterviewQuestionGenerationJobTransactionService {
         }
     }
 
+    // 외부 호출이 끝난 뒤 세션 상태·기존 질문·결과 개수를 다시 확인하고 전체 결과를 확정한다.
     private void validateCompletionState(
             LlmJob job,
             InterviewSession interviewSession,

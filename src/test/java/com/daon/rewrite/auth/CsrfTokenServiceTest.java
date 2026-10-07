@@ -9,6 +9,10 @@ import java.time.ZoneOffset;
 import javax.crypto.spec.SecretKeySpec;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 같은 서명 키와 고정 Clock으로 발급·검증 시각을 분리해 실제 대기 없이 만료 경계를 검증한다.
+ * 서명된 payload를 변조한 경우도 정상 토큰과 구분해 확인한다.
+ */
 class CsrfTokenServiceTest {
 
     private static final Instant NOW = Instant.parse("2026-07-28T00:00:00Z");
@@ -31,6 +35,7 @@ class CsrfTokenServiceTest {
     void rejectsMissingMalformedAndTamperedTokens() {
         CsrfTokenService service = serviceAt(NOW);
         String token = service.issue();
+        // 서명은 그대로 두고 만료 시각의 첫 자리만 바꿔 payload 변조를 만든다.
         String tampered = (token.startsWith("1") ? "2" : "1") + token.substring(1);
 
         assertThat(service.isValid(null)).isFalse();

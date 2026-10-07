@@ -1,7 +1,9 @@
+# 현재 Backend CI는 Codecov를 호출하지 않는다. Codecov 실행 시 적용할 설정을 이 파일에 유지한다.
 coverage:
   status:
     project:
       default:
+        # 커버리지 결과를 정보용으로 보고하며 실패 기준으로 사용하지 않는다.
         informational: true
     patch:
       default:

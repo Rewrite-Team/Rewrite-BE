@@ -27,6 +27,11 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 
+/**
+ * 전체 문항이 성공한 첨삭 Job의 임시 결과를 이미 생성된 버전의 정식 결과로 확정한다.
+ * 결과 저장·최신 성공 버전 교체·Job 완료를 한 트랜잭션에서 처리한다.
+ * 완료된 Job의 재요청은 기존 결과를 반환하고, 취소된 Job은 결과를 확정하지 않는다.
+ */
 @Service
 @RequiredArgsConstructor
 public class ReviewVersionCompletionService {
@@ -41,6 +46,7 @@ public class ReviewVersionCompletionService {
     private final IdGenerator idGenerator;
     private final Clock clock;
 
+    /** 최초 첨삭 Job과 자기소개서 상태를 잠금 안에서 확인한 뒤 문항 결과를 확정한다. */
     @Transactional
     public CompleteReviewResult completeFirstReview(String jobId) {
         CoverLetterJobLockService.LockedCoverLetterJob locked = coverLetterJobLockService.lock(jobId);
@@ -65,9 +71,12 @@ public class ReviewVersionCompletionService {
         return completeReview(coverLetter, job);
     }
 
+    /**
+     * 재첨삭 시작 때 고정한 기준 버전이 같은 자기소개서에 속하는지 확인한 뒤 새 결과를 확정한다.
+     * 기존 성공 버전은 이 확정이 커밋될 때까지 최신 성공 기준으로 유지된다.
+     */
     @Transactional
     public CompleteReviewResult completeReReview(String jobId) {
-        // 재첨삭 Job 완료 처리는 동일 Job의 중복 완료 요청을 막기 위해 row lock을 잡고 진행한다.
         CoverLetterJobLockService.LockedCoverLetterJob locked = coverLetterJobLockService.lock(jobId);
         LlmJob job = locked.job();
         validateReReviewJob(job);
@@ -82,7 +91,6 @@ public class ReviewVersionCompletionService {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR);
         }
 
-        // 재첨삭은 이미 최초 첨삭이 완료된 자기소개서에서만 가능하다.
         CoverLetter coverLetter = locked.coverLetter();
         if (coverLetter.getStatus() != CoverLetterStatus.REVIEWING
                 || coverLetter.getLatestReviewedVersionId() == null) {
@@ -102,6 +110,10 @@ public class ReviewVersionCompletionService {
         return completeReview(coverLetter, job);
     }
 
+    /**
+     * 완성된 임시 결과의 실제 입력 답변을 originalAnswer로 옮기고, 새 수정본을 finalAnswer의 초깃값으로 삼는다.
+     * 정식 결과가 모두 저장된 뒤 자기소개서의 최신 성공 참조와 Job의 결과 참조를 함께 갱신한다.
+     */
     private CompleteReviewResult completeReview(CoverLetter coverLetter, LlmJob job) {
         List<ReviewJobQuestionResult> stagedResults = findCompletedStagedResults(job);
 
@@ -159,6 +171,7 @@ public class ReviewVersionCompletionService {
         return new CompleteReviewResult(reviewVersion, questionResults);
     }
 
+    // 전체 예정 문항 수와 완료 상태가 일치해야 부분 성공을 정식 버전 결과로 확정하지 않는다.
     private List<ReviewJobQuestionResult> findCompletedStagedResults(LlmJob job) {
         List<ReviewJobQuestionResult> stagedResults = jobQuestionResultRepository
                 .findByLlmJobIdOrderByQuestionOrderAsc(job.getId());

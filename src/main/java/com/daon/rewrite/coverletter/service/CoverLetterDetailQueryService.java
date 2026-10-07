@@ -27,6 +27,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
+/**
+ * 현재 자기소개서 상세와 선택한 첨삭 버전 상세를 같은 조회 결과 구조로 조합한다.
+ * WRITING 원본, 진행·실패 Job의 입력 및 임시 결과, 성공 버전의 확정 결과 중 화면에 맞는 문항을 선택한다.
+ * 사용자 조회는 항상 자기소개서 소유권과 soft delete 여부를 먼저 확인한다.
+ */
 @Service
 @RequiredArgsConstructor
 public class CoverLetterDetailQueryService {
@@ -43,6 +48,11 @@ public class CoverLetterDetailQueryService {
     private final ReviewVersionRepository reviewVersionRepository;
     private final ReviewVersionQuestionResultRepository reviewVersionQuestionResultRepository;
 
+    /**
+     * 진행·실패 중이면 해당 첨삭 시도를, 완료 상태이면 최신 성공 버전을 현재 상세로 선택한다.
+     * 문항은 현재 Job의 임시 결과 → 선택한 버전의 확정 결과 → 원본 순서로 찾는다.
+     * 여러 조회 사이의 worker 커밋으로 상태와 문항이 섞이지 않도록 REPEATABLE_READ 스냅샷에서 읽는다.
+     */
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public CoverLetterDetailResult findCurrent(String coverLetterId) {
         CoverLetter coverLetter = findMyActiveCoverLetter(coverLetterId);
@@ -54,7 +64,7 @@ public class CoverLetterDetailQueryService {
         }
         CoverLetterDetailResult.ReviewVersionResult reviewVersion = toVersionResult(coverLetter, currentVersion);
 
-        // 진행·실패 Job의 임시 문항 결과를 우선 반환한다.
+        // 임시 문항에는 실제 Job 입력과 완료된 새 AI 결과가 들어 있어 진행·실패 화면을 복원할 수 있다.
         if (reviewJob != null) {
             List<ReviewJobQuestionResult> jobResults = reviewJobQuestionResultRepository
                     .findByLlmJobIdOrderByQuestionOrderAsc(reviewJob.getId());
@@ -68,7 +78,7 @@ public class CoverLetterDetailQueryService {
             }
         }
 
-        // 확정된 문항 결과가 있으면 반환한다.
+        // Job 입력 스냅샷이 없을 때 선택한 버전에 확정 결과가 있으면 사용한다.
         if (reviewVersion != null && coverLetter.getStatus() != CoverLetterStatus.WRITING) {
             List<CoverLetterDetailResult.QuestionResult> versionQuestions =
                     findVersionQuestions(reviewVersion.value());
@@ -77,7 +87,7 @@ public class CoverLetterDetailQueryService {
             }
         }
 
-        // 첨삭 전에는 원본 문항을 반환한다.
+        // WRITING 또는 최초 첨삭 worker가 임시 문항을 만들기 전에는 저장된 원본을 보여준다.
         return new CoverLetterDetailResult(
                 coverLetter,
                 reviewVersion,
@@ -86,26 +96,27 @@ public class CoverLetterDetailQueryService {
         );
     }
 
+    /**
+     * 히스토리에서 선택한 버전을 조회하며, 자기소개서 표시 상태는 현재 값으로 유지한다.
+     * 미완료·실패 버전은 해당 Job과 임시 문항을, 성공 버전은 확정 문항을 반환한다.
+     * Job 연결이 없는 기존 성공 버전도 확정 결과로 읽는다.
+     */
     @Transactional(readOnly = true)
     public CoverLetterDetailResult findVersion(String coverLetterId, String versionId) {
         CoverLetter coverLetter = findMyActiveCoverLetter(coverLetterId);
         ReviewVersion reviewVersion = reviewVersionRepository
                 .findByIdAndCoverLetterId(versionId, coverLetter.getId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
-        // 조회할 첨삭 버전을 처리한 Job을 가져온다.
         LlmJob job = reviewVersion.getLlmJob();
-        // PENDING·PROCESSING·FAILED·CANCELED는 정식 결과가 확정되지 않았으므로 임시 결과를 조회한다.
         if (job != null && job.getStatus() != LlmJobStatus.COMPLETED) {
-            // 성공 문항뿐 아니라 진행 중·실패 문항도 포함해 문항 순서대로 가져온다.
+            // 성공 문항 외에도 진행·실패 문항의 입력을 유지하고, 아직 없는 AI 필드는 null로 전달한다.
             List<ReviewJobQuestionResult> jobResults = reviewJobQuestionResultRepository
                     .findByLlmJobIdOrderByQuestionOrderAsc(job.getId());
-            // 해당 버전 정보, Job 상태와 현재까지 저장된 문항 정보를 함께 반환한다.
             return new CoverLetterDetailResult(
                     coverLetter,
                     toVersionResult(coverLetter, reviewVersion),
                     job,
-                    // 임시 행이 없으면 원본 문항을 반환한다. 최초 첨삭 Worker 시작 전이 이에 해당한다.
-                    // 임시 행이 있으면 응답용 객체로 변환한다. 아직 AI 결과가 없는 문항의 AI 필드는 null이다.
+                    // 최초 첨삭 worker 시작 전처럼 임시 행이 없으면 원본으로 복원한다.
                     jobResults.isEmpty() ? findOriginalQuestions(coverLetter)
                             : jobResults.stream().map(this::fromJobResult).toList()
             );
@@ -124,6 +135,7 @@ public class CoverLetterDetailQueryService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
     }
 
+    /** 최신 시도와 별개로 CoverLetter에 저장된 최신 성공 버전을 찾는다. */
     private ReviewVersion findLatestReviewVersion(CoverLetter coverLetter) {
         if (coverLetter.getLatestReviewedVersionId() == null) {
             return null;
@@ -134,6 +146,10 @@ public class CoverLetterDetailQueryService {
         return reviewVersion;
     }
 
+    /**
+     * latest는 실패·취소도 포함한 마지막 시도, latestReviewed는 최신 성공 참조와의 일치 여부다.
+     * 시도마다 버전 번호를 하나씩 부여하므로 마지막 시도는 전체 버전 수에 해당하는 라벨로 식별한다.
+     */
     private CoverLetterDetailResult.ReviewVersionResult toVersionResult(
             CoverLetter coverLetter,
             ReviewVersion reviewVersion
@@ -149,6 +165,7 @@ public class CoverLetterDetailQueryService {
         );
     }
 
+    /** 표시 상태에 대응하는 첨삭 Job만 선택한다. 키워드·면접 Job은 자기소개서 상세의 reviewJob에 포함하지 않는다. */
     private LlmJob findCurrentReviewJob(CoverLetter coverLetter) {
         List<LlmJobStatus> statuses;
         if (coverLetter.getStatus() == CoverLetterStatus.REVIEWING) {
@@ -200,6 +217,10 @@ public class CoverLetterDetailQueryService {
         );
     }
 
+    /**
+     * Job에 고정한 입력을 originalAnswer로 전달한다. 재첨삭이면 이전 최신 성공 버전의 finalAnswer다.
+     * 임시 결과는 읽기 전용이므로 확정 문항 결과 ID를 부여하지 않는다.
+     */
     private CoverLetterDetailResult.QuestionResult fromJobResult(ReviewJobQuestionResult result) {
         return new CoverLetterDetailResult.QuestionResult(
                 null,

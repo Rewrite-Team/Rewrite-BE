@@ -40,6 +40,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.when;
 
+/** 실제 Worker와 DB를 사용해 실패·재시도·중복 제출에 따른 시도 버전과 최신 성공 버전의 분리를 확인한다. */
 @SpringBootTest
 @ActiveProfiles("test")
 class ReviewVersionLifecycleIntegrationTest {
@@ -57,6 +58,7 @@ class ReviewVersionLifecycleIntegrationTest {
     @Autowired private ReReviewJobWorker reReviewJobWorker;
     @Autowired private JdbcTemplate jdbcTemplate;
 
+    // 자동 실행을 억제해 테스트가 Worker 실행 시점을 정하고, client 응답으로 문항별 성공·실패를 제어한다.
     @MockitoBean private ReviewJobEventListener eventListener;
     @MockitoBean private ReviewClient reviewClient;
 
@@ -78,6 +80,7 @@ class ReviewVersionLifecycleIntegrationTest {
         assertThat(coverLetterService.submit(coverLetter.getId()).job().getId()).isEqualTo(first.job().getId());
         assertThat(versionRepository.countByCoverLetterId(coverLetter.getId())).isEqualTo(1);
 
+        // 병렬 완료 순서와 무관하게 둘째 문항만 실패시켜 첫 문항의 부분 성공 보존을 확인한다.
         when(reviewClient.reviewQuestion(any(), anyString())).thenAnswer(invocation -> {
             String questionId = invocation.getArgument(1);
             if (questionId.equals(questionIds.get(1))) {
@@ -206,6 +209,7 @@ class ReviewVersionLifecycleIntegrationTest {
         SubmitCoverLetterResult first = coverLetterService.submit(coverLetter.getId());
         firstReviewJobWorker.execute(first.job().getId());
         String versionId = versionRepository.findByLlmJobId(first.job().getId()).orElseThrow().getId();
+        // Job 연결 없이 남아 있는 기존 성공 버전을 재현해 조회·수정 호환성을 확인한다.
         jdbcTemplate.update("update review_versions set llm_job_id = null where id = ?", versionId);
 
         var versions = versionQueryService.findMyReviewVersions(coverLetter.getId());
@@ -250,6 +254,7 @@ class ReviewVersionLifecycleIntegrationTest {
     @Test
     void concurrentSubmitsCreateOneJobAndOneVersion() throws Exception {
         CoverLetter coverLetter = createCoverLetter(1);
+        // 두 제출 요청을 같은 출발점에서 풀어 동일 자기소개서에 대한 Job·버전 생성 경합을 확인한다.
         CountDownLatch start = new CountDownLatch(1);
 
         try (var executor = Executors.newFixedThreadPool(2)) {

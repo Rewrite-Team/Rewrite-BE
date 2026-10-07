@@ -4,6 +4,10 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 
+/**
+ * HTTP 오류 응답에 사용할 상태·공개 코드·메시지를 정의한다.
+ * 비동기 LLM 작업 실패는 Job에 기록하며 이 HTTP 오류 목록과 별도로 전달한다.
+ */
 @Getter
 @RequiredArgsConstructor
 public enum ErrorCode {

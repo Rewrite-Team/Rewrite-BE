@@ -15,6 +15,10 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+/**
+ * standalone MockMvc에 컨트롤러와 공통 예외 처리만 등록해 갱신 서비스의 내부 실패 응답을 검증한다.
+ * 인증 실패로 쿠키를 지우는 경로와 구분해, 내부 오류에는 쿠키 변경 응답이 없는지 확인한다.
+ */
 class TokenRefreshControllerTest {
 
     @Test

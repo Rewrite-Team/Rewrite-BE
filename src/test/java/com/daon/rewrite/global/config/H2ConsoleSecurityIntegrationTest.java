@@ -16,6 +16,10 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.test.context.ActiveProfiles;
 
+/**
+ * local의 db-h2 보안 체인과 H2 servlet을 활성화하고 test의 인메모리 DB로 로컬 파일 DB를 대체한다.
+ * 실제 랜덤 포트에 HTTP 요청을 보내 Basic Auth·콘솔 POST의 CSRF 예외·동일 출처 iframe 허용을 검증한다.
+ */
 @SpringBootTest(
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = {

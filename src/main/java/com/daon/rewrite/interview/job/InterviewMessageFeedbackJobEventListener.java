@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
+/** USER 답변과 피드백 Job이 함께 커밋된 뒤 해당 Job의 Worker를 비동기로 시작한다. */
 @Component
 @RequiredArgsConstructor
 class InterviewMessageFeedbackJobEventListener {

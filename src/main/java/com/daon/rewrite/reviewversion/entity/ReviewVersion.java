@@ -18,6 +18,11 @@ import lombok.NoArgsConstructor;
 
 import java.time.Instant;
 
+/**
+ * 첨삭 Job을 시작할 때 생성하는 시도 이력이며 실패·취소돼도 보존한다.
+ * version은 v0.1부터 증가하는 화면 표시 번호이고, 상태는 연결된 Job에서 읽는다.
+ * 최신 성공 결과인지는 자기소개서의 latestReviewedVersionId로 별도 판단한다.
+ */
 @Getter
 @Entity
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -44,7 +49,7 @@ public class ReviewVersion {
     @Column(name = "request_instruction", length = 1000)
     private String requestInstruction;
 
-    // 버전 조회 시 연결된 Job도 로딩
+    // 버전의 상태와 실패 정보가 연결된 Job에 있으므로 버전 조회 시 함께 읽는다.
     @OneToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "llm_job_id", unique = true)
     private LlmJob llmJob;
@@ -79,6 +84,10 @@ public class ReviewVersion {
         return new ReviewVersion(id, coverLetter, version, requestInstruction, llmJob, createdAt);
     }
 
+    /**
+     * 신규 버전의 상태는 연결된 Job을 따른다.
+     * Job 연결 없이 저장된 기존 성공 버전은 완료로 읽어 이전 데이터를 계속 조회할 수 있게 한다.
+     */
     public LlmJobStatus getStatus() {
         return llmJob == null ? LlmJobStatus.COMPLETED : llmJob.getStatus();
     }

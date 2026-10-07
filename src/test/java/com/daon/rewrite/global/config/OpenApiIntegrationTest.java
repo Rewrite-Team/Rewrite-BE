@@ -21,6 +21,10 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+/**
+ * test·auth-dev에서 실제 생성한 OpenAPI의 문서 메타데이터·오류 예제·첨삭 상태 계약과 Swagger 접근을 검증한다.
+ * auth-real에서 활성화되는 인증 API까지 포함한 전체 계약과 문서 접근 보안은 OpenApiSecurityIntegrationTest가 확인한다.
+ */
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")

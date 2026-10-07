@@ -4,6 +4,7 @@ import com.daon.rewrite.llmjob.entity.LlmJob;
 import com.daon.rewrite.llmjob.entity.LlmJobStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 
+/** Job 엔티티를 상태 복구용 공개 정보로 변환한다. SSE 상태 이벤트도 같은 진행률·결과·오류 변환을 사용한다. */
 @Schema(requiredProperties = {"status", "progress", "resultRef", "error"})
 public record LlmJobStateResponse(
         LlmJobStatus status,
@@ -46,6 +47,7 @@ public record LlmJobStateResponse(
         }
 
         private static String publicErrorCode(String errorCode) {
+            // 화면에서 구별하는 두 오류 외의 내부 실패 분류는 공통 provider 오류 코드로 공개한다.
             return switch (errorCode) {
                 case "LLM_CONTEXT_LENGTH_EXCEEDED", "LLM_CONTENT_FILTERED" -> errorCode;
                 default -> "LLM_PROVIDER_ERROR";

@@ -1,21 +1,22 @@
-name: Backend CI  # GitHub Actions 화면에 표시할 전체 워크플로우 이름
+name: Backend CI
 
 on:
   pull_request:
     branches:
-      - dev # dev를 대상으로 하는 PR에서 실행, 열린 PR에 커밋을 추가로 push 하면 PR이 갱신되면서 CI도 다시 실행됨
+      - dev # dev 대상 PR의 생성·커밋 갱신 시 검사한다.
 
-# GitHub Actions 는 실행할 때 임시 GITHUB_TOKEN을 받는다. 해당 토큰을 사용하면 설정에 따라 저장소를 읽거나 수정할 수 있다.
+# PR 코드를 실행하는 check는 읽기 권한만 사용하고, 댓글 쓰기 권한은 pr-report에만 부여한다.
 permissions:
-  contents: read  # 저장소 내용 읽기 허용
+  contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}   # PR 번호가 있으면 PR 번호 사용, 없으면 Git 브랜치 ref 사용
-  cancel-in-progress: true  # PR에 커밋을 연속으로 push 하는 상황에서 첫번째 CI는 오래된 코드를 검증하고 있으므로 계속 실행할 필요 없음. 따라서 첫 번째 실행을 취소하고 최신 실행만 유지
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true # 같은 PR의 이전 실행을 취소해 최신 커밋 결과를 유지한다.
 
 jobs:
+  # 검사 → 보고서 보관 → XML 집계 순서로 수행하고 Summary와 댓글 job에 같은 결과를 전달한다.
   check:
-    name: Backend Check # 워크플로우 안에서 실행되는 job 이름
+    name: Backend Check
     runs-on: ubuntu-latest
     timeout-minutes: 20
     outputs:
@@ -24,9 +25,9 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6  # 현재 검증할 커밋을 임시 컴퓨터로 가져옴(checkout)
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          persist-credentials: false  # checkout 과정에서 사용한 GitHub 인증 정보를 Git 설정에 남기지 않음
+          persist-credentials: false # 후속 Gradle 실행에 Git 인증 정보를 남기지 않는다.
 
       - name: Set up JDK 21
         uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
@@ -35,26 +36,26 @@ jobs:
           java-version: '21'
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0   # Gradle실행환경을 준비하고, Gradle이 다운로드한 의존성 등을 캐시하여 이후 CI 실행 시간을 줄임
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
 
       - name: Run checks
         id: checks
         run: ./gradlew check
 
       - name: Upload test report
-        if: always()  # Run checks 가 실패하더라도 리포트 업로드 시도
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1 # GitHub Actions에서 테스트 결과 파일을 업로드하는 공식 Action
+        if: always() # 검사 실패 시에도 생성된 보고서를 보관한다.
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: backend-test-report   # GitHub Actions 실행 결과에서 다운로드할 artifact 이름
-          path: build/reports/tests/test  # 업로드할 디렉터리
-          if-no-files-found: warn   # 업로드 대상 파일이 없을 때 업로드 step 자체를 실패시키지 않고 경고
-          retention-days: 14    # artifact를 GitHub에 14일간 보관
+          name: backend-test-report
+          path: build/reports/tests/test
+          if-no-files-found: warn # 테스트 실행 전 실패했다면 보고서 누락을 경고로 남긴다.
+          retention-days: 14
 
       - name: Upload JaCoCo report
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: backend-jacoco-report   # artifact 이름
+          name: backend-jacoco-report
           path: build/reports/jacoco/test
           if-no-files-found: warn
           retention-days: 14
@@ -134,6 +135,7 @@ jobs:
               stream.write(f"test_result={test_result}\n")
               stream.write(f"coverage_result={coverage_result}\n")
 
+  # 저장소 내부의 일반 PR만 댓글을 갱신한다. PR 코드를 checkout·실행하지 않고 check의 outputs만 사용한다.
   pr-report:
     name: PR Report
     runs-on: ubuntu-latest

@@ -12,6 +12,11 @@ import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * 등록 step 저장의 입력 정규화·값 검증과 제출의 필수값 검증을 나누어 관리한다.
+ * 임시저장은 앞뒤 공백과 빈 입력을 정리한 뒤 입력된 값의 길이·범위·형식만 검사한다.
+ * 제출은 저장된 기본 정보·우대사항·문항이 완성됐는지 확인하고 필드별 오류를 모아 반환한다.
+ */
 @Component
 class CoverLetterInputPolicy {
 
@@ -25,6 +30,7 @@ class CoverLetterInputPolicy {
     private static final int MAX_MAX_ANSWER_LENGTH = 5000;
     private static final int MAX_ORIGINAL_ANSWER_LENGTH = 5000;
 
+    /** 기본 정보 전체 폼의 미입력값을 null로 정규화하고 값이 있는 필드의 오류를 한 번에 수집한다. */
     BasicInfo normalizeBasicInfo(
             String title,
             String companyName,
@@ -84,6 +90,10 @@ class CoverLetterInputPolicy {
         return normalizedPreferences;
     }
 
+    /**
+     * 문항 필드의 미입력은 허용하며, 목록 null은 전체 교체할 빈 목록으로 정규화한다.
+     * 배열 안의 null 문항과 입력된 값의 길이·범위 오류는 questions[index] 경로로 모아 거부한다.
+     */
     List<SaveQuestionInput> normalizeQuestions(List<SaveQuestionInput> questions) {
         List<ErrorResponse.ErrorDetail> details = new ArrayList<>();
         if (questions == null) {
@@ -131,26 +141,10 @@ class CoverLetterInputPolicy {
         return normalizedQuestions;
     }
 
-    // 제출 필수값 최종 검증
-    // 기본 정보(제목, 회사명, 직무명, 우대사항), 문항 존재 여부,
-    // 각 문항의 질문·원본 답변 입력 여부와 최대 답변 글자 수 범위(100~5000자) 확인
-    // 오류가 여러 개라면 아래와같이 details에 모두 모아 반환
     /**
-     * <pre>{@code
-     *   "error": {
-     *     "code": "VALIDATION_ERROR",
-     *     "details": [
-     *       {
-     *         "field": "preferences",
-     *         "reason": "채용 우대사항을 입력해야 합니다."
-     *       },
-     *       {
-     *         "field": "questions[0].originalAnswer",
-     *         "reason": "답변을 입력해야 합니다."
-     *       }
-     *     ]
-     *   }
-     * }</pre>
+     * Job 생성 전에 저장된 제목·회사·직무·우대사항과 1개 이상 문항의 필수값을 최종 확인한다.
+     * 각 문항은 질문·답변과 허용 범위의 최대 글자 수가 필요하며, 공고 링크는 필수값에 포함하지 않는다.
+     * 여러 누락을 details에 함께 모으고 문항은 저장 순서의 0부터 시작하는 index로 필드를 식별한다.
      */
     void validateSubmit(CoverLetter coverLetter, List<CoverLetterQuestion> questions) {
         List<ErrorResponse.ErrorDetail> details = new ArrayList<>();
@@ -159,7 +153,6 @@ class CoverLetterInputPolicy {
         addMissingDetail("positionTitle", coverLetter.getPositionTitle(), "직무명을 입력해야 합니다.", details);
         addMissingDetail("preferences", coverLetter.getPreferences(), "채용 우대사항을 입력해야 합니다.", details);
 
-        // 질문 답변 자체가 없는 경우
         if (questions.isEmpty()) {
             details.add(new ErrorResponse.ErrorDetail(
                     "questions",
@@ -168,14 +161,12 @@ class CoverLetterInputPolicy {
         } else {
             for (int index = 0; index < questions.size(); index++) {
                 CoverLetterQuestion question = questions.get(index);
-                // 해당 index의 질문 유무 검사
                 addMissingDetail(
                         "questions[" + index + "].question",
                         question.getQuestion(),
                         "질문을 입력해야 합니다.",
                         details
                 );
-                // 최대 답변 글자 수의 허용 범위 검사
                 if (question.getMaxAnswerLength() == null
                         || question.getMaxAnswerLength() < MIN_MAX_ANSWER_LENGTH
                         || question.getMaxAnswerLength() > MAX_MAX_ANSWER_LENGTH) {
@@ -184,7 +175,6 @@ class CoverLetterInputPolicy {
                             "최대 답변 글자 수는 100자 이상 5000자 이하여야 합니다."
                     ));
                 }
-                // 답변 유무 검사
                 addMissingDetail(
                         "questions[" + index + "].originalAnswer",
                         question.getOriginalAnswer(),
@@ -194,7 +184,6 @@ class CoverLetterInputPolicy {
             }
         }
 
-        // 에러가 적어도 1개 있다면 BusinessException 을 던짐
         if (!details.isEmpty()) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, details);
         }
@@ -229,6 +218,7 @@ class CoverLetterInputPolicy {
         }
     }
 
+    /** 링크의 길이와 scheme이 있는 절대 URI 형식만 확인하며, 외부 사이트에 접속하지 않는다. */
     private String normalizeOptionalJobPostingUrl(
             String value,
             List<ErrorResponse.ErrorDetail> details
@@ -260,6 +250,7 @@ class CoverLetterInputPolicy {
         return normalized.isEmpty() ? null : normalized;
     }
 
+    // UTF-16 char 수 대신 Unicode code point 수를 사용해 보조 평면 문자를 두 글자로 세지 않는다.
     private int countCodePoints(String value) {
         return value.codePointCount(0, value.length());
     }
@@ -273,7 +264,6 @@ class CoverLetterInputPolicy {
         }
     }
 
-    // 누락된 필드가 있다면 ErrorDetail에 추가
     private void addMissingDetail(
             String field,
             String value,

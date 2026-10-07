@@ -19,6 +19,11 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 
+/**
+ * 질문별 대화방에 저장하는 USER 답변 또는 완료된 ASSISTANT 피드백이다.
+ * ASSISTANT의 공개 content는 피드백과 꼬리질문을 연결한 문장이고, 구조화 피드백·별도 꼬리질문은 내부 필드로 보관한다.
+ * USER는 답변만 보관해 점수가 null이며, ASSISTANT는 피드백 구조와 1~100점의 점수를 함께 가진다.
+ */
 @Getter
 @Entity
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -104,6 +109,10 @@ public class InterviewMessage {
         );
     }
 
+    /**
+     * 생성이 완료된 피드백 한 개를 저장할 메시지로 구성한다. 꼬리질문도 같은 메시지에 포함한다.
+     * LLM 클라이언트의 출력 검증 이후에도 필수 피드백 구조와 점수 범위를 엔티티 경계에서 확인한다.
+     */
     public static InterviewMessage assistantFeedback(
             String id,
             InterviewThread thread,

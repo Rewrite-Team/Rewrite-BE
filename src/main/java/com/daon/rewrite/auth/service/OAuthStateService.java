@@ -12,6 +12,11 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * 로그인 시작 요청과 callback을 연결할 일회성 state·브라우저 nonce를 관리한다.
+ * state는 카카오 왕복 query에, nonce는 시작 브라우저의 Cookie에 담기며 DB에는 두 값의 해시만 저장한다.
+ * 복귀할 프론트엔드 환경도 state에 포함해 callback 검증 후 복원한다.
+ */
 @Service
 @Profile("auth-real")
 @RequiredArgsConstructor
@@ -22,10 +27,14 @@ public class OAuthStateService {
     private final OAuthLoginStateRepository repository;
     private final Clock clock;
 
+    /**
+     * 허용된 프론트엔드 환경을 난수 state의 접미부에 넣고, 별도의 브라우저 nonce와 함께 발급한다.
+     * 환경을 포함한 state 전체의 해시를 저장하므로 callback에서 접미부만 바꾼 값도 검증을 통과하지 못한다.
+     * 반환한 두 원문은 카카오 URL과 브라우저 Cookie에 각각 사용하며, 저장된 요청은 5분 동안 유효하다.
+     */
     @Transactional
     public StateIssue issue(FrontendTarget frontendTarget) {
-        // expiresAt <= 현재시간 인 OAuthLoginState 데이터 삭제
-        // 별도 스케줄러 없이 로그인 요청 시점에 오래된 데이터를 정리하는 lazy cleanup 방식
+        // 별도 스케줄러 없이 새 로그인 요청 시점에 만료된 state를 정리한다.
         repository.deleteByExpiresAtLessThanEqual(Instant.now(clock));
         String state = SecureTokenSupport.randomToken() + "." + frontendTarget.value();
         String browserNonce = SecureTokenSupport.randomToken();
@@ -38,30 +47,21 @@ public class OAuthStateService {
     }
 
 
-    /*
-    로그인 시작 때 저장한 state 와 browserNonce를 검증하고, 성공하면 DB에서 삭제하여 정확히 한 번만 사용되도록 소비하는 매서드
-
-    [Transaction이 필요한 이유]
-    요청 A -> state 행 조회 및 잠금 획득
-    요청 B -> 같은 행의 잠금이 풀릴 때까지 대기
-    요청 A -> state 검증 및 삭제
-    요청 A -> 트랜잭션 커밋, 잠금 해제
-    요청 B -> 다시 조회했지만 행이 이미 삭제됨
-    요청 B -> false 반환
+    /**
+     * state 해시로 찾은 요청의 nonce와 만료 시각을 검증하고, 일치하면 행을 삭제한 뒤 복귀 환경을 반환한다.
+     * 조회 잠금부터 삭제까지 한 트랜잭션으로 묶어 동시 callback이 같은 state를 중복 소비하지 못하게 한다.
+     * 누락·불일치·만료·재사용 또는 해석할 수 없는 환경은 빈 Optional로 반환한다.
+     * 카카오 조회·사용자 저장보다 먼저 소비하므로 이후 로그인 처리가 실패해도 같은 state는 재사용할 수 없다.
      */
     @Transactional
     public Optional<FrontendTarget> consume(String state, String browserNonce) {
-        // state 와 browserNonce가 모두 존재하는지 확인
         if (state == null || state.isBlank() || browserNonce == null || browserNonce.isBlank()) {
-            // DB 조회 없이 바로 실패 처리
             return Optional.empty();
         }
 
         Instant now = Instant.now(clock);
         return repository.findByStateHashForUpdate(SecureTokenSupport.sha256(state))
-                // state 존재 && nonce일치 && 만료되지 않음 일 경우 기존 값 반환
                 .filter(loginState -> loginState.canConsume(SecureTokenSupport.sha256(browserNonce), now))
-                // 검증에 성공했으므로 해당 DB 레코드 삭제(consume_소비 처리)
                 .flatMap(loginState -> {
                     repository.delete(loginState);
                     return frontendTarget(state);
@@ -71,6 +71,7 @@ public class OAuthStateService {
     private static Optional<FrontendTarget> frontendTarget(String state) {
         int separatorIndex = state.lastIndexOf('.');
         if (separatorIndex < 0) {
+            // 환경 접미부가 없는 state는 기존 운영 로그인 흐름으로 해석한다.
             return Optional.of(FrontendTarget.PRODUCTION);
         }
         if (separatorIndex == state.length() - 1) {

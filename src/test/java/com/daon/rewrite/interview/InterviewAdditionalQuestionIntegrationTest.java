@@ -37,6 +37,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+/** 추가 질문 시작 API의 기준 버전 선택·진행 Job 재사용·이벤트 발행을 검증한다. */
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
@@ -53,6 +54,7 @@ class InterviewAdditionalQuestionIntegrationTest {
     @Autowired private LlmJobRepository llmJobRepository;
     @Autowired private ApplicationEvents applicationEvents;
 
+    // 실제 질문 생성을 억제해 HTTP 요청이 만든 Job과 이벤트만 확인한다.
     @MockitoBean private InterviewQuestionGenerationJobWorker worker;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -171,6 +173,7 @@ class InterviewAdditionalQuestionIntegrationTest {
         assertThat(applicationEvents.stream(LlmJobCreatedEvent.class).toList()).isEmpty();
     }
 
+    // 세션의 초기 버전과 최신 성공 버전을 다르게 구성해 추가 생성의 기준 선택을 구분한다.
     private ActiveInterview createActiveInterview(String ownerId) {
         CoverLetter coverLetter = coverLetterRepository.save(CoverLetter.create(id("cl"), ownerId, NOW));
         ReviewVersion initialVersion = reviewVersionRepository.save(ReviewVersion.started(

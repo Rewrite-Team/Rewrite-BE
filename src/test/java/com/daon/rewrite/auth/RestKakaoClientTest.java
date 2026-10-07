@@ -20,6 +20,10 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
+/**
+ * 실제 RestKakaoClient의 HTTP 요청을 MockRestServiceServer로 받아 코드 교환·사용자 응답 매핑을 검증한다.
+ * 서버를 RestClient.Builder에 연결해 Kakao 네트워크 호출 없이 요청 형식과 응답 처리를 확인한다.
+ */
 class RestKakaoClientTest {
 
     private MockRestServiceServer server;
@@ -51,6 +55,7 @@ class RestKakaoClientTest {
                 .andExpect(content().string(containsString("client_secret=client-secret")))
                 .andExpect(content().string(containsString("code=authorization-code")))
                 .andRespond(withSuccess("{\"access_token\":\"kakao-access\"}", MediaType.APPLICATION_JSON));
+        // 코드 교환으로 받은 Kakao access token이 이어지는 사용자 조회의 Bearer 값으로 전달되어야 한다.
         server.expect(requestTo("https://kapi.kakao.com/v2/user/me"))
                 .andExpect(method(HttpMethod.GET))
                 .andExpect(header("Authorization", "Bearer kakao-access"))

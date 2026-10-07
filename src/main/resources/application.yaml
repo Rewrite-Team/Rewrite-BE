@@ -3,9 +3,9 @@ spring:
     name: rewrite
 
   profiles:
-    # 세부 프로필 역할
+    # 실행 목적별 group이 DB와 인증 세부 profile을 조합한다.
     # - db-h2: 로컬 파일 H2 데이터베이스와 H2 Console을 사용한다.
-    # - db-postgres: PostgreSQL 접속 환경변수, 드라이버와 공통 JPA 설정을 사용한다.
+    # - db-postgres: PostgreSQL 접속 환경변수, 드라이버와 JPA schema 갱신 설정을 사용한다.
     # - auth-dev: 인증을 생략하고 고정된 개발 사용자로 요청을 처리한다.
     # - auth-real: JWT와 Kakao OAuth 기반의 실제 인증 기능을 활성화한다.
     group:
@@ -24,11 +24,12 @@ spring:
       # 일반 자동화 테스트 환경: 테스트 전용 H2 설정과 개발용 인증을 사용한다.
       test:
         - auth-dev
-      # 실제 인증 흐름 통합 테스트 환경: 실제 인증을 검증한다.
+      # 인증 통합 테스트 환경: auth-real을 켜고 테스트 전용 DB·JWT 설정을 사용한다.
       auth-test:
         - auth-real
 
   datasource:
+    # profile의 접속 정보 없이 내장 H2가 자동 선택되지 않도록 한다.
     embedded-database-connection: none
 
   jpa:
@@ -39,20 +40,24 @@ spring:
 
   h2:
     console:
+      # 기본은 비활성화하며 application-db-h2.yaml에서 활성화한다.
       enabled: false
       path: /h2-console
 
   ai:
     retry:
+      # Spring AI 호출 계층의 시도 횟수이며 Job Runner의 문항 재시도 정책과 별개다.
       max-attempts: 1
     openai:
       api-key: ${OPENAI_API_KEY}
       chat:
         options:
-          model: gpt-5-nano  # GPT-5 models do not support temperature parameter
-          temperature: 1 # temperature 미 설정 시 기본값 0.7 이 들어가면서 error 발생. 해당 모델은 temperature: 1 만 가능
+          model: gpt-5-nano
+          # 호출 옵션을 명시해 라이브러리의 기본 temperature 설정에 의존하지 않는다.
+          temperature: 1
 
 rewrite:
+  # db-h2의 콘솔 Basic Auth에 사용하며 환경변수를 생략하면 로컬 기본 계정을 적용한다.
   internal-tools:
     username: ${INTERNAL_TOOLS_USERNAME:0000}
     password: ${INTERNAL_TOOLS_PASSWORD:0000}
@@ -76,7 +81,7 @@ rewrite:
 
 springdoc:
   swagger-ui:
-    filter: true  # swagger UI 상단에 검색 입력창 표시
-    doc-expansion: none # 처음 swagger UI를 열었을 때 모든 도메인과 API를 접힌 상태로 표시
-    tags-sorter: alpha  # 인증, 자기소개서, 첨삭 버전 과 같은 도메인 태그를 이름순(오름차순) 정렬 (controller 선언순서에 영향받지 않음)
-    operations-sorter: alpha  # 각 태그 안의 API를 알파벡순으로 정렬 (controller에 작성된 순서가 아니라 경로 문자열 기준 오름차순 배치)
+    filter: true  # 상단 검색 입력창 표시
+    doc-expansion: none # 첫 진입 시 태그와 API를 접어서 표시
+    tags-sorter: alpha  # 태그 이름순 정렬
+    operations-sorter: alpha  # 각 태그 안의 API 경로순 정렬

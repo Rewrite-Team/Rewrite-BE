@@ -1,5 +1,9 @@
 package com.daon.rewrite.reviewversion.client;
 
+/**
+ * 외부 호출 실패와 응답 변환·내용 검증 실패를 Job 계층이 구분할 수 있게 전달한다.
+ * Job 처리 계층은 이 예외를 문항 재시도 대상으로 다루고 reason을 최종 Job 오류 코드 변환에 사용한다.
+ */
 public class ReviewClientException extends RuntimeException {
 
     private final Reason reason;
