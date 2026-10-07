@@ -7,6 +7,10 @@ import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.List;
 
+/**
+ * 분석 리소스가 없으면 응답에서만 NOT_STARTED로 표현한다.
+ * 결과 노출 여부와 진행·실패 Job 선택은 서비스가 결정하며, 재분석 중·실패 시 keywords는 빈 목록이다.
+ */
 @Schema(requiredProperties = {"coverLetter", "sourceReviewVersion", "status", "jobId", "keywords"})
 public record LatestKeywordAnalysisResponse(
         CoverLetterResponse coverLetter,

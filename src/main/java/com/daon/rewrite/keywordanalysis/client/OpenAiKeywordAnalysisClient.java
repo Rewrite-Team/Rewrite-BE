@@ -10,6 +10,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+/**
+ * 지원 정보와 문항별 최종 작성본을 OpenAI에 전달하고 워드클라우드용 키워드로 변환한다.
+ * 전체 응답의 내용을 검증한 뒤 중요도 순으로 결과를 반환하며 영속 저장은 Job 계층에 맡긴다.
+ */
 @Component
 public class OpenAiKeywordAnalysisClient implements KeywordAnalysisClient {
 
@@ -36,6 +40,10 @@ public class OpenAiKeywordAnalysisClient implements KeywordAnalysisClient {
         this.chatClient = chatClientBuilder.build();
     }
 
+    /**
+     * 프롬프트 구성·호출·응답 변환 중 발생한 JacksonException은 출력 검증 실패로 분류한다.
+     * 그 밖의 예외는 provider 실패로 분류하고 객체 변환 후에는 목록과 각 키워드의 내용을 검증한다.
+     */
     @Override
     public List<KeywordAnalysisResult> analyze(KeywordAnalysisRequest request) {
         OpenAiKeywordAnalysisResponse response;
@@ -59,6 +67,10 @@ public class OpenAiKeywordAnalysisClient implements KeywordAnalysisClient {
                 + JSON_MAPPER.writeValueAsString(request);
     }
 
+    /**
+     * 빈 응답이나 항목 하나의 검증 실패도 전체 분석 실패로 처리한다.
+     * 모든 항목을 검증한 뒤 중요도 내림차순의 최대 20개를 반환하며 20개 미만도 허용한다.
+     */
     private List<KeywordAnalysisResult> validateAndNormalize(OpenAiKeywordAnalysisResponse response) {
         if (response == null || response.keywords() == null
                 || response.keywords().isEmpty()) {
@@ -76,6 +88,10 @@ public class OpenAiKeywordAnalysisClient implements KeywordAnalysisClient {
                 .toList();
     }
 
+    /**
+     * 키워드는 앞뒤 공백 제거 후 비어 있지 않아야 하고 중요도는 1~100이어야 한다.
+     * 중복 검사는 앞뒤 공백 제거 후 정확히 같은 문자열에만 적용하며 의미가 같은 다른 단어까지 비교하지 않는다.
+     */
     private KeywordAnalysisResult normalize(KeywordAnalysisResult result, Set<String> seenKeywords) {
         if (result == null) {
             throw KeywordAnalysisClientException.outputValidationFailed();
