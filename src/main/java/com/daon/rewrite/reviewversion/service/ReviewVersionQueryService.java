@@ -36,14 +36,16 @@ public class ReviewVersionQueryService {
         CoverLetter coverLetter = findMyActiveCoverLetter(coverLetterId);
         List<ReviewVersion> versions = reviewVersionRepository.findByCoverLetterIdOrderByCreatedAtAsc(coverLetter.getId());
         versions.sort(Comparator.comparing(ReviewVersion::getCreatedAt)
-                .thenComparingInt(version -> Integer.parseInt(version.getVersion().substring(3))));
-        // 버전은 시도마다 순차 생성하고 삭제하지 않으므로 전체 개수에 해당하는 번호가 최신 시도다.
-        String latestVersion = "v0." + versions.size();
+                .thenComparingLong(ReviewVersion::getVersionNumber));
+        long latestVersionNumber = versions.stream()
+                .mapToLong(ReviewVersion::getVersionNumber)
+                .max()
+                .orElse(0);
         return versions
                 .stream()
                 .map(reviewVersion -> new ReviewVersionSummary(
                         reviewVersion,
-                        reviewVersion.getVersion().equals(latestVersion),
+                        reviewVersion.getVersionNumber() == latestVersionNumber,
                         reviewVersion.getId().equals(coverLetter.getLatestReviewedVersionId())
                 ))
                 .toList();

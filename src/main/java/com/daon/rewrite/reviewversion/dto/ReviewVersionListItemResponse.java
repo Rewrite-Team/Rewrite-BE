@@ -24,7 +24,7 @@ public record ReviewVersionListItemResponse(
         ReviewVersion reviewVersion = summary.reviewVersion();
         return new ReviewVersionListItemResponse(
                 reviewVersion.getId(),
-                reviewVersion.getVersion(),
+                "v0." + reviewVersion.getVersionNumber(),
                 reviewVersion.getStatus(),
                 summary.isLatest(),
                 summary.isLatestReviewed(),

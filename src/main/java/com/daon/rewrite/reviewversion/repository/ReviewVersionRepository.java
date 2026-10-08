@@ -2,6 +2,8 @@ package com.daon.rewrite.reviewversion.repository;
 
 import com.daon.rewrite.reviewversion.entity.ReviewVersion;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
@@ -18,6 +20,13 @@ public interface ReviewVersionRepository extends JpaRepository<ReviewVersion, St
 
     Optional<ReviewVersion> findByLlmJobId(String llmJobId);
 
-    // 실패·취소를 포함한 전체 버전 수를 세어 새 시도의 다음 표시 번호를 정할 때 사용한다.
+    /** 다음 번호 생성과 최신 시도 판별에 사용하며, 아직 시도가 없으면 0을 반환한다. */
+    @Query("""
+            select coalesce(max(reviewVersion.versionNumber), 0)
+            from ReviewVersion reviewVersion
+            where reviewVersion.coverLetter.id = :coverLetterId
+            """)
+    long findMaxVersionNumberByCoverLetterId(@Param("coverLetterId") String coverLetterId);
+
     long countByCoverLetterId(String coverLetterId);
 }

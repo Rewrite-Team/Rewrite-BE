@@ -67,6 +67,11 @@ OPENAI_API_KEY=your-api-key \
 - 현재 사용자 조회는 `auth-dev`의 `DevCurrentUserProvider`, `auth-real`의 `AuthenticatedCurrentUserProvider`를 사용한다.
 - `local-postgres`와 `prod`는 `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`를 필수로 받는다.
 
+### 기존 첨삭 버전 데이터 전환
+
+기존 `review_versions.version` 문자열을 사용하는 PostgreSQL·파일 H2 DB는 새 코드를 실행하기 전에 [versionNumber 전환 절차](scripts/migrations/review-version-number/README.md)를 적용한다.
+`ddl-auto: update`는 기존 데이터의 번호 변환을 수행하지 않는다.
+
 ### 로컬 PostgreSQL 데이터
 
 - 기존 H2 데이터는 PostgreSQL로 자동 이관되지 않는다.

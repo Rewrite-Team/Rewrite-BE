@@ -70,6 +70,7 @@ class ReviewVersionCompletionIntegrationTest {
     void completionUsesStartedVersionAndRepeatedCompletionKeepsConfirmedResultIds(LlmJobType type) {
         ReviewAttempt attempt = createAttempt(type);
         long versionCount = versionRepository.countByCoverLetterId(attempt.coverLetterId());
+        long versionNumber = versionRepository.findById(attempt.versionId()).orElseThrow().getVersionNumber();
         startProcessing(attempt);
         List<String> inputAnswers = stagedResults(attempt).stream()
                 .map(ReviewJobQuestionResult::getInputAnswer)
@@ -79,6 +80,7 @@ class ReviewVersionCompletionIntegrationTest {
         CompleteReviewResult completed = complete(attempt);
 
         assertThat(completed.reviewVersion().getId()).isEqualTo(attempt.versionId());
+        assertThat(completed.reviewVersion().getVersionNumber()).isEqualTo(versionNumber);
         assertThat(completed.questionResults()).extracting(ReviewVersionQuestionResult::getOriginalAnswer)
                 .containsExactlyElementsOf(inputAnswers);
         assertThat(completed.questionResults()).extracting(ReviewVersionQuestionResult::getFinalAnswer)
@@ -283,7 +285,8 @@ class ReviewVersionCompletionIntegrationTest {
         return new CompletionState(
                 coverLetter.getStatus(), coverLetter.getLatestReviewedVersionId(), coverLetter.getUpdatedAt(),
                 job.getStatus(), job.getResultRefType(), job.getResultRefId(), job.getCompletedAt(),
-                versionRepository.countByCoverLetterId(attempt.coverLetterId()), resultIds
+                versionRepository.countByCoverLetterId(attempt.coverLetterId()),
+                versionRepository.findById(attempt.versionId()).orElseThrow().getVersionNumber(), resultIds
         );
     }
 
@@ -301,6 +304,7 @@ class ReviewVersionCompletionIntegrationTest {
             String resultRefId,
             Instant jobCompletedAt,
             long versionCount,
+            long versionNumber,
             List<String> confirmedResultIds
     ) {
     }

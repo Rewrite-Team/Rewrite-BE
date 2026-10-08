@@ -59,6 +59,8 @@ dependencyManagement {
 
 tasks.named('test') {
 	useJUnitPlatform()
+	// 수동 이관 SQL만 바뀌어도 실제 파일 DB 이관 테스트를 다시 실행한다.
+	inputs.file('scripts/migrations/review-version-number/h2.sql')
 	// 테스트 실행 후 커버리지 보고서를 생성해 로컬 확인과 CI 집계에 사용한다.
 	finalizedBy tasks.named('jacocoTestReport')
 }

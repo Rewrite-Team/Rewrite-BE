@@ -108,6 +108,14 @@ class OpenApiIntegrationTest {
                     .contains("status", "isLatest", "isLatestReviewed");
             assertThat(schema.path("properties").has("status")).isTrue();
         }
+        for (String schemaName : List.of("ReviewVersionListItemResponse", "CoverLetterDetailReviewVersionResponse",
+                "KeywordAnalysisReviewVersionResponse")) {
+            JsonNode schema = schemas.path(schemaName);
+            assertThat(schema.isMissingNode()).isFalse();
+            assertThat(schema.path("required").valueStream().map(JsonNode::asText).toList()).contains("version");
+            assertThat(schema.path("properties").path("version").path("type").asText()).isEqualTo("string");
+            assertThat(schema.path("properties").has("versionNumber")).isFalse();
+        }
 
         assertThat(operation(document, "/cover-letters/{coverLetterId}/review-versions", "get")
                 .path("description").asText())
