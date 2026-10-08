@@ -98,7 +98,7 @@ erDiagram
     REVIEW_VERSIONS {
         string id PK
         string cover_letter_id FK
-        string version
+        bigint version_number
         text request_instruction
         string llm_job_id FK, UK
         instant created_at
@@ -284,7 +284,7 @@ Policy:
 - 삭제된 자기소개서의 하위 row는 물리 삭제하지 않는다.
 - `latest_review_version_id`는 최신 성공 버전 ID다.
 - 응답의 `isLatestReviewed`는 이 값과 비교해 계산한다.
-- 응답의 `isLatest`는 가장 최근 시도로 계산한다.
+- 응답의 `isLatest`는 해당 자기소개서의 `version_number`가 가장 큰 시도로 계산한다.
 
 ### cover_letter_questions
 
@@ -315,7 +315,7 @@ Policy:
 |---|---:|---|
 | `id` | No | PK |
 | `cover_letter_id` | No | FK to `cover_letters.id` |
-| `version` | No | 화면 표시용 label. 예: `v0.1` |
+| `version_number` | No | `bigint` 양수 순번; `(cover_letter_id, version_number)` unique |
 | `request_instruction` | Yes | 재첨삭 요구사항. 최초 첨삭은 null 가능 |
 | `llm_job_id` | Yes | 새 버전의 첨삭 Job FK·unique. 기존 성공 버전은 null 가능 |
 | `created_at` | No | 첨삭 시작 시 버전 생성 시각 |
@@ -323,9 +323,15 @@ Policy:
 Policy:
 
 - 새 Job을 생성할 때 같은 transaction에서 버전을 생성한다.
+- 자기소개서별 새 `version_number`는 기존 최댓값 + 1이며, 이력이 없으면 1로 시작한다.
+- `version_number > 0`과 `(cover_letter_id, version_number)`의 유일성을 DB 제약으로 보장한다.
 - Job이 실패·취소돼도 해당 버전을 삭제하지 않는다.
 - 버전 상태는 연결된 `llm_jobs.status`에서 읽으며, 기존 Job 연결이 없는 버전은 `COMPLETED`로 취급한다.
-- `isLatest`는 최신 시도, `isLatestReviewed`는 `cover_letters.latest_review_version_id`와 비교해 계산하며 저장하지 않는다.
+- 버전 목록은 `created_at` 오름차순으로 반환하며, 생성 시각이 같으면 `version_number` 오름차순으로 정렬한다.
+- `isLatest`는 해당 자기소개서의 최대 `version_number`와 비교해 계산하며 저장하지 않는다.
+- `isLatestReviewed`는 `cover_letters.latest_review_version_id`와 비교해 계산하며 저장하지 않는다.
+- API 응답의 `version`은 `version_number`로 `v0.N` 문자열을 조립하며, 내부 `versionNumber`는 응답에 노출하지 않는다.
+- 기존 문자열 버전 데이터는 [버전 번호 전환 절차](../scripts/migrations/review-version-number/README.md)에 따라 검증·이관한다.
 
 ### review_version_question_results
 
@@ -551,7 +557,8 @@ Policy:
 ### Latest references
 
 - 최신 성공 첨삭 버전은 `cover_letters.latest_review_version_id`로 저장한다.
-- `review_versions.isLatest`와 `isLatestReviewed`는 저장하지 않고 응답 DTO에서 계산한다.
+- 최신 시도는 자기소개서별 최대 `review_versions.version_number`로 판단한다.
+- `isLatest`와 `isLatestReviewed`는 저장하지 않고 조회 시 계산해 응답에 포함한다.
 - 키워드 분석은 자기소개서별 최신 결과 하나만 유지한다.
 - 면접 세션은 자기소개서당 하나만 유지한다.
 

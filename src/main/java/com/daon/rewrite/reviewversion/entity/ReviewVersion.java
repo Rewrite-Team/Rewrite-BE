@@ -3,6 +3,7 @@ package com.daon.rewrite.reviewversion.entity;
 import com.daon.rewrite.coverletter.entity.CoverLetter;
 import com.daon.rewrite.llmjob.entity.LlmJob;
 import com.daon.rewrite.llmjob.entity.LlmJobStatus;
+import jakarta.persistence.CheckConstraint;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -20,7 +21,7 @@ import java.time.Instant;
 
 /**
  * 첨삭 Job을 시작할 때 생성하는 시도 이력이며 실패·취소돼도 보존한다.
- * version은 v0.1부터 증가하는 화면 표시 번호이고, 상태는 연결된 Job에서 읽는다.
+ * versionNumber는 1부터 증가하는 번호이며, 응답에서 v0.N 라벨로 표시한다. 상태는 연결된 Job에서 읽는다.
  * 최신 성공 결과인지는 자기소개서의 latestReviewedVersionId로 별도 판단한다.
  */
 @Getter
@@ -28,9 +29,10 @@ import java.time.Instant;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(
         name = "review_versions",
+        check = @CheckConstraint(name = "ck_review_versions_version_number_positive", constraint = "version_number > 0"),
         uniqueConstraints = @UniqueConstraint(
-                name = "uk_review_versions_cover_letter_version",
-                columnNames = {"cover_letter_id", "version"}
+                name = "uk_review_versions_cover_letter_version_number",
+                columnNames = {"cover_letter_id", "version_number"}
         )
 )
 public class ReviewVersion {
@@ -43,8 +45,8 @@ public class ReviewVersion {
     @JoinColumn(name = "cover_letter_id", nullable = false)
     private CoverLetter coverLetter;
 
-    @Column(name = "version", nullable = false, length = 20)
-    private String version;
+    @Column(name = "version_number", nullable = false)
+    private long versionNumber;
 
     @Column(name = "request_instruction", length = 1000)
     private String requestInstruction;
@@ -60,14 +62,17 @@ public class ReviewVersion {
     private ReviewVersion(
             String id,
             CoverLetter coverLetter,
-            String version,
+            long versionNumber,
             String requestInstruction,
             LlmJob llmJob,
             Instant createdAt
     ) {
         this.id = id;
         this.coverLetter = coverLetter;
-        this.version = version;
+        if (versionNumber < 1) {
+            throw new IllegalArgumentException("versionNumber는 1 이상이어야 합니다.");
+        }
+        this.versionNumber = versionNumber;
         this.requestInstruction = requestInstruction;
         this.llmJob = llmJob;
         this.createdAt = createdAt;
@@ -76,12 +81,12 @@ public class ReviewVersion {
     public static ReviewVersion started(
             String id,
             CoverLetter coverLetter,
-            String version,
+            long versionNumber,
             String requestInstruction,
             LlmJob llmJob,
             Instant createdAt
     ) {
-        return new ReviewVersion(id, coverLetter, version, requestInstruction, llmJob, createdAt);
+        return new ReviewVersion(id, coverLetter, versionNumber, requestInstruction, llmJob, createdAt);
     }
 
     /**

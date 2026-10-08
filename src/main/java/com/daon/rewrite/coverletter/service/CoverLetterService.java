@@ -251,11 +251,12 @@ public class CoverLetterService {
                 now,
                 questions.size()
         ));
-        long nextPatch = reviewVersionRepository.countByCoverLetterId(coverLetter.getId()) + 1;
+        long nextVersionNumber = Math.incrementExact(
+                reviewVersionRepository.findMaxVersionNumberByCoverLetterId(coverLetter.getId()));
         reviewVersionRepository.save(ReviewVersion.started(
                 idGenerator.generate(REVIEW_VERSION_ID_PREFIX),
                 coverLetter,
-                "v0." + nextPatch,
+                nextVersionNumber,
                 null,
                 job,
                 now

@@ -83,7 +83,7 @@ public record CoverLetterDetailResponse(
             ReviewVersion reviewVersion = result.value();
             return new ReviewVersionResponse(
                     reviewVersion.getId(),
-                    reviewVersion.getVersion(),
+                    "v0." + reviewVersion.getVersionNumber(),
                     reviewVersion.getStatus(),
                     result.latest(),
                     result.latestReviewed(),

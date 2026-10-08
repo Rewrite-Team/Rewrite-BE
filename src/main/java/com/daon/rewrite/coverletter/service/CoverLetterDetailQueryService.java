@@ -148,7 +148,7 @@ public class CoverLetterDetailQueryService {
 
     /**
      * latest는 실패·취소도 포함한 마지막 시도, latestReviewed는 최신 성공 참조와의 일치 여부다.
-     * 시도마다 버전 번호를 하나씩 부여하므로 마지막 시도는 전체 버전 수에 해당하는 라벨로 식별한다.
+     * 마지막 시도는 실패·취소를 포함한 가장 큰 버전 번호로 식별한다.
      */
     private CoverLetterDetailResult.ReviewVersionResult toVersionResult(
             CoverLetter coverLetter,
@@ -157,10 +157,10 @@ public class CoverLetterDetailQueryService {
         if (reviewVersion == null) {
             return null;
         }
-        long versionCount = reviewVersionRepository.countByCoverLetterId(coverLetter.getId());
+        long latestVersionNumber = reviewVersionRepository.findMaxVersionNumberByCoverLetterId(coverLetter.getId());
         return new CoverLetterDetailResult.ReviewVersionResult(
                 reviewVersion,
-                reviewVersion.getVersion().equals("v0." + versionCount),
+                reviewVersion.getVersionNumber() == latestVersionNumber,
                 reviewVersion.getId().equals(coverLetter.getLatestReviewedVersionId())
         );
     }

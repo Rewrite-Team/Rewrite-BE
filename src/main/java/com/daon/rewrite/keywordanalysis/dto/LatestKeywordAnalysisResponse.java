@@ -38,7 +38,7 @@ public record LatestKeywordAnalysisResponse(
                 CoverLetterResponse.from(result.coverLetter()),
                 new ReviewVersionResponse(
                         result.sourceReviewVersion().getId(),
-                        result.sourceReviewVersion().getVersion()
+                        "v0." + result.sourceReviewVersion().getVersionNumber()
                 ),
                 result.keywordAnalysis().getStatus().name(),
                 result.job() == null ? null : result.job().getId(),

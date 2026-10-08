@@ -88,7 +88,7 @@ class InterviewAdditionalQuestionIntegrationTest {
         failedJob.markFailed(0, "첨삭 실패", "LLM_PROVIDER_ERROR", "첨삭 실패", failedAt);
         failedJob = llmJobRepository.save(failedJob);
         reviewVersionRepository.save(ReviewVersion.started(
-                id("rv"), coverLetter, "v0.3", null, failedJob, failedAt
+                id("rv"), coverLetter, 3, null, failedJob, failedAt
         ));
         coverLetter.failReview(failedAt);
         coverLetterRepository.save(coverLetter);
@@ -177,10 +177,10 @@ class InterviewAdditionalQuestionIntegrationTest {
     private ActiveInterview createActiveInterview(String ownerId) {
         CoverLetter coverLetter = coverLetterRepository.save(CoverLetter.create(id("cl"), ownerId, NOW));
         ReviewVersion initialVersion = reviewVersionRepository.save(ReviewVersion.started(
-                id("rv"), coverLetter, "v0.1", null, null, NOW
+                id("rv"), coverLetter, 1, null, null, NOW
         ));
         ReviewVersion latestVersion = reviewVersionRepository.save(ReviewVersion.started(
-                id("rv"), coverLetter, "v0.2", null, null, NOW.plusSeconds(1)
+                id("rv"), coverLetter, 2, null, null, NOW.plusSeconds(1)
         ));
         coverLetter.completeReview(latestVersion.getId(), NOW.plusSeconds(1));
         coverLetterRepository.save(coverLetter);

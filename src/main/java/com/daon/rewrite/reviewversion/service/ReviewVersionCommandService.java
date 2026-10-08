@@ -133,12 +133,13 @@ public class ReviewVersionCommandService {
                 now,
                 latestResults.size()
         ));
-        // 실패·취소 버전도 보존하므로 성공 횟수가 아닌 전체 시도 수로 다음 표시 번호를 정한다.
-        long nextPatch = reviewVersionRepository.countByCoverLetterId(coverLetter.getId()) + 1;
+        // 자기소개서 잠금 안에서 실패·취소를 포함한 최대 번호 다음으로 새 버전을 생성한다.
+        long nextVersionNumber = Math.incrementExact(
+                reviewVersionRepository.findMaxVersionNumberByCoverLetterId(coverLetter.getId()));
         reviewVersionRepository.save(ReviewVersion.started(
                 idGenerator.generate(REVIEW_VERSION_ID_PREFIX),
                 coverLetter,
-                "v0." + nextPatch,
+                nextVersionNumber,
                 normalizedInstruction,
                 job,
                 now
