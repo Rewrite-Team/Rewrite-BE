@@ -82,18 +82,22 @@ class OpenApiIntegrationTest {
                 .contains(
                         "job.state.status=FAILED",
                         "HTTP ErrorResponse가 아니다",
-                        "최종 job.state와 도메인별 후속 이벤트 전송을 마친 뒤 연결을 종료"
+                        "최종 job.state와 도메인별 후속 이벤트 전송을 마친 뒤 연결을 종료",
+                        "기본 15초", "heartbeat", "기본 30초 무응답", "API-015"
                 );
         assertThat(api016.path("responses").has("403")).isFalse();
         assertThat(api016.path("responses").path("200").path("content")
                 .path("text/event-stream").path("schema").path("example").asText())
-                .contains("event: job.state", "event: review.questions");
+                .contains("event: job.state", "event: review.questions", "event: heartbeat\ndata: {}");
 
         JsonNode api030 = operation(document, "/cover-letters/stream", "get");
         assertThat(api030.path("responses").path("200").path("content")
                 .path("text/event-stream").path("schema").path("example").asText())
-                .contains("cover-letter.review-status.snapshot", "cover-letter.review-status.changed")
+                .contains("cover-letter.review-status.snapshot", "cover-letter.review-status.changed",
+                        "event: heartbeat\ndata: {}")
                 .doesNotContain("\"jobId\"");
+        assertThat(api030.path("description").asText())
+                .contains("기본 15초", "heartbeat", "기본 30초 무응답", "API-007");
     }
 
     @Test

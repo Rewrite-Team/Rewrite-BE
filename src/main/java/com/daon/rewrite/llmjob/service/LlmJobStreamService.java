@@ -1,6 +1,7 @@
 package com.daon.rewrite.llmjob.service;
 
 import com.daon.rewrite.global.sse.BufferedSseConnection;
+import com.daon.rewrite.global.sse.SseHeartbeatScheduler;
 import com.daon.rewrite.llmjob.dto.InterviewFeedbackDeltaResponse;
 import com.daon.rewrite.llmjob.dto.LlmJobStateEventResponse;
 import com.daon.rewrite.llmjob.dto.ReviewQuestionsEventResponse;
@@ -41,6 +42,7 @@ public class LlmJobStreamService {
     private final LlmJobService llmJobService;
     private final LlmJobRepository llmJobRepository;
     private final ReviewJobQuestionResultRepository questionResultRepository;
+    private final SseHeartbeatScheduler heartbeatScheduler;
 
     // 한 Job을 여러 탭에서 구독할 수 있으므로 전송 이력은 연결별로 관리한다.
     private final Map<String, Map<String, JobConnection>> connections = new ConcurrentHashMap<>();
@@ -57,6 +59,7 @@ public class LlmJobStreamService {
 
         String connectionId = UUID.randomUUID().toString();
         BufferedSseConnection stream = new BufferedSseConnection(
+                heartbeatScheduler,
                 () -> removeConnection(jobId, connectionId)
         );
         JobConnection connection = new JobConnection(stream);
@@ -67,9 +70,10 @@ public class LlmJobStreamService {
             // 첫 소유권 조회와 연결 등록 사이에 진행된 상태도 초기 스냅샷에 반영한다.
             LlmJob job = llmJobService.findMyJob(jobId);
             sendInitial(connection, job);
-            stream.finishInitialization();
-        if (job.getStatus().isTerminal()) {
+            if (job.getStatus().isTerminal()) {
                 stream.close();
+            } else {
+                stream.finishInitialization();
             }
         }
         return stream.emitter();

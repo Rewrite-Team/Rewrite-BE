@@ -15,6 +15,7 @@ Rewrite 서비스의 Java Spring Boot 백엔드다. 팀의 기존 문서·GitHub
 | 제품 요구사항·화면 흐름 | [requirements](docs/requirements.md) |
 | HTTP 계약 | controller·DTO·`@RewriteApi`에서 생성한 OpenAPI와 Swagger UI |
 | 인증·Job·자기소개서·면접의 교차 API 흐름 | [API 안내](docs/api/README.md)와 연결된 보완 문서 |
+| SSE heartbeat·무응답 복구 | [공통 복구 흐름](docs/api/common.md#heartbeat와-무응답-복구)·[전송 주기 설정](README.md#sse-연결-유지) |
 | DB/JPA·schema·migration | [ERD](docs/erd.md) |
 | 설계 이유·대안·결정 이력 | [Decision Index](docs/decisions/README.md#decision-index)와 해당 결정 |
 | OCI·배포·복구 | [배포 가이드](docs/deployment.md) |

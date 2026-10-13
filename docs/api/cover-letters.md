@@ -58,7 +58,7 @@ data: {"coverLetterId":"cl_01HZ...","displayStatus":"REVIEW_FAILED","latestRevie
 - 두 이벤트 모두 상태·최신 성공 버전을 그대로 반영하며 Job 상태로 화면 상태를 추론하지 않는다.
 - 현재 목록에 없는 id는 무시하고, `PENDING → PROCESSING`만으로는 별도 표시 상태 이벤트를 만들지 않는다.
 - 연결 등록 → 스냅샷 → 그 사이 버퍼링한 변경 순서를 지키며 영속 replay 없이 재연결 시 최신 스냅샷을 받는다.
-- heartbeat는 SSE comment를 사용한다.
+- 연결 유지와 30초 무응답 감시는 [공통 heartbeat·복구 흐름](common.md#heartbeat와-무응답-복구)을 따른다.
 - `onerror`면 연결을 닫고 일반 인증 요청에서 single-flight 갱신 후 새 스트림을 만든다.
 - 인증 복구 실패는 로그인으로 이동하고 스트림 장애가 지속되면 API-007로 복구한다.
 

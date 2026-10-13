@@ -320,6 +320,10 @@ public class CoverLetterController {
 
                                     event: cover-letter.review-status.changed
                                     data: {"coverLetterId":"cover_letter_01","displayStatus":"REVIEWED","latestReviewedVersionId":"review_version_01"}
+
+                                    event: heartbeat
+                                    data: {}
+
                                     """
                     )
             )
@@ -332,8 +336,15 @@ public class CoverLetterController {
             purpose = "현재 사용자의 자기소개서 첨삭 상태 변경을 하나의 SSE 연결로 수신한다.",
             screens = {"자기소개서 목록", "첨삭 진행"},
             trigger = "로그인 후 목록·첨삭 진행 화면에서 사용자 단일 EventSource를 만들 때 연결한다.",
-            behavior = "cover-letter.review-status.snapshot을 먼저 보내고 이후 cover-letter.review-status.changed 단건 이벤트를 전달한다. 재연결하면 전체 스냅샷으로 복구한다.",
-            success = "스냅샷과 변경 이벤트를 displayStatus 기준으로 반영한다. 연결 오류는 API-004 인증 갱신 후 재연결하고 반복 실패 시 API-007을 조회한다."
+            behavior = """
+                    cover-letter.review-status.snapshot을 먼저 보내고 이후 cover-letter.review-status.changed 단건 이벤트를 전달한다. 재연결하면 전체 스냅샷으로 복구한다.
+                    상태 변화가 없어도 기본 15초 주기로 빈 객체를 담은 heartbeat 이벤트를 전달한다. 전송 주기는 서버 설정에 따라 바뀔 수 있다.
+                    """,
+            success = """
+                    스냅샷과 변경 이벤트를 displayStatus 기준으로 반영한다. 연결 오류는 API-004 인증 갱신 후 재연결하고 반복 실패 시 API-007을 조회한다.
+                    addEventListener(\"heartbeat\", ...)로 수신하며 heartbeat·업무 이벤트마다 무응답 감시 기준을 갱신한다.
+                    기본 30초 무응답이면 연결을 닫고 API-007로 상태를 확인한 뒤 재연결한다. 전송 주기를 바꾸면 무응답 기준도 더 긴 값으로 조정한다.
+                    """
     )
     public SseEmitter streamCoverLetterReviewStatuses() {
         return coverLetterReviewStatusStreamService.openMyStream();

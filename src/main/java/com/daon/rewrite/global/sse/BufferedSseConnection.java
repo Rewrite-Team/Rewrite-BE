@@ -4,7 +4,9 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
 import java.util.ArrayDeque;
+import java.util.Map;
 import java.util.Queue;
+import java.util.concurrent.ScheduledFuture;
 
 /**
  * 초기 스냅샷보다 변경 이벤트가 먼저 전송되지 않도록 연결별 초기화 버퍼를 둔다.
@@ -18,7 +20,9 @@ public final class BufferedSseConnection {
     private static final int MAX_BUFFERED_EVENTS = 256;
 
     private final SseEmitter emitter = new SseEmitter(TIMEOUT_MILLIS);
+    private final SseHeartbeatScheduler heartbeatScheduler;
     private final Queue<Event> bufferedEvents = new ArrayDeque<>();
+    private ScheduledFuture<?> heartbeatTask;
     private boolean initializing = true;
     private boolean closed;
 
@@ -26,13 +30,18 @@ public final class BufferedSseConnection {
      * emitter timeout은 30분이며 완료·시간초과·오류 콜백에서 라우터의 연결 등록을 정리한다.
      * cleanup은 여러 종료 콜백에서 호출되어도 안전해야 한다.
      */
-    public BufferedSseConnection(Runnable cleanup) {
-        emitter.onCompletion(cleanup);
+    public BufferedSseConnection(SseHeartbeatScheduler heartbeatScheduler, Runnable cleanup) {
+        this.heartbeatScheduler = heartbeatScheduler;
+        Runnable finish = () -> {
+            stop();
+            cleanup.run();
+        };
+        emitter.onCompletion(finish);
         emitter.onTimeout(() -> {
             close();
-            cleanup.run();
+            finish.run();
         });
-        emitter.onError(error -> cleanup.run());
+        emitter.onError(error -> finish.run());
     }
 
     public SseEmitter emitter() {
@@ -68,6 +77,16 @@ public final class BufferedSseConnection {
         while (!bufferedEvents.isEmpty() && !closed) {
             sendNow(bufferedEvents.remove());
         }
+        if (!closed && heartbeatTask == null) {
+            heartbeatTask = heartbeatScheduler.schedule(this::sendHeartbeat);
+        }
+    }
+
+    /** 초기 스냅샷과 버퍼 전송 이후 열린 연결에 프론트가 수신할 수 있는 heartbeat를 보낸다. */
+    private synchronized void sendHeartbeat() {
+        if (!closed && !initializing) {
+            sendNow(new Event("heartbeat", Map.of()));
+        }
     }
 
     /** 중복 종료는 무시한다. 라우터 정리는 emitter의 완료 콜백에 맡긴다. */
@@ -75,8 +94,17 @@ public final class BufferedSseConnection {
         if (closed) {
             return;
         }
-        closed = true;
+        stop();
         emitter.complete();
+    }
+
+    private synchronized void stop() {
+        closed = true;
+        bufferedEvents.clear();
+        if (heartbeatTask != null) {
+            heartbeatTask.cancel(false);
+            heartbeatTask = null;
+        }
     }
 
     private void sendNow(Event event) {
@@ -87,7 +115,7 @@ public final class BufferedSseConnection {
             emitter.send(SseEmitter.event().name(event.name()).data(event.data()));
         } catch (IOException | IllegalStateException exception) {
             // 클라이언트 단절 등 전송 실패는 이 연결을 종료하고 emitter의 오류 처리로 넘긴다.
-            closed = true;
+            stop();
             emitter.completeWithError(exception);
         }
     }
