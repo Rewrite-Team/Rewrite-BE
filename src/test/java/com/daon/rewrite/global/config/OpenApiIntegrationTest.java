@@ -6,6 +6,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.daon.rewrite.llmjob.dto.InterviewFeedbackDeltaResponse;
+import com.daon.rewrite.llmjob.dto.LlmJobStateEventResponse;
+import com.daon.rewrite.llmjob.entity.LlmJobStatus;
+import com.daon.rewrite.llmjob.entity.LlmJobType;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.ArrayList;
@@ -87,7 +91,7 @@ class OpenApiIntegrationTest {
                 );
         assertThat(api016.path("responses").has("403")).isFalse();
         assertThat(api016.path("responses").path("200").path("content")
-                .path("text/event-stream").path("schema").path("example").asText())
+                .path("text/event-stream").path("examples").path("coverLetterReview").path("value").asText())
                 .contains("event: job.state", "event: review.questions", "event: heartbeat\ndata: {}");
 
         JsonNode api030 = operation(document, "/cover-letters/stream", "get");
@@ -98,6 +102,60 @@ class OpenApiIntegrationTest {
                 .doesNotContain("\"jobId\"");
         assertThat(api030.path("description").asText())
                 .contains("기본 15초", "heartbeat", "기본 30초 무응답", "API-007");
+    }
+
+    @Test
+    void jobStreamExamplesSeparateReviewAndValidatedInterviewFeedback() throws Exception {
+        JsonNode api016 = operation(openApiDocument(), "/llm-jobs/{jobId}/stream", "get");
+        JsonNode streamContent = api016.path("responses").path("200").path("content").path("text/event-stream");
+        assertThat(streamContent.path("schema").path("type").asText()).isEqualTo("string");
+        JsonNode examples = streamContent.path("examples");
+        assertThat(examples.propertyStream().map(entry -> entry.getKey()).toList())
+                .containsExactlyInAnyOrder("coverLetterReview", "interviewMessageFeedback");
+        assertThat(examples.path("coverLetterReview").path("value").asText())
+                .contains("event: review.questions")
+                .doesNotContain("event: interview.feedback.delta");
+
+        JsonNode feedbackExample = examples.path("interviewMessageFeedback");
+        assertThat(feedbackExample.path("summary").asText()).isEqualTo("면접 답변 피드백 상태와 조각");
+        assertThat(feedbackExample.path("description").asText())
+                .contains("전체 AI 응답을 검증한 뒤", "sequence 순서로 contentDelta를 이어 붙인다");
+        assertThat(api016.path("description").asText())
+                .contains("전체 AI 응답을 검증한 뒤 완성된 content");
+        String stream = feedbackExample.path("value").asText();
+        assertThat(stream).startsWith("event: job.state\n").endsWith("\n\n")
+                .doesNotContain("event: review.questions");
+        List<JsonNode> states = eventPayloads(stream, "job.state");
+        assertThat(states).hasSize(1);
+        JsonNode state = states.get(0);
+        assertThat(state.propertyStream().map(entry -> entry.getKey()).toList())
+                .containsExactlyInAnyOrder("jobType", "status", "progress", "resultRef", "error");
+        assertThat(state.path("progress").propertyStream().map(entry -> entry.getKey()).toList())
+                .containsExactlyInAnyOrder("current", "total", "message");
+        LlmJobStateEventResponse jobState = objectMapper.treeToValue(state, LlmJobStateEventResponse.class);
+        assertThat(jobState.jobType()).isEqualTo(LlmJobType.INTERVIEW_MESSAGE_FEEDBACK);
+        assertThat(jobState.status()).isEqualTo(LlmJobStatus.PROCESSING);
+        assertThat(jobState.progress().current()).isZero();
+        assertThat(jobState.progress().total()).isEqualTo(1);
+        assertThat(jobState.progress().message()).isNotBlank();
+        assertThat(jobState.resultRef()).isNull();
+        assertThat(jobState.error()).isNull();
+
+        List<InterviewFeedbackDeltaResponse> deltas = new ArrayList<>();
+        for (JsonNode payload : eventPayloads(stream, "interview.feedback.delta")) {
+            assertThat(payload.propertyStream().map(entry -> entry.getKey()).toList())
+                    .containsExactlyInAnyOrder("sequence", "contentDelta");
+            assertThat(payload.path("sequence").isInt()).isTrue();
+            assertThat(payload.path("contentDelta").isTextual()).isTrue();
+            deltas.add(objectMapper.treeToValue(payload, InterviewFeedbackDeltaResponse.class));
+        }
+        assertThat(deltas).extracting(InterviewFeedbackDeltaResponse::sequence).containsExactly(1, 2);
+        assertThat(deltas).extracting(InterviewFeedbackDeltaResponse::contentDelta)
+                .allSatisfy(delta -> assertThat(delta).isNotBlank());
+        assertThat(eventPayloads(stream, "heartbeat")).singleElement().satisfies(payload -> {
+            assertThat(payload.isObject()).isTrue();
+            assertThat(payload.isEmpty()).isTrue();
+        });
     }
 
     @Test
@@ -240,6 +298,19 @@ class OpenApiIntegrationTest {
         return objectMapper.readTree(result.getResponse().getContentAsByteArray());
     }
 
+
+    private List<JsonNode> eventPayloads(String stream, String eventName) throws Exception {
+        List<JsonNode> payloads = new ArrayList<>();
+        for (String frame : stream.split("\n\n")) {
+            List<String> lines = frame.lines().toList();
+            if (!lines.isEmpty() && lines.get(0).equals("event: " + eventName)) {
+                assertThat(lines).hasSize(2);
+                assertThat(lines.get(1)).startsWith("data: ");
+                payloads.add(objectMapper.readTree(lines.get(1).substring("data: ".length())));
+            }
+        }
+        return payloads;
+    }
 
     private JsonNode operation(JsonNode document, String path, String method) {
         return document.path("paths").path(path).path(method);
