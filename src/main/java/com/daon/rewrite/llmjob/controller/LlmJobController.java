@@ -7,6 +7,7 @@ import com.daon.rewrite.llmjob.dto.LlmJobStateResponse;
 import com.daon.rewrite.llmjob.service.LlmJobService;
 import com.daon.rewrite.llmjob.service.LlmJobStreamService;
 import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import lombok.RequiredArgsConstructor;
@@ -54,20 +55,43 @@ public class LlmJobController {
             description = "job.state와 도메인별 중간 결과 SSE 스트림",
             content = @Content(
                     mediaType = MediaType.TEXT_EVENT_STREAM_VALUE,
-                    schema = @Schema(
-                            type = "string",
-                            example = """
-                                    event: job.state
-                                    data: {"jobType":"COVER_LETTER_REVIEW","status":"PROCESSING","progress":{"current":1,"total":3,"message":"첨삭 중"},"resultRef":null,"error":null}
+                    schema = @Schema(type = "string"),
+                    examples = {
+                            @ExampleObject(
+                                    name = "coverLetterReview",
+                                    summary = "첨삭 상태와 완료 문항",
+                                    value = """
+                                            event: job.state
+                                            data: {"jobType":"COVER_LETTER_REVIEW","status":"PROCESSING","progress":{"current":1,"total":3,"message":"첨삭 중"},"resultRef":null,"error":null}
 
-                                    event: review.questions
-                                    data: {"items":[{"questionId":"question_01","order":1,"aiReport":"분석","rewrittenAnswer":"수정 답변","rewrittenAnswerLength":5,"finalAnswer":"수정 답변","finalAnswerLength":5}]}
+                                            event: review.questions
+                                            data: {"items":[{"questionId":"question_01","order":1,"aiReport":"분석","rewrittenAnswer":"수정 답변","rewrittenAnswerLength":5,"finalAnswer":"수정 답변","finalAnswerLength":5}]}
 
-                                    event: heartbeat
-                                    data: {}
+                                            event: heartbeat
+                                            data: {}
 
-                                    """
-                    )
+                                            """
+                            ),
+                            @ExampleObject(
+                                    name = "interviewMessageFeedback",
+                                    summary = "면접 답변 피드백 상태와 조각",
+                                    description = "전체 AI 응답을 검증한 뒤 완성된 content를 분할 전송하며, sequence 순서로 contentDelta를 이어 붙인다.",
+                                    value = """
+                                            event: job.state
+                                            data: {"jobType":"INTERVIEW_MESSAGE_FEEDBACK","status":"PROCESSING","progress":{"current":0,"total":1,"message":"면접 답변 피드백 생성을 시작합니다."},"resultRef":null,"error":null}
+
+                                            event: heartbeat
+                                            data: {}
+
+                                            event: interview.feedback.delta
+                                            data: {"sequence":1,"contentDelta":"답변에서 API 설계 경험을 구체적으로 설명한 점이 좋습니다. 성과 지표"}
+
+                                            event: interview.feedback.delta
+                                            data: {"sequence":2,"contentDelta":"를 더하면 전달력이 좋아집니다."}
+
+                                            """
+                            )
+                    }
             )
     )
     @RewriteApi(
@@ -81,6 +105,7 @@ public class LlmJobController {
             behavior = """
                     job.state 이벤트로 최초 상태, 진행률과 종료 상태를 전달한다.
                     첨삭 문항은 review.questions, 면접 피드백은 interview.feedback.delta 이벤트로 전달한다.
+                    면접 피드백은 전체 AI 응답을 검증한 뒤 완성된 content를 sequence 순서의 조각으로 분할 전송한다.
                     상태 변화가 없어도 기본 15초 주기로 빈 객체를 담은 heartbeat 이벤트를 전달한다. 전송 주기는 서버 설정에 따라 바뀔 수 있다.
                     job.state.status=FAILED는 정상 SSE 연결에서 받은 비동기 작업 결과이며 HTTP ErrorResponse가 아니다.
                     """,
