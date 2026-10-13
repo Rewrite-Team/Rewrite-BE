@@ -5,6 +5,7 @@ import com.daon.rewrite.coverletter.dto.CoverLetterReviewStatusEventResponse;
 import com.daon.rewrite.coverletter.entity.CoverLetter;
 import com.daon.rewrite.coverletter.repository.CoverLetterRepository;
 import com.daon.rewrite.global.sse.BufferedSseConnection;
+import com.daon.rewrite.global.sse.SseHeartbeatScheduler;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -29,6 +30,7 @@ public class CoverLetterReviewStatusStreamService {
 
     private final CurrentUserProvider currentUserProvider;
     private final CoverLetterRepository coverLetterRepository;
+    private final SseHeartbeatScheduler heartbeatScheduler;
 
     // ownerId → connectionId별 연결이다. 여러 탭의 연결은 각각 직전 전송 상태를 유지한다.
     private final Map<String, Map<String, CoverConnection>> connections = new ConcurrentHashMap<>();
@@ -42,6 +44,7 @@ public class CoverLetterReviewStatusStreamService {
         String ownerId = currentUserProvider.currentUser().id();
         String connectionId = UUID.randomUUID().toString();
         BufferedSseConnection stream = new BufferedSseConnection(
+                heartbeatScheduler,
                 () -> removeConnection(ownerId, connectionId)
         );
         CoverConnection connection = new CoverConnection(stream);

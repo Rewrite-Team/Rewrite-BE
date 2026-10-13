@@ -62,6 +62,10 @@ public class LlmJobController {
 
                                     event: review.questions
                                     data: {"items":[{"questionId":"question_01","order":1,"aiReport":"분석","rewrittenAnswer":"수정 답변","rewrittenAnswerLength":5,"finalAnswer":"수정 답변","finalAnswerLength":5}]}
+
+                                    event: heartbeat
+                                    data: {}
+
                                     """
                     )
             )
@@ -77,9 +81,14 @@ public class LlmJobController {
             behavior = """
                     job.state 이벤트로 최초 상태, 진행률과 종료 상태를 전달한다.
                     첨삭 문항은 review.questions, 면접 피드백은 interview.feedback.delta 이벤트로 전달한다.
+                    상태 변화가 없어도 기본 15초 주기로 빈 객체를 담은 heartbeat 이벤트를 전달한다. 전송 주기는 서버 설정에 따라 바뀔 수 있다.
                     job.state.status=FAILED는 정상 SSE 연결에서 받은 비동기 작업 결과이며 HTTP ErrorResponse가 아니다.
                     """,
-            success = "서버가 최종 job.state와 도메인별 후속 이벤트 전송을 마친 뒤 연결을 종료한다. 클라이언트는 terminal 상태에 따라 API별 결과 조회 또는 실패 처리를 수행한다.",
+            success = """
+                    서버가 최종 job.state와 도메인별 후속 이벤트 전송을 마친 뒤 연결을 종료한다. 클라이언트는 terminal 상태에 따라 API별 결과 조회 또는 실패 처리를 수행한다.
+                    addEventListener(\"heartbeat\", ...)로 수신하며 heartbeat·업무 이벤트마다 무응답 감시 기준을 갱신한다.
+                    기본 30초 무응답이면 연결을 닫고 API-015로 상태를 확인한 뒤 진행 중인 Job만 재연결한다. 전송 주기를 바꾸면 무응답 기준도 더 긴 값으로 조정한다.
+                    """,
             errors = @ApiError(
                     code = ErrorCode.NOT_FOUND,
                     condition = "Job 없음, 접근 불가 또는 삭제된 자기소개서에 연결된 Job",

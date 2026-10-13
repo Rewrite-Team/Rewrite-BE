@@ -116,6 +116,15 @@ docker compose down -v    # 로컬 PostgreSQL 데이터를 삭제하고 완전�
 - `auth-real`에서 인증이 필요한 Rewrite API를 호출할 때는 카카오 로그인으로 발급한 인증 Cookie가 필요하다.
 - `auth-real`의 상태 변경 요청에는 CSRF 토큰도 필요하다.
 
+### SSE 연결 유지
+
+- Job 스트림과 사용자 상태 스트림은 기본 15초 주기로 `heartbeat` 이벤트와 `{}`를 전송한다.
+- 전송 간격은 `SSE_HEARTBEAT_INTERVAL` 환경변수로 설정한다. 예: `10s`, `PT15S`.
+- 간격은 양수여야 하며 `0s`·음수 설정이면 애플리케이션 시작 시 거부한다.
+- 프론트의 기본 무응답 기준은 30초다. 전송 간격을 바꾸면 무응답 기준도 더 긴 값으로 조정한다.
+- heartbeat는 서버의 30분 SSE 연결 timeout을 연장하지 않는다.
+- 프론트 구독·인증 확인·재연결은 [heartbeat와 무응답 복구](docs/api/common.md#heartbeat와-무응답-복구)를 따른다.
+
 ## 코드 흐름 탐색
 
 저장소 스킬 [code-flow](.agents/skills/code-flow/SKILL.md)로 Java 호출 흐름을 생성할 수 있습니다.

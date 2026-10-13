@@ -125,3 +125,4 @@ API 계약: `../api/README.md`
 | Decision 100 | Swagger UI를 핵심 API 문서로 사용한다 | `common.md` | REQ-001, REQ-003 - REQ-010 | API-001 - API-030 | Active |
 | Decision 101 | 실행 프로필은 DB와 인증 세부 프로필을 조합한다 | `persistence.md` | REQ-007, REQ-008 | 내부 persistence·실행 환경 | Active |
 | Decision 102 | 첨삭 버전은 Job 시작 시 생성하고 실패해도 보존한다 | `review-versions.md` | REQ-005, REQ-006 | API-012, API-014, API-017 - API-019, API-024 | Active |
+| Decision 103 | 공통 SSE heartbeat는 프론트가 수신할 수 있는 이벤트로 전달한다 | `llm-jobs.md` | REQ-003, REQ-005, REQ-006, REQ-009, REQ-010 | API-016, API-030 | Active |
