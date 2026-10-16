@@ -1,5 +1,8 @@
 package com.daon.rewrite.global.exception;
 
+import com.fasterxml.jackson.annotation.JsonValue;
+import io.swagger.v3.oas.annotations.media.Schema;
+
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -10,6 +13,7 @@ import org.springframework.http.HttpStatus;
  */
 @Getter
 @RequiredArgsConstructor
+@Schema(enumAsRef = true)
 public enum ErrorCode {
 
     UNAUTHORIZED(
@@ -69,4 +73,9 @@ public enum ErrorCode {
     private final HttpStatus status;
     private final String code;
     private final String message;
+
+    @JsonValue
+    public String getCode() {
+        return code;
+    }
 }

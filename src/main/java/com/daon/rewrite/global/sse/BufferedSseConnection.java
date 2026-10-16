@@ -85,7 +85,7 @@ public final class BufferedSseConnection {
     /** 초기 스냅샷과 버퍼 전송 이후 열린 연결에 프론트가 수신할 수 있는 heartbeat를 보낸다. */
     private synchronized void sendHeartbeat() {
         if (!closed && !initializing) {
-            sendNow(new Event("heartbeat", Map.of()));
+            sendNow(new Event(SseEventName.HEARTBEAT.value(), Map.of()));
         }
     }
 

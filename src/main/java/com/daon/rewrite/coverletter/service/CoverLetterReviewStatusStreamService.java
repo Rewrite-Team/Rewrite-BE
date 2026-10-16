@@ -6,6 +6,7 @@ import com.daon.rewrite.coverletter.entity.CoverLetter;
 import com.daon.rewrite.coverletter.repository.CoverLetterRepository;
 import com.daon.rewrite.global.sse.BufferedSseConnection;
 import com.daon.rewrite.global.sse.SseHeartbeatScheduler;
+import com.daon.rewrite.global.sse.SseEventName;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -25,8 +26,8 @@ import java.util.concurrent.ConcurrentHashMap;
 @RequiredArgsConstructor
 public class CoverLetterReviewStatusStreamService {
 
-    private static final String SNAPSHOT_EVENT = "cover-letter.review-status.snapshot";
-    private static final String CHANGED_EVENT = "cover-letter.review-status.changed";
+    private static final String SNAPSHOT_EVENT = SseEventName.COVER_LETTER_REVIEW_STATUS_SNAPSHOT.value();
+    private static final String CHANGED_EVENT = SseEventName.COVER_LETTER_REVIEW_STATUS_CHANGED.value();
 
     private final CurrentUserProvider currentUserProvider;
     private final CoverLetterRepository coverLetterRepository;

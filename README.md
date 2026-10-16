@@ -113,6 +113,8 @@ docker compose down -v    # 로컬 PostgreSQL 데이터를 삭제하고 완전�
 | `local`, `local-postgres`, `test` | 실제 인증 controller가 비활성화되어 API-001~004, API-006을 제외한 24개 API |
 | `prod`, `auth-test` | 인증 API를 포함한 활성 API 29개 전체 |
 
+- `OpenApiSecurityIntegrationTest` 실행 시 타입 생성 검증에 사용할 인증 API 포함 명세를 `build/verification/openapi.json`에 저장한다.
+- 공통 enum과 SSE·redirect 타입 참조 규칙은 [OpenAPI 작성 기준](docs/README.md#openapi--swagger)을 따른다.
 - `auth-real`에서 인증이 필요한 Rewrite API를 호출할 때는 카카오 로그인으로 발급한 인증 Cookie가 필요하다.
 - `auth-real`의 상태 변경 요청에는 CSRF 토큰도 필요하다.
 

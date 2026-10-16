@@ -162,7 +162,7 @@ class OpenApiIntegrationTest {
                 case INTERVIEW_ADDITIONAL_QUESTION_GENERATION -> LlmJobResultRefType.INTERVIEW_QUESTION;
                 case INTERVIEW_MESSAGE_FEEDBACK -> LlmJobResultRefType.INTERVIEW_MESSAGE;
             };
-            assertThat(LlmJobResultRefType.valueOf(completed.resultRef().type())).isEqualTo(expectedResult);
+            assertThat(completed.resultRef().type()).isEqualTo(expectedResult);
             assertThat(completed.resultRef().id()).isNotBlank();
             assertThat(eventPayloads(events, "heartbeat")).singleElement().satisfies(payload -> {
                 assertThat(payload.isObject()).isTrue();

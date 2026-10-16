@@ -69,12 +69,16 @@
 - API ID는 `x-rewrite-api-id`에도 유지한다.
 - `operationId`는 고유한 의미 기반 camelCase 이름을 사용한다.
 - tag는 공백 없는 영문 도메인 이름으로 작성한다.
+- 공개 상태·종류·오류 코드는 enum으로 표현하고, 같은 값 집합은 명명된 OpenAPI component를 참조해 생성 타입을 재사용한다.
+- 저장 상태에 없는 화면 상태가 필요하면 응답 전용 enum을 사용하며, API 표시를 위해 영속 상태를 추가하지 않는다.
 - 실제 JSON에 항상 존재하는 속성은 응답 스키마에서 `required`로 표시한다.
 - 값이 `null`일 수 있는 속성은 required와 nullable을 함께 표시한다.
 - `@ApiError`에는 실제 발생 가능한 오류 코드·발생 조건·프론트엔드 처리 방법만 기록한다.
 - 같은 HTTP 상태의 복수 오류는 named example로 구분한다.
 - `VALIDATION_ERROR`의 대표 detail은 실제 서비스가 반환할 수 있는 field와 reason을 함께 기록한다.
 - OAuth redirect 오류는 JSON `ErrorResponse`로 문서화하지 않고 `@ApiRedirectError`로 구분한다.
+- OAuth redirect의 공개 오류 코드는 `x-rewrite-redirect-error-code-schema`의 component 참조로 노출하며, 실제 302 응답에 JSON body를 추가하지 않는다.
+- SSE 응답은 실제 `text/event-stream` 문자열 형식을 유지하고, `x-rewrite-sse-events`로 이벤트 이름과 data payload component를 연결한다. 이벤트 이름의 공통 enum은 `x-rewrite-sse-event-name-schema`로 참조한다.
 - 인증 API를 포함한 운영 profile OpenAPI는 활성 API 29개를 모두 포함해야 하고, API-028은 Deprecated path로 노출하지 않는다.
 - 공통 `401`, `403`, `500`과 API별 오류는 `ErrorResponse` schema를 사용하고, 비동기 Job 실패는 HTTP 오류와 분리한다.
 - `x-rewrite-*` 확장은 Swagger 설명에 사용할 구조화된 메타데이터로 유지한다.

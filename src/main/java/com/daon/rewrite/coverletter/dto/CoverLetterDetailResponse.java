@@ -3,6 +3,7 @@ package com.daon.rewrite.coverletter.dto;
 import com.daon.rewrite.coverletter.entity.CoverLetter;
 import com.daon.rewrite.coverletter.entity.CoverLetterStatus;
 import com.daon.rewrite.coverletter.service.CoverLetterDetailResult;
+import com.daon.rewrite.llmjob.dto.LlmJobErrorCode;
 import com.daon.rewrite.llmjob.entity.LlmJob;
 import com.daon.rewrite.llmjob.entity.LlmJobStatus;
 import com.daon.rewrite.reviewversion.entity.ReviewVersion;
@@ -119,16 +120,12 @@ public record CoverLetterDetailResponse(
     }
 
     @Schema(name = "CoverLetterDetailJobErrorResponse", requiredProperties = {"code", "message"})
-    public record ErrorResponse(String code, String message) {
+    public record ErrorResponse(LlmJobErrorCode code, String message) {
         private static ErrorResponse from(LlmJob job) {
             if (job.getErrorCode() == null) {
                 return null;
             }
-            String code = switch (job.getErrorCode()) {
-                case "LLM_CONTEXT_LENGTH_EXCEEDED", "LLM_CONTENT_FILTERED" -> job.getErrorCode();
-                default -> "LLM_PROVIDER_ERROR";
-            };
-            return new ErrorResponse(code, job.getErrorMessage());
+            return new ErrorResponse(LlmJobErrorCode.fromInternalCode(job.getErrorCode()), job.getErrorMessage());
         }
     }
 

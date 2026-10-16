@@ -2,6 +2,7 @@ package com.daon.rewrite.llmjob.service;
 
 import com.daon.rewrite.global.sse.BufferedSseConnection;
 import com.daon.rewrite.global.sse.SseHeartbeatScheduler;
+import com.daon.rewrite.global.sse.SseEventName;
 import com.daon.rewrite.llmjob.dto.InterviewFeedbackDeltaResponse;
 import com.daon.rewrite.llmjob.dto.LlmJobStateEventResponse;
 import com.daon.rewrite.llmjob.dto.ReviewQuestionsEventResponse;
@@ -34,9 +35,9 @@ import java.util.concurrent.CopyOnWriteArrayList;
 @RequiredArgsConstructor
 public class LlmJobStreamService {
 
-    private static final String JOB_STATE_EVENT = "job.state";
-    private static final String REVIEW_QUESTIONS_EVENT = "review.questions";
-    private static final String INTERVIEW_FEEDBACK_DELTA_EVENT = "interview.feedback.delta";
+    private static final String JOB_STATE_EVENT = SseEventName.JOB_STATE.value();
+    private static final String REVIEW_QUESTIONS_EVENT = SseEventName.REVIEW_QUESTIONS.value();
+    private static final String INTERVIEW_FEEDBACK_DELTA_EVENT = SseEventName.INTERVIEW_FEEDBACK_DELTA.value();
     private static final int FEEDBACK_CHUNK_SIZE = 40;
 
     private final LlmJobService llmJobService;

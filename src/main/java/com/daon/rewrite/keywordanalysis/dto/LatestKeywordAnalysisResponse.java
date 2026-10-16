@@ -16,20 +16,18 @@ public record LatestKeywordAnalysisResponse(
         CoverLetterResponse coverLetter,
         @Schema(nullable = true)
         ReviewVersionResponse sourceReviewVersion,
-        String status,
+        LatestKeywordAnalysisStatus status,
         @Schema(nullable = true)
         String jobId,
         List<KeywordResponse> keywords
 ) {
-
-    private static final String NOT_STARTED_STATUS = "NOT_STARTED";
 
     public static LatestKeywordAnalysisResponse from(LatestKeywordAnalysisResult result) {
         if (result.keywordAnalysis() == null) {
             return new LatestKeywordAnalysisResponse(
                     CoverLetterResponse.from(result.coverLetter()),
                     null,
-                    NOT_STARTED_STATUS,
+                    LatestKeywordAnalysisStatus.NOT_STARTED,
                     null,
                     List.of()
             );
@@ -40,7 +38,7 @@ public record LatestKeywordAnalysisResponse(
                         result.sourceReviewVersion().getId(),
                         "v0." + result.sourceReviewVersion().getVersionNumber()
                 ),
-                result.keywordAnalysis().getStatus().name(),
+                LatestKeywordAnalysisStatus.from(result.keywordAnalysis().getStatus()),
                 result.job() == null ? null : result.job().getId(),
                 result.keywords().stream()
                         .map(KeywordResponse::from)

@@ -22,7 +22,7 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(errorCode.getStatus())
                 .body(ErrorResponse.of(
-                        errorCode.getCode(),
+                        errorCode,
                         e.getMessage(),
                         e.getDetails()
                 ));
@@ -43,7 +43,7 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(ErrorCode.VALIDATION_ERROR.getStatus())
                 .body(ErrorResponse.of(
-                        ErrorCode.VALIDATION_ERROR.getCode(),
+                        ErrorCode.VALIDATION_ERROR,
                         ErrorCode.VALIDATION_ERROR.getMessage(),
                         details
                 ));
@@ -56,10 +56,7 @@ public class GlobalExceptionHandler {
     ) {
         return ResponseEntity
                 .status(ErrorCode.VALIDATION_ERROR.getStatus())
-                .body(ErrorResponse.of(
-                        ErrorCode.VALIDATION_ERROR.getCode(),
-                        ErrorCode.VALIDATION_ERROR.getMessage()
-                ));
+                .body(ErrorResponse.of(ErrorCode.VALIDATION_ERROR));
     }
 
     // 분류되지 않은 예외의 원문을 응답에 노출하지 않고 공통 내부 오류 메시지만 반환한다.
@@ -67,9 +64,6 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleException(Exception e) {
         return ResponseEntity
                 .status(ErrorCode.INTERNAL_ERROR.getStatus())
-                .body(ErrorResponse.of(
-                        ErrorCode.INTERNAL_ERROR.getCode(),
-                        ErrorCode.INTERNAL_ERROR.getMessage()
-                ));
+                .body(ErrorResponse.of(ErrorCode.INTERNAL_ERROR));
     }
 }

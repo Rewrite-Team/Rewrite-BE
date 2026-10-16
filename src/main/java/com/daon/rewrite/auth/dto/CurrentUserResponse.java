@@ -1,5 +1,6 @@
 package com.daon.rewrite.auth.dto;
 
+import com.daon.rewrite.auth.AuthProvider;
 import com.daon.rewrite.auth.CurrentUser;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
@@ -11,7 +12,7 @@ public record CurrentUserResponse(
         String nickname,
         @Schema(nullable = true)
         String profileImageUrl,
-        String provider,
+        AuthProvider provider,
         LocalDateTime createdAt
 ) {
 
@@ -23,7 +24,7 @@ public record CurrentUserResponse(
                 user.id(),
                 user.nickname(),
                 user.profileImageUrl(),
-                user.provider().name(),
+                user.provider(),
                 LocalDateTime.ofInstant(user.createdAt(), SEOUL)
         );
     }

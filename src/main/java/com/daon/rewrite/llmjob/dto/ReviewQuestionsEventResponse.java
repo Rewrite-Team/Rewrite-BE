@@ -1,6 +1,7 @@
 package com.daon.rewrite.llmjob.dto;
 
 import com.daon.rewrite.reviewversion.entity.ReviewJobQuestionResult;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.List;
 
@@ -8,6 +9,7 @@ import java.util.List;
  * 연결 시 완료 문항 스냅샷과 새 문항 완료 이벤트가 함께 사용하는 payload.
  * items는 스냅샷이면 전체 완료 문항, 변경이면 단건이며 클라이언트는 questionId로 같은 문항을 갱신한다.
  */
+@Schema(requiredProperties = "items")
 public record ReviewQuestionsEventResponse(List<QuestionResponse> items) {
 
     public ReviewQuestionsEventResponse {
@@ -20,6 +22,7 @@ public record ReviewQuestionsEventResponse(List<QuestionResponse> items) {
                 .toList());
     }
 
+    @Schema(name = "ReviewQuestionEventResponse", requiredProperties = {"questionId", "order", "aiReport", "rewrittenAnswer", "rewrittenAnswerLength", "finalAnswer", "finalAnswerLength"})
     public record QuestionResponse(
             String questionId,
             int order,
