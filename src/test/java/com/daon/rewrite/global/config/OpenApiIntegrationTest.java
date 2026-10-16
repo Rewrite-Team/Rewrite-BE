@@ -6,8 +6,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.daon.rewrite.coverletter.dto.CoverLetterReviewStatusEventResponse;
+import com.daon.rewrite.coverletter.entity.CoverLetterStatus;
 import com.daon.rewrite.llmjob.dto.InterviewFeedbackDeltaResponse;
 import com.daon.rewrite.llmjob.dto.LlmJobStateEventResponse;
+import com.daon.rewrite.llmjob.dto.ReviewQuestionsEventResponse;
+import com.daon.rewrite.llmjob.entity.LlmJobResultRefType;
 import com.daon.rewrite.llmjob.entity.LlmJobStatus;
 import com.daon.rewrite.llmjob.entity.LlmJobType;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -16,7 +20,9 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -105,16 +111,106 @@ class OpenApiIntegrationTest {
     }
 
     @Test
-    void jobStreamExamplesSeparateReviewAndValidatedInterviewFeedback() throws Exception {
+    void jobStreamExamplesDocumentEveryJobTypeAndItsCompletedResult() throws Exception {
         JsonNode api016 = operation(openApiDocument(), "/llm-jobs/{jobId}/stream", "get");
         JsonNode streamContent = api016.path("responses").path("200").path("content").path("text/event-stream");
         assertThat(streamContent.path("schema").path("type").asText()).isEqualTo("string");
         JsonNode examples = streamContent.path("examples");
+        Map<String, LlmJobType> expectedTypes = Map.of(
+                "coverLetterReview", LlmJobType.COVER_LETTER_REVIEW,
+                "coverLetterReReview", LlmJobType.COVER_LETTER_RE_REVIEW,
+                "keywordAnalysis", LlmJobType.KEYWORD_ANALYSIS,
+                "interviewInitialQuestionGeneration", LlmJobType.INTERVIEW_INITIAL_QUESTION_GENERATION,
+                "interviewAdditionalQuestionGeneration", LlmJobType.INTERVIEW_ADDITIONAL_QUESTION_GENERATION,
+                "interviewMessageFeedback", LlmJobType.INTERVIEW_MESSAGE_FEEDBACK
+        );
+        assertThat(expectedTypes.values()).containsExactlyInAnyOrder(LlmJobType.values());
         assertThat(examples.propertyStream().map(entry -> entry.getKey()).toList())
-                .containsExactlyInAnyOrder("coverLetterReview", "interviewMessageFeedback");
-        assertThat(examples.path("coverLetterReview").path("value").asText())
-                .contains("event: review.questions")
-                .doesNotContain("event: interview.feedback.delta");
+                .containsExactlyInAnyOrderElementsOf(expectedTypes.keySet());
+        String description = api016.path("description").asText();
+        assertThat(fencedCodeBlocks(description)).containsExactlyInAnyOrderElementsOf(
+                examples.propertyStream().map(entry -> entry.getValue().path("value").asText()).toList()
+        );
+
+        for (Map.Entry<String, LlmJobType> expected : expectedTypes.entrySet()) {
+            List<SseEvent> events = readSseEvents(examples.path(expected.getKey()).path("value").asText());
+            assertThat(events.getFirst().name()).isEqualTo("job.state");
+            assertThat(events.getLast().name()).isEqualTo("job.state");
+            List<LlmJobStateEventResponse> states = new ArrayList<>();
+            for (JsonNode payload : eventPayloads(events, "job.state")) {
+                states.add(readPayload(payload, LlmJobStateEventResponse.class));
+            }
+            assertThat(states).extracting(LlmJobStateEventResponse::status)
+                    .containsExactly(LlmJobStatus.PROCESSING, LlmJobStatus.COMPLETED);
+            int total = expected.getValue() == LlmJobType.INTERVIEW_INITIAL_QUESTION_GENERATION ? 5 : 1;
+            assertThat(states).allSatisfy(state -> {
+                assertThat(state.jobType()).isEqualTo(expected.getValue());
+                assertThat(state.progress()).isNotNull();
+                assertThat(state.progress().total()).isEqualTo(total);
+                assertThat(state.progress().message()).isNotBlank();
+                assertThat(state.error()).isNull();
+            });
+            assertThat(states.getFirst().progress().current()).isZero();
+            assertThat(states.getFirst().resultRef()).isNull();
+            LlmJobStateEventResponse completed = states.getLast();
+            assertThat(completed.progress().current()).isEqualTo(total);
+            assertThat(completed.resultRef()).isNotNull();
+            LlmJobResultRefType expectedResult = switch (expected.getValue()) {
+                case COVER_LETTER_REVIEW, COVER_LETTER_RE_REVIEW -> LlmJobResultRefType.REVIEW_VERSION;
+                case KEYWORD_ANALYSIS -> LlmJobResultRefType.KEYWORD_ANALYSIS;
+                case INTERVIEW_INITIAL_QUESTION_GENERATION -> LlmJobResultRefType.INTERVIEW_SESSION;
+                case INTERVIEW_ADDITIONAL_QUESTION_GENERATION -> LlmJobResultRefType.INTERVIEW_QUESTION;
+                case INTERVIEW_MESSAGE_FEEDBACK -> LlmJobResultRefType.INTERVIEW_MESSAGE;
+            };
+            assertThat(LlmJobResultRefType.valueOf(completed.resultRef().type())).isEqualTo(expectedResult);
+            assertThat(completed.resultRef().id()).isNotBlank();
+            assertThat(eventPayloads(events, "heartbeat")).singleElement().satisfies(payload -> {
+                assertThat(payload.isObject()).isTrue();
+                assertThat(payload.isEmpty()).isTrue();
+            });
+        }
+    }
+
+    @Test
+    void jobStreamExamplesSeparateReviewQuestionsAndValidatedInterviewFeedback() throws Exception {
+        JsonNode api016 = operation(openApiDocument(), "/llm-jobs/{jobId}/stream", "get");
+        JsonNode examples = api016.path("responses").path("200").path("content")
+                .path("text/event-stream").path("examples");
+        for (Map.Entry<String, JsonNode> example : examples.propertyStream().toList()) {
+            List<SseEvent> events = readSseEvents(example.getValue().path("value").asText());
+            List<JsonNode> reviews = eventPayloads(events, "review.questions");
+            if (Set.of("coverLetterReview", "coverLetterReReview").contains(example.getKey())) {
+                assertThat(events.get(1).name()).isEqualTo("review.questions");
+                assertThat(reviews).hasSize(2);
+                assertThat(readPayload(reviews.getFirst(), ReviewQuestionsEventResponse.class).items()).isEmpty();
+                ReviewQuestionsEventResponse completedQuestion = readPayload(
+                        reviews.getLast(), ReviewQuestionsEventResponse.class
+                );
+                assertThat(completedQuestion.items()).singleElement().satisfies(question -> {
+                    assertThat(question.questionId()).isNotBlank();
+                    assertThat(question.order()).isPositive();
+                    assertThat(question.aiReport()).isNotBlank();
+                    assertThat(question.rewrittenAnswer()).isNotBlank();
+                    assertThat(question.rewrittenAnswerLength()).isEqualTo(question.rewrittenAnswer().length());
+                    assertThat(question.finalAnswer()).isNotBlank();
+                    assertThat(question.finalAnswerLength()).isEqualTo(question.finalAnswer().length());
+                });
+            } else {
+                assertThat(reviews).isEmpty();
+            }
+
+            List<InterviewFeedbackDeltaResponse> deltas = new ArrayList<>();
+            for (JsonNode payload : eventPayloads(events, "interview.feedback.delta")) {
+                deltas.add(readPayload(payload, InterviewFeedbackDeltaResponse.class));
+            }
+            if (example.getKey().equals("interviewMessageFeedback")) {
+                assertThat(deltas).extracting(InterviewFeedbackDeltaResponse::sequence).containsExactly(1, 2);
+                assertThat(deltas).extracting(InterviewFeedbackDeltaResponse::contentDelta)
+                        .allSatisfy(delta -> assertThat(delta).isNotBlank());
+            } else {
+                assertThat(deltas).isEmpty();
+            }
+        }
 
         JsonNode feedbackExample = examples.path("interviewMessageFeedback");
         assertThat(feedbackExample.path("summary").asText()).isEqualTo("면접 답변 피드백 상태와 조각");
@@ -122,40 +218,53 @@ class OpenApiIntegrationTest {
                 .contains("전체 AI 응답을 검증한 뒤", "sequence 순서로 contentDelta를 이어 붙인다");
         assertThat(api016.path("description").asText())
                 .contains("전체 AI 응답을 검증한 뒤 완성된 content");
-        String stream = feedbackExample.path("value").asText();
-        assertThat(stream).startsWith("event: job.state\n").endsWith("\n\n")
-                .doesNotContain("event: review.questions");
-        List<JsonNode> states = eventPayloads(stream, "job.state");
-        assertThat(states).hasSize(1);
-        JsonNode state = states.get(0);
-        assertThat(state.propertyStream().map(entry -> entry.getKey()).toList())
-                .containsExactlyInAnyOrder("jobType", "status", "progress", "resultRef", "error");
-        assertThat(state.path("progress").propertyStream().map(entry -> entry.getKey()).toList())
-                .containsExactlyInAnyOrder("current", "total", "message");
-        LlmJobStateEventResponse jobState = objectMapper.treeToValue(state, LlmJobStateEventResponse.class);
-        assertThat(jobState.jobType()).isEqualTo(LlmJobType.INTERVIEW_MESSAGE_FEEDBACK);
-        assertThat(jobState.status()).isEqualTo(LlmJobStatus.PROCESSING);
-        assertThat(jobState.progress().current()).isZero();
-        assertThat(jobState.progress().total()).isEqualTo(1);
-        assertThat(jobState.progress().message()).isNotBlank();
-        assertThat(jobState.resultRef()).isNull();
-        assertThat(jobState.error()).isNull();
+    }
 
-        List<InterviewFeedbackDeltaResponse> deltas = new ArrayList<>();
-        for (JsonNode payload : eventPayloads(stream, "interview.feedback.delta")) {
-            assertThat(payload.propertyStream().map(entry -> entry.getKey()).toList())
-                    .containsExactlyInAnyOrder("sequence", "contentDelta");
-            assertThat(payload.path("sequence").isInt()).isTrue();
-            assertThat(payload.path("contentDelta").isTextual()).isTrue();
-            deltas.add(objectMapper.treeToValue(payload, InterviewFeedbackDeltaResponse.class));
-        }
-        assertThat(deltas).extracting(InterviewFeedbackDeltaResponse::sequence).containsExactly(1, 2);
-        assertThat(deltas).extracting(InterviewFeedbackDeltaResponse::contentDelta)
-                .allSatisfy(delta -> assertThat(delta).isNotBlank());
-        assertThat(eventPayloads(stream, "heartbeat")).singleElement().satisfies(payload -> {
+    @Test
+    void coverLetterStreamDocumentsItsDtoPayloadsAndAllPublicSseEvents() throws Exception {
+        JsonNode document = openApiDocument();
+        JsonNode api030 = operation(document, "/cover-letters/stream", "get");
+        JsonNode schema = api030.path("responses").path("200").path("content")
+                .path("text/event-stream").path("schema");
+        assertThat(schema.path("type").asText()).isEqualTo("string");
+        List<String> codeBlocks = fencedCodeBlocks(api030.path("description").asText());
+        assertThat(codeBlocks).hasSize(1);
+        String stream = codeBlocks.getFirst();
+        assertThat(schema.path("example").asText().stripTrailing()).isEqualTo(stream.stripTrailing());
+        List<SseEvent> events = readSseEvents(stream);
+        assertThat(events).extracting(SseEvent::name).containsExactly(
+                "cover-letter.review-status.snapshot", "cover-letter.review-status.changed", "heartbeat"
+        );
+        CoverLetterReviewStatusEventResponse.Snapshot snapshot = readPayload(
+                events.getFirst().payload(), CoverLetterReviewStatusEventResponse.Snapshot.class
+        );
+        assertThat(snapshot.items()).singleElement().satisfies(item -> {
+            assertThat(item.coverLetterId()).isNotBlank();
+            assertThat(item.displayStatus()).isEqualTo(CoverLetterStatus.REVIEWING);
+            assertThat(item.latestReviewedVersionId()).isNull();
+        });
+        CoverLetterReviewStatusEventResponse.Item changed = readPayload(
+                events.get(1).payload(), CoverLetterReviewStatusEventResponse.Item.class
+        );
+        assertThat(changed.coverLetterId()).isEqualTo(snapshot.items().getFirst().coverLetterId());
+        assertThat(changed.displayStatus()).isEqualTo(CoverLetterStatus.REVIEWED);
+        assertThat(changed.latestReviewedVersionId()).isNotBlank();
+        assertThat(eventPayloads(events, "heartbeat")).singleElement().satisfies(payload -> {
             assertThat(payload.isObject()).isTrue();
             assertThat(payload.isEmpty()).isTrue();
         });
+
+        Set<String> eventNames = new HashSet<>();
+        events.forEach(event -> eventNames.add(event.name()));
+        JsonNode jobExamples = operation(document, "/llm-jobs/{jobId}/stream", "get")
+                .path("responses").path("200").path("content").path("text/event-stream").path("examples");
+        for (JsonNode example : jobExamples) {
+            readSseEvents(example.path("value").asText()).forEach(event -> eventNames.add(event.name()));
+        }
+        assertThat(eventNames).containsExactlyInAnyOrder(
+                "job.state", "review.questions", "interview.feedback.delta", "heartbeat",
+                "cover-letter.review-status.snapshot", "cover-letter.review-status.changed"
+        );
     }
 
     @Test
@@ -298,21 +407,42 @@ class OpenApiIntegrationTest {
         return objectMapper.readTree(result.getResponse().getContentAsByteArray());
     }
 
+    private List<String> fencedCodeBlocks(String description) {
+        return Pattern.compile("(?ms)^```[^\\n]*\\n(.*?)^```[ \\t]*(?=\\n|$)")
+                .matcher(description).results().map(match -> match.group(1)).toList();
+    }
 
-    private List<JsonNode> eventPayloads(String stream, String eventName) throws Exception {
-        List<JsonNode> payloads = new ArrayList<>();
+    private List<SseEvent> readSseEvents(String stream) throws Exception {
+        assertThat(stream).startsWith("event: ").endsWith("\n\n");
+        List<SseEvent> events = new ArrayList<>();
         for (String frame : stream.split("\n\n")) {
             List<String> lines = frame.lines().toList();
-            if (!lines.isEmpty() && lines.get(0).equals("event: " + eventName)) {
-                assertThat(lines).hasSize(2);
-                assertThat(lines.get(1)).startsWith("data: ");
-                payloads.add(objectMapper.readTree(lines.get(1).substring("data: ".length())));
-            }
+            assertThat(lines).hasSize(2);
+            assertThat(lines.getFirst()).startsWith("event: ");
+            assertThat(lines.get(1)).startsWith("data: ");
+            events.add(new SseEvent(
+                    lines.getFirst().substring("event: ".length()),
+                    objectMapper.readTree(lines.get(1).substring("data: ".length()))
+            ));
         }
-        return payloads;
+        return events;
+    }
+
+    private List<JsonNode> eventPayloads(List<SseEvent> events, String eventName) {
+        return events.stream().filter(event -> event.name().equals(eventName)).map(SseEvent::payload).toList();
+    }
+
+    private <T> T readPayload(JsonNode payload, Class<T> responseType) throws Exception {
+        T response = objectMapper.treeToValue(payload, responseType);
+        JsonNode serialized = objectMapper.valueToTree(response);
+        assertThat(serialized).isEqualTo(payload);
+        return response;
     }
 
     private JsonNode operation(JsonNode document, String path, String method) {
         return document.path("paths").path(path).path(method);
+    }
+
+    private record SseEvent(String name, JsonNode payload) {
     }
 }

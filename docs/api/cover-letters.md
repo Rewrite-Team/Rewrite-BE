@@ -1,6 +1,7 @@
 # 자기소개서·첨삭·키워드 흐름
 
 필드·길이·HTTP 오류 예시는 Swagger UI를 확인한다.
+최초 첨삭·재첨삭·키워드 분석의 Job별 SSE 사용 흐름과 예시는 Swagger UI의 API-016 설명에서 확인한다.
 제품 기준은 [REQ-003~006·009](../requirements.md), 설계 근거는 [자기소개서](../decisions/cover-letters.md)·[첨삭 버전](../decisions/review-versions.md)·[키워드](../decisions/keyword-analysis.md) 결정에 둔다.
 인증·오류 복구·Job SSE는 [공통 흐름](common.md)을 따른다.
 
@@ -32,6 +33,7 @@
 ## 목록과 상태 스트림
 
 관련 API: 목록 API-007, 사용자 상태 SSE API-030.
+상태 스냅샷·단건 변경·heartbeat의 의미와 SSE 원문 예시는 Swagger UI의 API-030 설명에서 확인한다.
 
 | `displayStatus` | 카드 이동 화면 |
 |---|---|
@@ -45,14 +47,6 @@
 - 잘못된 query는 `page=1`, `size=9`로 정규화해 한 번 조회하고 전체 페이지를 넘은 page는 빈 목록으로 처리한다.
 - 메인 화면은 카드별 연결 대신 사용자 SSE 하나를 유지한다.
 - 연결 직후 삭제되지 않은 모든 자기소개서 스냅샷을 받고 이후 단건 변경을 받는다.
-
-```text
-event: cover-letter.review-status.snapshot
-data: {"items":[{"coverLetterId":"cl_01HZ...","displayStatus":"REVIEWING","latestReviewedVersionId":null}]}
-
-event: cover-letter.review-status.changed
-data: {"coverLetterId":"cl_01HZ...","displayStatus":"REVIEW_FAILED","latestReviewedVersionId":"rv_01HZ..."}
-```
 
 - 스냅샷의 `items`는 항상 배열이며 없으면 `[]`다.
 - 두 이벤트 모두 상태·최신 성공 버전을 그대로 반영하며 Job 상태로 화면 상태를 추론하지 않는다.

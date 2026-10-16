@@ -88,7 +88,11 @@ HTTP 경로·요청·응답·validation·오류 예시는 Swagger UI를 기준�
 
 ## 비동기 Job과 SSE
 
-관련 API: 상태 복구 API-015, 공통 스트림 API-016. 근거는 [Job 결정](../decisions/llm-jobs.md)을 따른다.
+관련 API: 상태 복구 API-015, Job 스트림 API-016, 사용자 상태 스트림 API-030. 근거는 [Job 결정](../decisions/llm-jobs.md)을 따른다.
+
+SSE endpoint는 API-016과 API-030 두 가지다.
+Swagger UI의 API-016 설명에서 6가지 Job 유형별 시작·진행·종료·결과 재조회 흐름과 예시를 확인한다.
+API-030 설명에서 목록 상태의 스냅샷·변경 흐름과 예시를 확인하며, 두 API 설명이 전체 6종 이벤트를 다룬다.
 
 - 최초·재첨삭, 키워드, 초기·추가 면접 질문, 답변 피드백은 시작 API의 `jobId`로 추적한다.
 - 같은 자기소개서에서 `PENDING`·`PROCESSING` Job은 하나만 허용한다.
@@ -104,17 +108,6 @@ HTTP 경로·요청·응답·validation·오류 예시는 Swagger UI를 기준�
 2. 첨삭이면 완료 문항 스냅샷 `review.questions`를 받는다.
 3. 새 문항 완료 시 문항 결과를 먼저 저장하고 해당 문항 이벤트 → 갱신된 `job.state` 순서로 받는다.
 4. 상태·진행률 변화는 같은 `job.state`로 받고 종료 후 결과 API를 재조회한다.
-
-```text
-event: job.state
-data: {"jobType":"COVER_LETTER_REVIEW","status":"PROCESSING","progress":{"current":1,"total":3,"message":"첨삭 중"},"resultRef":null,"error":null}
-
-event: review.questions
-data: {"items":[{"questionId":"clq_01HZ...","order":1,"aiReport":"성과를 보강해주세요.","rewrittenAnswer":"수정 답변","rewrittenAnswerLength":5,"finalAnswer":"수정 답변","finalAnswerLength":5}]}
-
-event: interview.feedback.delta
-data: {"sequence":1,"contentDelta":"답변에서 API 설계 경험은 "}
-```
 
 - `job.state`는 `jobType`, `status`, `progress`, `resultRef`, `error`를 항상 포함한다.
 - `progress`와 그 하위 필드는 항상 non-null이다.
@@ -137,14 +130,9 @@ data: {"sequence":1,"contentDelta":"답변에서 API 설계 경험은 "}
 API-016 Job 스트림과 API-030 사용자 상태 스트림은 초기 스냅샷 전송 후 같은 heartbeat 이벤트를 보낸다.
 연결 상태 감시를 위한 이벤트이며 작업 상태·진행률을 변경하지 않는다.
 
-~~~text
-event: heartbeat
-data: {}
-
-~~~
-
 - 이벤트 이름은 `heartbeat`, payload는 항상 빈 JSON 객체 `{}`다.
 - 프론트는 `addEventListener("heartbeat", ...)`로 수신한다.
+- SSE 원문 예시는 Swagger UI의 API-016·030 설명과 성공 응답에서 확인한다.
 - 기본 전송 주기는 15초이며 [SSE 설정](../../README.md#sse-연결-유지)으로 변경한다.
 - 서버는 heartbeat를 전송하기 위해 DB를 추가 조회하지 않는다.
 - 연결 완료·timeout·오류·전송 실패 시 해당 연결의 heartbeat 예약과 등록을 정리한다.
