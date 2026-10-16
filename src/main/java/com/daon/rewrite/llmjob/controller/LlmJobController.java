@@ -59,37 +59,34 @@ public class LlmJobController {
                     examples = {
                             @ExampleObject(
                                     name = "coverLetterReview",
-                                    summary = "첨삭 상태와 완료 문항",
-                                    value = """
-                                            event: job.state
-                                            data: {"jobType":"COVER_LETTER_REVIEW","status":"PROCESSING","progress":{"current":1,"total":3,"message":"첨삭 중"},"resultRef":null,"error":null}
-
-                                            event: review.questions
-                                            data: {"items":[{"questionId":"question_01","order":1,"aiReport":"분석","rewrittenAnswer":"수정 답변","rewrittenAnswerLength":5,"finalAnswer":"수정 답변","finalAnswerLength":5}]}
-
-                                            event: heartbeat
-                                            data: {}
-
-                                            """
+                                    summary = "최초 첨삭 상태와 완료 문항",
+                                    value = LlmJobStreamDocumentation.COVER_LETTER_REVIEW
+                            ),
+                            @ExampleObject(
+                                    name = "coverLetterReReview",
+                                    summary = "재첨삭 상태와 완료 문항",
+                                    value = LlmJobStreamDocumentation.COVER_LETTER_RE_REVIEW
+                            ),
+                            @ExampleObject(
+                                    name = "keywordAnalysis",
+                                    summary = "키워드 분석 상태와 결과 참조",
+                                    value = LlmJobStreamDocumentation.KEYWORD_ANALYSIS
+                            ),
+                            @ExampleObject(
+                                    name = "interviewInitialQuestionGeneration",
+                                    summary = "초기 면접 질문 생성 상태와 세션 참조",
+                                    value = LlmJobStreamDocumentation.INTERVIEW_INITIAL_QUESTION_GENERATION
+                            ),
+                            @ExampleObject(
+                                    name = "interviewAdditionalQuestionGeneration",
+                                    summary = "추가 면접 질문 생성 상태와 질문 참조",
+                                    value = LlmJobStreamDocumentation.INTERVIEW_ADDITIONAL_QUESTION_GENERATION
                             ),
                             @ExampleObject(
                                     name = "interviewMessageFeedback",
                                     summary = "면접 답변 피드백 상태와 조각",
                                     description = "전체 AI 응답을 검증한 뒤 완성된 content를 분할 전송하며, sequence 순서로 contentDelta를 이어 붙인다.",
-                                    value = """
-                                            event: job.state
-                                            data: {"jobType":"INTERVIEW_MESSAGE_FEEDBACK","status":"PROCESSING","progress":{"current":0,"total":1,"message":"면접 답변 피드백 생성을 시작합니다."},"resultRef":null,"error":null}
-
-                                            event: heartbeat
-                                            data: {}
-
-                                            event: interview.feedback.delta
-                                            data: {"sequence":1,"contentDelta":"답변에서 API 설계 경험을 구체적으로 설명한 점이 좋습니다. 성과 지표"}
-
-                                            event: interview.feedback.delta
-                                            data: {"sequence":2,"contentDelta":"를 더하면 전달력이 좋아집니다."}
-
-                                            """
+                                    value = LlmJobStreamDocumentation.INTERVIEW_MESSAGE_FEEDBACK
                             )
                     }
             )
@@ -102,17 +99,15 @@ public class LlmJobController {
             purpose = "첨삭·키워드 분석·AI 면접 Job의 상태와 도메인별 중간 결과를 하나의 SSE 연결로 수신한다.",
             screens = {"첨삭 진행", "키워드 분석", "AI 면접"},
             trigger = "Job 시작 API가 반환한 jobId로 진행 상태를 구독할 때 연결한다.",
-            behavior = """
-                    job.state 이벤트로 최초 상태, 진행률과 종료 상태를 전달한다.
-                    첨삭 문항은 review.questions, 면접 피드백은 interview.feedback.delta 이벤트로 전달한다.
-                    면접 피드백은 전체 AI 응답을 검증한 뒤 완성된 content를 sequence 순서의 조각으로 분할 전송한다.
-                    상태 변화가 없어도 기본 15초 주기로 빈 객체를 담은 heartbeat 이벤트를 전달한다. 전송 주기는 서버 설정에 따라 바뀔 수 있다.
-                    job.state.status=FAILED는 정상 SSE 연결에서 받은 비동기 작업 결과이며 HTTP ErrorResponse가 아니다.
-                    """,
+            behavior = LlmJobStreamDocumentation.BEHAVIOR,
             success = """
                     서버가 최종 job.state와 도메인별 후속 이벤트 전송을 마친 뒤 연결을 종료한다. 클라이언트는 terminal 상태에 따라 API별 결과 조회 또는 실패 처리를 수행한다.
+                    FAILED이면 error.code에 따라 실패를 표시하고 면접 피드백의 임시 문장은 제거한다. CANCELED이면 부분 결과를 폐기한 뒤 원래 화면·목록을 재조회한다.
+                    재연결 시 최신 상태와 첨삭 완료 문항 스냅샷을 받는다. 면접 피드백은 PROCESSING 동안 서버 메모리에 남은 조각을 sequence=1부터 다시 보내므로 이미 반영한 sequence는 무시한다. 버퍼가 없으면 진행 상태만 유지하고 완료 후 API-029로 전체 결과를 조회한다.
+                    Last-Event-ID 기반 영속 replay는 제공하지 않는다.
                     addEventListener(\"heartbeat\", ...)로 수신하며 heartbeat·업무 이벤트마다 무응답 감시 기준을 갱신한다.
                     기본 30초 무응답이면 연결을 닫고 API-015로 상태를 확인한 뒤 진행 중인 Job만 재연결한다. 전송 주기를 바꾸면 무응답 기준도 더 긴 값으로 조정한다.
+                    onerror에서도 연결을 닫고 API-015로 인증·대상·현재 상태를 확인한다. 장애가 반복되면 재연결 간격을 늘리고 API-015 또는 도메인 조회 polling으로 전환하며 NOT_FOUND이면 복구를 중단한다.
                     """,
             errors = @ApiError(
                     code = ErrorCode.NOT_FOUND,

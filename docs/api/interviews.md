@@ -1,6 +1,7 @@
 # AI 면접 흐름
 
 HTTP 계약·필드·validation·오류 예시는 Swagger UI를 확인한다.
+초기 면접 질문·추가 면접 질문·답변 피드백의 Job별 SSE 사용 흐름과 예시는 Swagger UI의 API-016 설명에서 확인한다.
 제품 기준은 [REQ-010](../requirements.md#req-010-ai-면접), 설계 근거는 [면접 결정](../decisions/interviews.md)에 둔다.
 인증·오류 복구·SSE·피드백 replay는 [공통 흐름](common.md)을 따른다.
 

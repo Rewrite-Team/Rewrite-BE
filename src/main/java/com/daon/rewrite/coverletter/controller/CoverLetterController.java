@@ -314,17 +314,7 @@ public class CoverLetterController {
                     mediaType = MediaType.TEXT_EVENT_STREAM_VALUE,
                     schema = @Schema(
                             type = "string",
-                            example = """
-                                    event: cover-letter.review-status.snapshot
-                                    data: {"items":[{"coverLetterId":"cover_letter_01","displayStatus":"REVIEWING","latestReviewedVersionId":null}]}
-
-                                    event: cover-letter.review-status.changed
-                                    data: {"coverLetterId":"cover_letter_01","displayStatus":"REVIEWED","latestReviewedVersionId":"review_version_01"}
-
-                                    event: heartbeat
-                                    data: {}
-
-                                    """
+                            example = CoverLetterSseDocumentation.REVIEW_STATUS_EXAMPLE
                     )
             )
     )
@@ -336,14 +326,12 @@ public class CoverLetterController {
             purpose = "현재 사용자의 자기소개서 첨삭 상태 변경을 하나의 SSE 연결로 수신한다.",
             screens = {"자기소개서 목록", "첨삭 진행"},
             trigger = "로그인 후 목록·첨삭 진행 화면에서 사용자 단일 EventSource를 만들 때 연결한다.",
-            behavior = """
-                    cover-letter.review-status.snapshot을 먼저 보내고 이후 cover-letter.review-status.changed 단건 이벤트를 전달한다. 재연결하면 전체 스냅샷으로 복구한다.
-                    상태 변화가 없어도 기본 15초 주기로 빈 객체를 담은 heartbeat 이벤트를 전달한다. 전송 주기는 서버 설정에 따라 바뀔 수 있다.
-                    """,
+            behavior = CoverLetterSseDocumentation.REVIEW_STATUS_BEHAVIOR,
             success = """
-                    스냅샷과 변경 이벤트를 displayStatus 기준으로 반영한다. 연결 오류는 API-004 인증 갱신 후 재연결하고 반복 실패 시 API-007을 조회한다.
-                    addEventListener(\"heartbeat\", ...)로 수신하며 heartbeat·업무 이벤트마다 무응답 감시 기준을 갱신한다.
-                    기본 30초 무응답이면 연결을 닫고 API-007로 상태를 확인한 뒤 재연결한다. 전송 주기를 바꾸면 무응답 기준도 더 긴 값으로 조정한다.
+                    두 상태 이벤트의 displayStatus·latestReviewedVersionId를 그대로 반영한다. 현재 페이지에 없는 coverLetterId는 무시한다.
+                    각 이벤트는 addEventListener(\"이벤트 이름\", ...)로 수신한다. heartbeat·업무 이벤트마다 무응답 감시 기준을 갱신한다.
+                    연결 오류나 기본 30초 무응답이면 연결을 닫고 API-007로 현재 상태를 확인한 뒤 재연결한다. 401이면 API-004 single-flight 인증 갱신을 적용한다.
+                    전송 주기를 바꾸면 무응답 기준도 더 긴 값으로 조정한다. 장애가 반복되면 API-007 polling으로 전환한다. 화면 종료·로그아웃에서는 연결과 감시를 중단한다.
                     """
     )
     public SseEmitter streamCoverLetterReviewStatuses() {
