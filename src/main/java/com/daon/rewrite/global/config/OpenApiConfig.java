@@ -1,7 +1,14 @@
 package com.daon.rewrite.global.config;
 
+import com.daon.rewrite.auth.dto.OAuthRedirectErrorCode;
+import com.daon.rewrite.coverletter.dto.CoverLetterReviewStatusEventResponse;
+import com.daon.rewrite.global.sse.SseEventName;
+import com.daon.rewrite.llmjob.dto.InterviewFeedbackDeltaResponse;
+import com.daon.rewrite.llmjob.dto.LlmJobStateEventResponse;
+import com.daon.rewrite.llmjob.dto.ReviewQuestionsEventResponse;
 import com.daon.rewrite.global.openapi.RewriteApiOperationCustomizer;
 import com.daon.rewrite.global.response.ErrorResponse;
+import io.swagger.v3.core.converter.AnnotatedType;
 import io.swagger.v3.core.converter.ModelConverters;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
@@ -9,12 +16,15 @@ import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.springdoc.core.customizers.OpenApiCustomizer;
 import org.springdoc.core.customizers.OperationCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 
 /**
  * controller·DTO에서 생성한 OpenAPI에 Rewrite 사용 맥락과 공통 스키마·CSRF 요청 표시를 결합한다.
@@ -50,20 +60,54 @@ public class OpenApiConfig {
         return new RewriteApiOperationCustomizer();
     }
 
-    /**
-     * 오류 응답을 코드에서 직접 구성하는 operation도 ErrorResponse 스키마를 참조할 수 있도록 등록한다.
-     * 모델 변환기가 함께 발견한 중첩 오류 타입까지 components에 추가한다.
-     */
+    /** HTTP 본문에서 직접 참조되지 않는 오류·redirect·SSE 모델도 OpenAPI 3.1 components에 등록한다. */
     @Bean
-    OpenApiCustomizer errorResponseSchemaCustomizer() {
+    @Order(10)
+    OpenApiCustomizer publicResponseSchemaCustomizer() {
         return openApi -> {
             if (openApi.getComponents() == null) {
                 openApi.setComponents(new Components());
             }
-            ModelConverters.getInstance()
-                    .readAll(ErrorResponse.class)
-                    .forEach(openApi.getComponents()::addSchemas);
+            Map<SseEventName, Class<?>> events = new LinkedHashMap<>();
+            events.put(SseEventName.JOB_STATE, LlmJobStateEventResponse.class);
+            events.put(SseEventName.REVIEW_QUESTIONS, ReviewQuestionsEventResponse.class);
+            events.put(SseEventName.INTERVIEW_FEEDBACK_DELTA, InterviewFeedbackDeltaResponse.class);
+            events.put(SseEventName.COVER_LETTER_REVIEW_STATUS_SNAPSHOT, CoverLetterReviewStatusEventResponse.Snapshot.class);
+            events.put(SseEventName.COVER_LETTER_REVIEW_STATUS_CHANGED, CoverLetterReviewStatusEventResponse.Item.class);
+
+            ModelConverters converters = ModelConverters.getInstance(true);
+            for (Class<?> model : List.of(ErrorResponse.class, OAuthRedirectErrorCode.class, SseEventName.class)) {
+                converters.readAll(model).forEach(openApi.getComponents()::addSchemas);
+            }
+            Map<SseEventName, Map<String, String>> payloads = new LinkedHashMap<>();
+            events.forEach((event, model) -> {
+                var resolved = converters.resolveAsResolvedSchema(new AnnotatedType(model).resolveAsRef(true));
+                resolved.referencedSchemas.forEach(openApi.getComponents()::addSchemas);
+                payloads.put(event, Map.of("$ref", resolved.schema.get$ref()));
+            });
+            openApi.getComponents().addSchemas("SseHeartbeatEvent", new Schema<>()
+                    .types(Set.of("object"))
+                    .additionalProperties(false));
+            payloads.put(SseEventName.HEARTBEAT, Map.of("$ref", "#/components/schemas/SseHeartbeatEvent"));
+            documentSseEvents(openApi, "/llm-jobs/{jobId}/stream", payloads,
+                    SseEventName.JOB_STATE, SseEventName.REVIEW_QUESTIONS,
+                    SseEventName.INTERVIEW_FEEDBACK_DELTA, SseEventName.HEARTBEAT);
+            documentSseEvents(openApi, "/cover-letters/stream", payloads,
+                    SseEventName.COVER_LETTER_REVIEW_STATUS_SNAPSHOT,
+                    SseEventName.COVER_LETTER_REVIEW_STATUS_CHANGED, SseEventName.HEARTBEAT);
         };
+    }
+
+    private void documentSseEvents(OpenAPI openApi, String path,
+            Map<SseEventName, Map<String, String>> payloads, SseEventName... events) {
+        var operation = openApi.getPaths().get(path).getGet();
+        Map<String, Map<String, String>> schemas = new LinkedHashMap<>();
+        for (SseEventName event : events) {
+            schemas.put(event.value(), payloads.get(event));
+        }
+        operation.addExtension("x-rewrite-sse-events", schemas);
+        operation.addExtension("x-rewrite-sse-event-name-schema",
+                Map.of("$ref", "#/components/schemas/SseEventName"));
     }
 
     /**
@@ -71,6 +115,7 @@ public class OpenApiConfig {
      * 값이 null일 수 있다는 의미를 보완하며, DTO에서 지정한 필드 존재 여부(required)는 변경하지 않는다.
      */
     @Bean
+    @Order(20)
     OpenApiCustomizer nullableReferenceSchemaCustomizer() {
         return openApi -> {
             for (Schema<?> schema : openApi.getComponents().getSchemas().values()) {

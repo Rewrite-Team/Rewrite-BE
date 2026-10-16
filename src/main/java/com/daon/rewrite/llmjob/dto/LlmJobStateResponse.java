@@ -1,6 +1,7 @@
 package com.daon.rewrite.llmjob.dto;
 
 import com.daon.rewrite.llmjob.entity.LlmJob;
+import com.daon.rewrite.llmjob.entity.LlmJobResultRefType;
 import com.daon.rewrite.llmjob.entity.LlmJobStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -28,30 +29,22 @@ public record LlmJobStateResponse(
     }
 
     @Schema(requiredProperties = {"type", "id"})
-    public record ResultRefResponse(String type, String id) {
+    public record ResultRefResponse(LlmJobResultRefType type, String id) {
         private static ResultRefResponse from(LlmJob job) {
             if (job.getResultRefType() == null || job.getResultRefId() == null) {
                 return null;
             }
-            return new ResultRefResponse(job.getResultRefType().name(), job.getResultRefId());
+            return new ResultRefResponse(job.getResultRefType(), job.getResultRefId());
         }
     }
 
     @Schema(name = "LlmJobErrorResponse", requiredProperties = {"code", "message"})
-    public record ErrorResponse(String code, String message) {
+    public record ErrorResponse(LlmJobErrorCode code, String message) {
         private static ErrorResponse from(LlmJob job) {
             if (job.getErrorCode() == null) {
                 return null;
             }
-            return new ErrorResponse(publicErrorCode(job.getErrorCode()), job.getErrorMessage());
-        }
-
-        private static String publicErrorCode(String errorCode) {
-            // 화면에서 구별하는 두 오류 외의 내부 실패 분류는 공통 provider 오류 코드로 공개한다.
-            return switch (errorCode) {
-                case "LLM_CONTEXT_LENGTH_EXCEEDED", "LLM_CONTENT_FILTERED" -> errorCode;
-                default -> "LLM_PROVIDER_ERROR";
-            };
+            return new ErrorResponse(LlmJobErrorCode.fromInternalCode(job.getErrorCode()), job.getErrorMessage());
         }
     }
 }

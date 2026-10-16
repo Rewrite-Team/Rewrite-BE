@@ -25,6 +25,7 @@ public class RewriteApiOperationCustomizer implements OperationCustomizer {
 
     // OpenApiConfig가 등록하는 공통 오류 모델을 참조한다.
     private static final String ERROR_RESPONSE_SCHEMA = "#/components/schemas/ErrorResponse";
+    private static final String REDIRECT_ERROR_CODE_SCHEMA = "#/components/schemas/OAuthRedirectErrorCode";
 
     /**
      * {@code @RewriteApi}가 없는 메서드는 Springdoc 결과를 유지하고, 있는 메서드만 Rewrite 문서 규칙을 적용한다.
@@ -72,7 +73,7 @@ public class RewriteApiOperationCustomizer implements OperationCustomizer {
         Arrays.stream(api.redirectErrors())
                 .map(error -> new ErrorCase(
                         error.status(),
-                        error.code(),
+                        error.code().name(),
                         "",
                         error.condition(),
                         error.action(),
@@ -195,6 +196,10 @@ public class RewriteApiOperationCustomizer implements OperationCustomizer {
         operation.addExtension("x-rewrite-errors", errorCases.stream()
                 .map(this::errorExtension)
                 .toList());
+        if (api.redirectErrors().length > 0) {
+            operation.addExtension("x-rewrite-redirect-error-code-schema",
+                    Map.of("$ref", REDIRECT_ERROR_CODE_SCHEMA));
+        }
     }
 
     private Map<String, Object> errorExtension(ErrorCase error) {

@@ -1,5 +1,6 @@
 package com.daon.rewrite.global.openapi;
 
+import com.daon.rewrite.auth.dto.OAuthRedirectErrorCode;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -13,7 +14,7 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface ApiRedirectError {
 
-    String code();
+    OAuthRedirectErrorCode code();
 
     int status() default 302;
 

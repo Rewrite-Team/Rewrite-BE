@@ -10,7 +10,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.Cookie;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayDeque;
+import java.util.List;
+import java.util.Map;
 import java.util.Deque;
 import java.util.HashSet;
 import java.util.Set;
@@ -208,6 +212,115 @@ class OpenApiSecurityIntegrationTest {
     }
 
     @Test
+    void publicClassificationFieldsReferenceReusableEnums() throws Exception {
+        JsonNode document = objectMapper.readTree(mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray());
+        JsonNode schemas = document.path("components").path("schemas");
+        Map<String, List<String>> expectedValues = Map.ofEntries(
+                Map.entry("AuthProvider", List.of("KAKAO")),
+                Map.entry("LatestKeywordAnalysisStatus", List.of("NOT_STARTED", "PROCESSING", "COMPLETED", "FAILED")),
+                Map.entry("KeywordAnalysisStatus", List.of("PROCESSING", "COMPLETED", "FAILED")),
+                Map.entry("LlmJobStatus", List.of("PENDING", "PROCESSING", "COMPLETED", "FAILED", "CANCELED")),
+                Map.entry("LlmJobType", List.of("COVER_LETTER_REVIEW", "COVER_LETTER_RE_REVIEW", "KEYWORD_ANALYSIS",
+                        "INTERVIEW_INITIAL_QUESTION_GENERATION", "INTERVIEW_ADDITIONAL_QUESTION_GENERATION", "INTERVIEW_MESSAGE_FEEDBACK")),
+                Map.entry("LlmJobResultRefType", List.of("REVIEW_VERSION", "KEYWORD_ANALYSIS", "INTERVIEW_SESSION", "INTERVIEW_QUESTION", "INTERVIEW_MESSAGE")),
+                Map.entry("LlmJobErrorCode", List.of("LLM_PROVIDER_ERROR", "LLM_CONTEXT_LENGTH_EXCEEDED", "LLM_CONTENT_FILTERED")),
+                Map.entry("ErrorCode", List.of("UNAUTHORIZED", "CSRF_TOKEN_INVALID", "NOT_FOUND", "VALIDATION_ERROR", "CONFLICT",
+                        "COVER_LETTER_NOT_WRITING", "LLM_JOB_ALREADY_RUNNING", "REVIEW_VERSION_NOT_LATEST", "INTERNAL_ERROR")),
+                Map.entry("CoverLetterStatus", List.of("WRITING", "REVIEWING", "REVIEWED", "REVIEW_FAILED")),
+                Map.entry("InterviewSessionStatus", List.of("QUESTION_GENERATING", "ACTIVE", "FAILED")),
+                Map.entry("InterviewMessageRole", List.of("USER", "ASSISTANT")),
+                Map.entry("OAuthRedirectErrorCode", List.of("KAKAO_LOGIN_CANCELED", "KAKAO_LOGIN_FAILED")),
+                Map.entry("SseEventName", List.of("job.state", "review.questions", "interview.feedback.delta",
+                        "cover-letter.review-status.snapshot", "cover-letter.review-status.changed", "heartbeat"))
+        );
+        expectedValues.forEach((name, values) -> assertThat(schemas.path(name).path("enum")
+                .valueStream().map(JsonNode::asText).toList()).as("public values of %s", name)
+                .containsExactlyInAnyOrderElementsOf(values));
+
+        Map<String, String> fields = Map.ofEntries(
+                Map.entry("CurrentUserResponse.provider", "AuthProvider"),
+                Map.entry("LatestKeywordAnalysisResponse.status", "LatestKeywordAnalysisStatus"),
+                Map.entry("StartKeywordAnalysisResponse.status", "KeywordAnalysisStatus"),
+                Map.entry("ResultRefResponse.type", "LlmJobResultRefType"),
+                Map.entry("ErrorBody.code", "ErrorCode"),
+                Map.entry("LlmJobErrorResponse.code", "LlmJobErrorCode"),
+                Map.entry("CoverLetterDetailJobErrorResponse.code", "LlmJobErrorCode"),
+                Map.entry("LlmJobStateResponse.status", "LlmJobStatus"),
+                Map.entry("ReviewJobResponse.status", "LlmJobStatus"),
+                Map.entry("ReviewVersionListItemResponse.status", "LlmJobStatus"),
+                Map.entry("CoverLetterDetailReviewVersionResponse.status", "LlmJobStatus"),
+                Map.entry("CoverLetterListItemResponse.displayStatus", "CoverLetterStatus"),
+                Map.entry("CoverLetterDetailCoverLetterResponse.displayStatus", "CoverLetterStatus"),
+                Map.entry("SubmitCoverLetterResponse.displayStatus", "CoverLetterStatus"),
+                Map.entry("RequestReReviewResponse.displayStatus", "CoverLetterStatus"),
+                Map.entry("StartInterviewResponse.status", "InterviewSessionStatus"),
+                Map.entry("InterviewSessionResponse.status", "InterviewSessionStatus"),
+                Map.entry("InterviewMessageResponse.role", "InterviewMessageRole"),
+                Map.entry("LlmJobStateEventResponse.jobType", "LlmJobType"),
+                Map.entry("LlmJobStateEventResponse.status", "LlmJobStatus"),
+                Map.entry("CoverLetterReviewStatusItem.displayStatus", "CoverLetterStatus")
+        );
+        fields.forEach((field, type) -> {
+            String[] parts = field.split("\\.", 2);
+            assertThat(schemas.path(parts[0]).path("properties").path(parts[1]).path("$ref").asText())
+                    .as("shared enum of %s", field).isEqualTo("#/components/schemas/" + type);
+        });
+        assertThat(schemas.has("LlmJobTargetType")).isFalse();
+        assertThat(schemas.has("LlmJobRequestRefType")).isFalse();
+        assertThat(schemas.has("InterviewQuestionType")).isFalse();
+        assertThat(schemas.has("InterviewThreadStatus")).isFalse();
+
+        // 클라이언트 타입 생성 검증에 사용할 실제 운영 profile 명세를 build 아래에 보관한다.
+        Path exportedDocument = Path.of("build", "verification", "openapi.json");
+        Files.createDirectories(exportedDocument.getParent());
+        Files.writeString(exportedDocument, document.toPrettyString());
+    }
+
+    @Test
+    void streamAndRedirectOperationsExposePayloadAndPublicCodeReferences() throws Exception {
+        JsonNode document = objectMapper.readTree(mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray());
+        JsonNode schemas = document.path("components").path("schemas");
+        Map<String, String> expectedJob = Map.of(
+                "job.state", "LlmJobStateEventResponse",
+                "review.questions", "ReviewQuestionsEventResponse",
+                "interview.feedback.delta", "InterviewFeedbackDeltaResponse",
+                "heartbeat", "SseHeartbeatEvent");
+        Map<String, String> expectedCover = Map.of(
+                "cover-letter.review-status.snapshot", "CoverLetterReviewStatusSnapshot",
+                "cover-letter.review-status.changed", "CoverLetterReviewStatusItem",
+                "heartbeat", "SseHeartbeatEvent");
+        Map<String, Map<String, String>> streams = Map.of(
+                "/llm-jobs/{jobId}/stream", expectedJob,
+                "/cover-letters/stream", expectedCover);
+        streams.forEach((path, expected) -> {
+            JsonNode operation = document.path("paths").path(path).path("get");
+            JsonNode mapping = operation.path("x-rewrite-sse-events");
+            assertThat(mapping.propertyStream().map(Map.Entry::getKey).toList())
+                    .containsExactlyInAnyOrderElementsOf(expected.keySet());
+            expected.forEach((event, model) -> {
+                assertThat(mapping.path(event).path("$ref").asText()).isEqualTo("#/components/schemas/" + model);
+                assertThat(schemas.has(model)).as("payload model %s", model).isTrue();
+            });
+            assertThat(operation.path("x-rewrite-sse-event-name-schema").path("$ref").asText())
+                    .isEqualTo("#/components/schemas/SseEventName");
+            assertThat(operation.path("responses").path("200").path("content")
+                    .path("text/event-stream").path("schema").path("type").asText()).isEqualTo("string");
+        });
+        assertThat(schemas.path("ReviewQuestionsEventResponse").path("properties").path("items")
+                .path("items").path("$ref").asText()).isEqualTo("#/components/schemas/ReviewQuestionEventResponse");
+        assertThat(schemas.path("SseHeartbeatEvent").path("additionalProperties").asBoolean()).isFalse();
+        assertThat(schemas.path("SseHeartbeatEvent").path("properties").size()).isZero();
+        for (String path : List.of("/auth/kakao/authorize", "/auth/kakao/callback")) {
+            JsonNode operation = document.path("paths").path(path).path("get");
+            assertThat(operation.path("x-rewrite-redirect-error-code-schema").path("$ref").asText())
+                    .isEqualTo("#/components/schemas/OAuthRedirectErrorCode");
+            assertThat(operation.path("responses").path("302").has("content")).isFalse();
+        }
+    }
+
+    @Test
     void generatedJsonResponsesMarkEveryReturnedFieldRequiredAndNullableFieldsExplicitly() throws Exception {
         JsonNode document = objectMapper.readTree(mockMvc.perform(get("/v3/api-docs"))
                 .andExpect(status().isOk())
@@ -224,6 +337,10 @@ class OpenApiSecurityIntegrationTest {
                                         pending.add(mediaType.path("schema"));
                                     }
                                 }))));
+
+        document.path("paths").elements().forEachRemaining(path ->
+                path.elements().forEachRemaining(operation ->
+                        operation.path("x-rewrite-sse-events").elements().forEachRemaining(pending::add)));
 
         // 생성 문서의 응답 schema에서 출발해 참조·배열·합성 schema를 순회한다. 같은 component는 한 번만 확장한다.
         while (!pending.isEmpty()) {
@@ -296,6 +413,8 @@ class OpenApiSecurityIntegrationTest {
                 "QuestionResponse.rewrittenAnswerLength", "QuestionResponse.finalAnswer",
                 "QuestionResponse.finalAnswerLength",
                 "LlmJobStateResponse.resultRef", "LlmJobStateResponse.error",
+                "LlmJobStateEventResponse.resultRef", "LlmJobStateEventResponse.error",
+                "CoverLetterReviewStatusItem.latestReviewedVersionId",
                 "LatestKeywordAnalysisResponse.sourceReviewVersion", "LatestKeywordAnalysisResponse.jobId",
                 "KeywordAnalysisCoverLetterResponse.title", "KeywordAnalysisCoverLetterResponse.companyName",
                 "KeywordAnalysisCoverLetterResponse.positionTitle",

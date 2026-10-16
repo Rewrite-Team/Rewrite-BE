@@ -1,5 +1,6 @@
 package com.daon.rewrite.global.response;
 
+import com.daon.rewrite.global.exception.ErrorCode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 
@@ -9,7 +10,7 @@ public record ErrorResponse(ErrorBody error) {
 
     @Schema(requiredProperties = {"code", "message", "details"})
     public record ErrorBody(
-            String code,
+            ErrorCode code,
             String message,
             List<ErrorDetail> details
     ) {
@@ -22,11 +23,15 @@ public record ErrorResponse(ErrorBody error) {
     ) {
     }
 
-    public static ErrorResponse of(String code, String message) {
+    public static ErrorResponse of(ErrorCode code) {
+        return of(code, code.getMessage());
+    }
+
+    public static ErrorResponse of(ErrorCode code, String message) {
         return of(code, message, List.of());
     }
 
-    public static ErrorResponse of(String code, String message, List<ErrorDetail> details) {
+    public static ErrorResponse of(ErrorCode code, String message, List<ErrorDetail> details) {
         return new ErrorResponse(new ErrorBody(code, message, List.copyOf(details)));
     }
 }

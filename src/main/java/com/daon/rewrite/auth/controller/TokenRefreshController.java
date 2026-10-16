@@ -88,10 +88,7 @@ public class TokenRefreshController {
             return ResponseEntity.status(ErrorCode.UNAUTHORIZED.getStatus())
                     .header(HttpHeaders.SET_COOKIE, AuthCookieFactory.clearAccessToken().toString())
                     .header(HttpHeaders.SET_COOKIE, AuthCookieFactory.clearRefreshToken().toString())
-                    .body(ErrorResponse.of(
-                            ErrorCode.UNAUTHORIZED.getCode(),
-                            ErrorCode.UNAUTHORIZED.getMessage()
-                    ));
+                    .body(ErrorResponse.of(ErrorCode.UNAUTHORIZED));
         }
     }
 }

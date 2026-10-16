@@ -3,6 +3,7 @@ package com.daon.rewrite.auth.controller;
 import com.daon.rewrite.auth.config.AuthCookieFactory;
 import com.daon.rewrite.auth.config.AuthProperties;
 import com.daon.rewrite.auth.config.FrontendTarget;
+import com.daon.rewrite.auth.dto.OAuthRedirectErrorCode;
 import com.daon.rewrite.auth.service.AuthTokenPair;
 import com.daon.rewrite.auth.service.KakaoLoginService.AuthorizeResult;
 import com.daon.rewrite.auth.service.KakaoLoginService.LoginResult;
@@ -67,7 +68,7 @@ public class KakaoAuthController {
             authenticated = false,
             includeInternalError = false,
             redirectErrors = @ApiRedirectError(
-                    code = "KAKAO_LOGIN_FAILED",
+                    code = OAuthRedirectErrorCode.KAKAO_LOGIN_FAILED,
                     condition = "카카오 인가 URL 생성 등 로그인 시작 처리 실패",
                     action = "로그인 화면에서 일반 실패 안내를 표시하고 버튼을 다시 활성화하며 자동 재시도하지 않는다."
             )
@@ -83,7 +84,7 @@ public class KakaoAuthController {
         if (frontendTarget == null) {
             // 허용하지 않은 target을 redirect 주소로 사용하지 않고 운영 로그인 화면으로 돌려보낸다.
             return redirect(
-                    loginFailureUri(FrontendTarget.PRODUCTION, "KAKAO_LOGIN_FAILED"),
+                    loginFailureUri(FrontendTarget.PRODUCTION, OAuthRedirectErrorCode.KAKAO_LOGIN_FAILED),
                     clearOauthNonceCookie()
             );
         }
@@ -95,7 +96,10 @@ public class KakaoAuthController {
                     .build();
         } catch (RuntimeException e) {
             log.warn("Kakao login authorization failed", e);
-            return redirect(loginFailureUri(frontendTarget, "KAKAO_LOGIN_FAILED"), clearOauthNonceCookie());
+            return redirect(
+                    loginFailureUri(frontendTarget, OAuthRedirectErrorCode.KAKAO_LOGIN_FAILED),
+                    clearOauthNonceCookie()
+            );
         }
     }
 
@@ -123,12 +127,12 @@ public class KakaoAuthController {
             includeInternalError = false,
             redirectErrors = {
                     @ApiRedirectError(
-                            code = "KAKAO_LOGIN_CANCELED",
+                            code = OAuthRedirectErrorCode.KAKAO_LOGIN_CANCELED,
                             condition = "사용자가 카카오 로그인 또는 동의를 취소함",
                             action = "취소 안내를 표시하고 로그인 버튼을 다시 활성화한다."
                     ),
                     @ApiRedirectError(
-                            code = "KAKAO_LOGIN_FAILED",
+                            code = OAuthRedirectErrorCode.KAKAO_LOGIN_FAILED,
                             condition = "state·nonce 검증, code 교환, 사용자 조회 또는 저장 실패",
                             action = "일반 로그인 실패 안내를 표시하고 내부 원인은 노출하지 않으며 자동 재시도하지 않는다."
                     )
@@ -145,11 +149,11 @@ public class KakaoAuthController {
         return switch (result.status()) {
             case SUCCESS -> success(result.tokens(), result.frontendTarget());
             case CANCELED -> redirect(
-                    loginFailureUri(result.frontendTarget(), "KAKAO_LOGIN_CANCELED"),
+                    loginFailureUri(result.frontendTarget(), OAuthRedirectErrorCode.KAKAO_LOGIN_CANCELED),
                     clearOauthNonceCookie()
             );
             case FAILED -> redirect(
-                    loginFailureUri(result.frontendTarget(), "KAKAO_LOGIN_FAILED"),
+                    loginFailureUri(result.frontendTarget(), OAuthRedirectErrorCode.KAKAO_LOGIN_FAILED),
                     clearOauthNonceCookie()
             );
         };
@@ -171,9 +175,9 @@ public class KakaoAuthController {
                 .build();
     }
 
-    private URI loginFailureUri(FrontendTarget frontendTarget, String errorCode) {
+    private URI loginFailureUri(FrontendTarget frontendTarget, OAuthRedirectErrorCode errorCode) {
         return UriComponentsBuilder.fromUriString(properties.frontendLoginUrl(frontendTarget))
-                .queryParam("error", errorCode)
+                .queryParam("error", errorCode.name())
                 .build()
                 .encode()
                 .toUri();

@@ -7,6 +7,7 @@ import com.daon.rewrite.auth.controller.KakaoAuthController;
 import com.daon.rewrite.auth.controller.LogoutController;
 import com.daon.rewrite.auth.controller.TokenRefreshController;
 import com.daon.rewrite.auth.controller.UserController;
+import com.daon.rewrite.auth.dto.OAuthRedirectErrorCode;
 import com.daon.rewrite.coverletter.controller.CoverLetterController;
 import com.daon.rewrite.interview.controller.InterviewController;
 import com.daon.rewrite.interview.controller.InterviewMessageController;
@@ -107,12 +108,15 @@ class RewriteApiCoverageTest {
         assertThat(authorize.successStatus()).isEqualTo(302);
         assertThat(authorize.includeInternalError()).isFalse();
         assertThat(authorize.redirectErrors()).extracting(ApiRedirectError::code)
-                .containsExactly("KAKAO_LOGIN_FAILED");
+                .containsExactly(OAuthRedirectErrorCode.KAKAO_LOGIN_FAILED);
 
         assertThat(callback.successStatus()).isEqualTo(302);
         assertThat(callback.includeInternalError()).isFalse();
         assertThat(callback.redirectErrors()).extracting(ApiRedirectError::code)
-                .containsExactly("KAKAO_LOGIN_CANCELED", "KAKAO_LOGIN_FAILED");
+                .containsExactly(
+                        OAuthRedirectErrorCode.KAKAO_LOGIN_CANCELED,
+                        OAuthRedirectErrorCode.KAKAO_LOGIN_FAILED
+                );
     }
 
     private Map<String, RewriteApi> annotations() {

@@ -2,6 +2,7 @@ package com.daon.rewrite.coverletter.dto;
 
 import com.daon.rewrite.coverletter.entity.CoverLetter;
 import com.daon.rewrite.coverletter.entity.CoverLetterStatus;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.List;
 
@@ -14,6 +15,7 @@ public final class CoverLetterReviewStatusEventResponse {
     private CoverLetterReviewStatusEventResponse() {
     }
 
+    @Schema(name = "CoverLetterReviewStatusSnapshot", requiredProperties = "items")
     public record Snapshot(List<Item> items) {
         public Snapshot {
             items = List.copyOf(items);
@@ -24,9 +26,11 @@ public final class CoverLetterReviewStatusEventResponse {
         }
     }
 
+    @Schema(name = "CoverLetterReviewStatusItem", requiredProperties = {"coverLetterId", "displayStatus", "latestReviewedVersionId"})
     public record Item(
             String coverLetterId,
             CoverLetterStatus displayStatus,
+            @Schema(nullable = true)
             String latestReviewedVersionId
     ) {
         public static Item from(CoverLetter coverLetter) {
