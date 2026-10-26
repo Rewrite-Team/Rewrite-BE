@@ -1,5 +1,6 @@
 package com.daon.rewrite.reviewversion.client;
 
+import org.springframework.ai.chat.client.AdvisorParams;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Component;
 import tools.jackson.core.JacksonException;
@@ -7,7 +8,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * 전체 자기소개서와 대상 문항을 OpenAI에 전달하고 문항별 첨삭 결과로 변환한다.
- * 대상 ID·필수 문자열·최대 글자 수를 검증한 결과만 반환하며 저장이나 재시도는 Job 계층에 맡긴다.
+ * 구조화 출력으로 응답 형식을 지정하고 대상 ID·필수 문자열을 검증하며 저장이나 재시도는 Job 계층에 맡긴다.
  */
 @Component
 public class OpenAiReviewClient implements ReviewClient {
@@ -28,7 +29,7 @@ public class OpenAiReviewClient implements ReviewClient {
             - 지원 동기는 지원 이유와 경험의 연결을, 경험·역량 문항은 상황, 판단, 행동, 결과의 연결을 점검하세요.
               STAR는 경험의 논리를 점검하는 기준으로 사용하고 모든 문항에 같은 구성을 강제하지 마세요.
             - 명시적인 형식 변경 요청 없이 원문의 서술형 문단을 요약문, STAR 라벨, 실행 계획 목록으로 바꾸지 마세요.
-            - requestInstruction에 명시적인 재구성 요청이 있거나 문항 적합성·글자 수 제한을 위해 구조 조정이
+            - requestInstruction에 명시적인 재구성 요청이 있거나 문항 적합성·목표 분량을 위해 구조 조정이
               필요한 경우에만 필요한 범위에서 구성을 조정하고 그 이유를 aiReport에 설명하세요.
 
             [사실과 근거 보존]
@@ -42,11 +43,13 @@ public class OpenAiReviewClient implements ReviewClient {
               근거가 부족하면 확인된 사실까지만 작성하고 필요한 추가 정보는 aiReport에 안내하세요.
 
             [요구사항과 글자 수]
-            - requestInstruction이 제공되면 사실 보존과 최대 글자 수 제한 안에서 우선 반영하세요.
-            - 소제목, 공백, 줄바꿈을 포함한 rewrittenAnswer 전체가 대상 문항의 maxAnswerLength 이하여야 합니다.
-            - 글자 수를 맞추기 위해 축소가 필요하면 반복 표현과 문항 관련성이 낮은 내용부터 줄이고,
+            - requestInstruction이 제공되면 사실을 보존하면서 우선 반영하세요.
+            - maxAnswerLength는 문항별 기준 글자 수입니다. 소제목, 공백, 줄바꿈을 포함한 rewrittenAnswer 전체가
+              기준의 약 95~100% 분량에 가깝도록 작성하고, 가능하면 기준을 넘기지 않도록 조정하세요.
+            - 원문 근거가 부족하면 분량을 채우기 위해 사실을 추가하거나 같은 내용을 반복하지 마세요.
+            - 기준을 초과해 축소가 필요하면 반복 표현과 문항 관련성이 낮은 내용부터 줄이고,
               핵심 문제 상황, 선택 이유, 구체적인 행동과 확인된 결과는 우선 보존하세요.
-              제한을 만족하는 원문을 이유 없이 요약하거나 근거 없는 내용으로 늘리지 마세요.
+              문장이나 내용을 기계적으로 잘라내지 말고, 기준 이내의 원문을 이유 없이 요약하지 마세요.
 
             [출력 필드]
             - questionId: 입력에서 지정한 대상 문항 ID를 그대로 사용하세요.
@@ -79,6 +82,7 @@ public class OpenAiReviewClient implements ReviewClient {
             response = chatClient.prompt()
                     .system(SYSTEM_PROMPT)
                     .user(buildUserPrompt(request, targetQuestionId))
+                    .advisors(AdvisorParams.ENABLE_NATIVE_STRUCTURED_OUTPUT)
                     .call()
                     .entity(ReviewResult.class);
         } catch (JacksonException exception) {
@@ -100,23 +104,20 @@ public class OpenAiReviewClient implements ReviewClient {
     }
 
     /**
-     * 리포트와 수정본은 앞뒤 공백 제거 후 비어 있지 않아야 하고, 수정본 길이는 대상 문항 제한을 따른다.
-     * 글자 수는 Java UTF-16 길이 대신 Unicode code point 기준으로 비교한다.
+     * 대상 문항과 결과 ID가 일치하고 리포트·수정본은 앞뒤 공백 제거 후 비어 있지 않아야 한다.
+     * 문항별 글자 수는 생성 목표로 사용하며 초과했다는 이유만으로 생성 결과를 실패시키지 않는다.
      */
     private ReviewResult validateAndNormalize(
             ReviewRequest request,
             String targetQuestionId,
             ReviewResult response
     ) {
-        ReviewQuestion targetQuestion = request.questions().stream()
-                .filter(question -> question.questionId().equals(targetQuestionId))
-                .findFirst()
-                .orElseThrow(ReviewClientException::outputValidationFailed);
+        boolean targetExists = request.questions().stream()
+                .anyMatch(question -> question.questionId().equals(targetQuestionId));
         String aiReport = response == null ? null : normalizeRequired(response.aiReport());
         String rewrittenAnswer = response == null ? null : normalizeRequired(response.rewrittenAnswer());
-        if (response == null || !targetQuestionId.equals(response.questionId())
-                || aiReport == null || rewrittenAnswer == null
-                || countCodePoints(rewrittenAnswer) > targetQuestion.maxAnswerLength()) {
+        if (!targetExists || response == null || !targetQuestionId.equals(response.questionId())
+                || aiReport == null || rewrittenAnswer == null) {
             throw ReviewClientException.outputValidationFailed();
         }
 
@@ -129,9 +130,5 @@ public class OpenAiReviewClient implements ReviewClient {
         }
         String normalized = value.strip();
         return normalized.isEmpty() ? null : normalized;
-    }
-
-    private int countCodePoints(String value) {
-        return value.codePointCount(0, value.length());
     }
 }
