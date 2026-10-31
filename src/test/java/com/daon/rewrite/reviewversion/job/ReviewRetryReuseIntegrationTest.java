@@ -48,8 +48,7 @@ class ReviewRetryReuseIntegrationTest {
     @Autowired private ReviewVersionQuestionResultRepository resultRepository;
     @Autowired private CoverLetterRepository coverLetterRepository;
     @Autowired private CoverLetterQuestionRepository questionRepository;
-    @Autowired private FirstReviewJobExecutor firstReviewJobExecutor;
-    @Autowired private ReReviewJobExecutor reReviewJobExecutor;
+    @Autowired private ReviewJobExecutor reviewJobExecutor;
 
     @MockitoBean private ReviewJobEventListener eventListener;
     @MockitoBean private ReviewClient reviewClient;
@@ -78,7 +77,7 @@ class ReviewRetryReuseIntegrationTest {
 
         SubmitCoverLetterResult first = coverLetterService.submit(coverLetter.getId());
         List<String> firstCalls = stubClient(Set.of(questionIds.get(4)), "첫");
-        firstReviewJobExecutor.execute(first.job().getId());
+        reviewJobExecutor.execute(first.job().getId());
         // 실패 문항은 문항 단위 재시도로 두 번 호출되고 나머지는 한 번씩 호출된다.
         assertThat(firstCalls).hasSize(6);
         var failed = detailQueryService.findCurrent(coverLetter.getId());
@@ -96,7 +95,7 @@ class ReviewRetryReuseIntegrationTest {
                 .containsExactlyElementsOf(firstReports.subList(0, 4));
         assertThat(pending.questions().get(4).aiReport()).isNull();
         List<String> retryCalls = stubClient(Set.of(), "재시도");
-        firstReviewJobExecutor.execute(retry.job().getId());
+        reviewJobExecutor.execute(retry.job().getId());
 
         assertThat(retryCalls).containsExactly(questionIds.get(4));
         var completed = detailQueryService.findCurrent(coverLetter.getId());
@@ -125,11 +124,11 @@ class ReviewRetryReuseIntegrationTest {
 
         SubmitCoverLetterResult first = coverLetterService.submit(coverLetter.getId());
         stubClient(Set.of(questionIds.get(1), questionIds.get(2)), "첫");
-        firstReviewJobExecutor.execute(first.job().getId());
+        reviewJobExecutor.execute(first.job().getId());
 
         SubmitCoverLetterResult second = coverLetterService.submit(coverLetter.getId());
         List<String> secondCalls = stubClient(Set.of(questionIds.get(2)), "둘째");
-        firstReviewJobExecutor.execute(second.job().getId());
+        reviewJobExecutor.execute(second.job().getId());
         assertThat(secondCalls).containsExactlyInAnyOrder(
                 questionIds.get(1), questionIds.get(2), questionIds.get(2));
         var afterSecond = detailQueryService.findCurrent(coverLetter.getId());
@@ -144,7 +143,7 @@ class ReviewRetryReuseIntegrationTest {
 
         SubmitCoverLetterResult third = coverLetterService.submit(coverLetter.getId());
         List<String> thirdCalls = stubClient(Set.of(), "셋째");
-        firstReviewJobExecutor.execute(third.job().getId());
+        reviewJobExecutor.execute(third.job().getId());
         assertThat(thirdCalls).containsExactly(questionIds.get(2));
         var versionId = versionRepository.findByLlmJobId(third.job().getId()).orElseThrow().getId();
         assertThat(resultRepository.findByReviewVersionIdOrderByQuestionOrderAsc(versionId))
@@ -160,7 +159,7 @@ class ReviewRetryReuseIntegrationTest {
         List<String> questionIds = questionIds(coverLetter);
         SubmitCoverLetterResult first = coverLetterService.submit(coverLetter.getId());
         stubClient(Set.of(), "기준");
-        firstReviewJobExecutor.execute(first.job().getId());
+        reviewJobExecutor.execute(first.job().getId());
         String baseVersionId = versionRepository.findByLlmJobId(first.job().getId()).orElseThrow().getId();
         List<ReviewVersionQuestionResult> baseResults =
                 resultRepository.findByReviewVersionIdOrderByQuestionOrderAsc(baseVersionId);
@@ -168,7 +167,7 @@ class ReviewRetryReuseIntegrationTest {
 
         var reReview = versionCommandService.requestMyReReview(coverLetter.getId(), "첫 요구사항");
         stubClient(Set.of(questionIds.get(2)), "재첨삭");
-        reReviewJobExecutor.execute(reReview.job().getId());
+        reviewJobExecutor.execute(reReview.job().getId());
         var failed = detailQueryService.findCurrent(coverLetter.getId());
         assertThat(failed.reviewJob().getStatus()).isEqualTo(LlmJobStatus.FAILED);
         return new FailedReReview(
@@ -225,7 +224,7 @@ class ReviewRetryReuseIntegrationTest {
                 .containsExactly(questionIds.get(0), questionIds.get(1));
 
         List<String> retryCalls = stubClient(Set.of(), "재시도");
-        reReviewJobExecutor.execute(retry.job().getId());
+        reviewJobExecutor.execute(retry.job().getId());
         assertThat(retryCalls).containsExactly(questionIds.get(2));
 
         String retryVersionId = versionRepository.findByLlmJobId(retry.job().getId()).orElseThrow().getId();
@@ -252,7 +251,7 @@ class ReviewRetryReuseIntegrationTest {
         assertThat(detailQueryService.findCurrent(coverLetter.getId()).reviewJob().getProgressCurrent())
                 .isEqualTo(1);
         List<String> retryCalls = stubClient(Set.of(), "재시도");
-        reReviewJobExecutor.execute(retry.job().getId());
+        reviewJobExecutor.execute(retry.job().getId());
 
         assertThat(retryCalls).containsExactlyInAnyOrder(questionIds.get(1), questionIds.get(2));
         String retryVersionId = versionRepository.findByLlmJobId(retry.job().getId()).orElseThrow().getId();
@@ -273,7 +272,7 @@ class ReviewRetryReuseIntegrationTest {
         assertThat(retry.job().getRequestInstruction()).isEqualTo("새 요구사항");
         assertThat(detailQueryService.findCurrent(coverLetter.getId()).reviewJob().getProgressCurrent()).isZero();
         List<String> retryCalls = stubClient(Set.of(), "재시도");
-        reReviewJobExecutor.execute(retry.job().getId());
+        reviewJobExecutor.execute(retry.job().getId());
 
         assertThat(retryCalls).containsExactlyInAnyOrderElementsOf(questionIds(coverLetter));
         String retryVersionId = versionRepository.findByLlmJobId(retry.job().getId()).orElseThrow().getId();
@@ -290,7 +289,7 @@ class ReviewRetryReuseIntegrationTest {
 
         coverLetterService.deleteMyCoverLetter(coverLetter.getId());
         List<String> calls = stubClient(Set.of(), "취소 후");
-        reReviewJobExecutor.execute(retry.job().getId());
+        reviewJobExecutor.execute(retry.job().getId());
 
         assertThat(calls).isEmpty();
         assertThat(versionRepository.findByLlmJobId(retry.job().getId()).orElseThrow().getStatus())
@@ -304,11 +303,11 @@ class ReviewRetryReuseIntegrationTest {
         CoverLetter coverLetter = createCoverLetter(3);
         SubmitCoverLetterResult first = coverLetterService.submit(coverLetter.getId());
         stubClient(Set.of(), "기준");
-        firstReviewJobExecutor.execute(first.job().getId());
+        reviewJobExecutor.execute(first.job().getId());
 
         var reReview = versionCommandService.requestMyReReview(coverLetter.getId(), null);
         List<String> calls = stubClient(Set.of(), "재첨삭");
-        reReviewJobExecutor.execute(reReview.job().getId());
+        reviewJobExecutor.execute(reReview.job().getId());
 
         assertThat(calls).containsExactlyInAnyOrderElementsOf(questionIds(coverLetter));
         assertThat(reReview.job().getRequestInstruction()).isNull();
@@ -319,14 +318,14 @@ class ReviewRetryReuseIntegrationTest {
         CoverLetter coverLetter = createCoverLetter(1);
         SubmitCoverLetterResult first = coverLetterService.submit(coverLetter.getId());
         stubClient(Set.of(), "기준");
-        firstReviewJobExecutor.execute(first.job().getId());
+        reviewJobExecutor.execute(first.job().getId());
         String baseVersionId = versionRepository.findByLlmJobId(first.job().getId()).orElseThrow().getId();
         String resultId = resultRepository.findByReviewVersionIdOrderByQuestionOrderAsc(baseVersionId)
                 .getFirst().getId();
 
         var failedReReview = versionCommandService.requestMyReReview(coverLetter.getId(), "이전 요구사항");
         stubClient(Set.copyOf(questionIds(coverLetter)), "실패");
-        reReviewJobExecutor.execute(failedReReview.job().getId());
+        reviewJobExecutor.execute(failedReReview.job().getId());
 
         // 성공 문항이 없으면 재사용할 결과가 없으므로 수정한 최종 작성본과 새 요구사항으로 새로 시작한다.
         versionCommandService.saveMyFinalAnswers(coverLetter.getId(), baseVersionId,
