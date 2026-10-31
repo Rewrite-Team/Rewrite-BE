@@ -20,7 +20,7 @@ import com.daon.rewrite.llmjob.entity.LlmJobTargetType;
 import com.daon.rewrite.llmjob.entity.LlmJobType;
 import com.daon.rewrite.llmjob.repository.LlmJobRepository;
 import com.daon.rewrite.llmjob.service.LlmJobCreatedEvent;
-import com.daon.rewrite.llmjob.service.LlmJobService;
+import com.daon.rewrite.llmjob.service.RunningCoverLetterJobFinder;
 import com.daon.rewrite.reviewversion.repository.ReviewVersionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -60,7 +60,7 @@ public class InterviewService {
     private final InterviewQuestionRepository interviewQuestionRepository;
     private final InterviewThreadRepository interviewThreadRepository;
     private final LlmJobRepository llmJobRepository;
-    private final LlmJobService llmJobService;
+    private final RunningCoverLetterJobFinder runningJobFinder;
     private final IdGenerator idGenerator;
     private final Clock clock;
     private final ApplicationEventPublisher eventPublisher;
@@ -164,7 +164,7 @@ public class InterviewService {
         if (existingSession != null && existingSession.getStatus() == InterviewSessionStatus.ACTIVE) {
             return new StartInterviewResult(existingSession, null);
         }
-        LlmJob runningJob = llmJobService.findRunningCoverLetterJob(coverLetter.getId());
+        LlmJob runningJob = runningJobFinder.find(coverLetter.getId());
         if (existingSession != null
                 && existingSession.getStatus() == InterviewSessionStatus.QUESTION_GENERATING
                 && runningJob != null
@@ -216,7 +216,7 @@ public class InterviewService {
         validateReviewedCoverLetter(coverLetter);
         // 세션의 초기 기준을 바꾸지 않고 이번 추가 Job의 입력 참조에 새 기준 버전을 기록한다.
         String sourceReviewVersionId = findLatestReviewedVersionId(coverLetter);
-        LlmJob runningJob = llmJobService.findRunningCoverLetterJob(coverLetter.getId());
+        LlmJob runningJob = runningJobFinder.find(coverLetter.getId());
         if (runningJob != null && runningJob.getType() == LlmJobType.INTERVIEW_ADDITIONAL_QUESTION_GENERATION) {
             return new AddInterviewQuestionResult(interviewSession, runningJob);
         }

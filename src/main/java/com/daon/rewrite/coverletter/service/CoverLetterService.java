@@ -14,7 +14,7 @@ import com.daon.rewrite.llmjob.entity.LlmJob;
 import com.daon.rewrite.llmjob.entity.LlmJobType;
 import com.daon.rewrite.llmjob.repository.LlmJobRepository;
 import com.daon.rewrite.llmjob.service.LlmJobCreatedEvent;
-import com.daon.rewrite.llmjob.service.LlmJobService;
+import com.daon.rewrite.llmjob.service.RunningCoverLetterJobFinder;
 import com.daon.rewrite.reviewversion.entity.ReviewVersion;
 import com.daon.rewrite.reviewversion.repository.ReviewVersionRepository;
 import com.daon.rewrite.reviewversion.service.ReviewRetrySnapshotService;
@@ -53,7 +53,7 @@ public class CoverLetterService {
     private final LlmJobRepository llmJobRepository;
     private final ReviewVersionRepository reviewVersionRepository;
     private final ReviewRetrySnapshotService retrySnapshotService;
-    private final LlmJobService llmJobService;
+    private final RunningCoverLetterJobFinder runningJobFinder;
     private final IdGenerator idGenerator;
     private final Clock clock;
     private final ApplicationEventPublisher eventPublisher;
@@ -105,7 +105,7 @@ public class CoverLetterService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
 
         Instant now = Instant.now(clock);
-        LlmJob runningJob = llmJobService.findRunningCoverLetterJob(coverLetter.getId());
+        LlmJob runningJob = runningJobFinder.find(coverLetter.getId());
         if (runningJob != null) {
             runningJob.cancel(now);
         }
@@ -218,7 +218,7 @@ public class CoverLetterService {
                 .findActiveByIdAndOwnerIdForUpdate(coverLetterId, currentUser.id())
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
 
-        LlmJob runningJob = llmJobService.findRunningCoverLetterJob(coverLetter.getId());
+        LlmJob runningJob = runningJobFinder.find(coverLetter.getId());
 
         if (runningJob != null) {
             // 버튼 중복 클릭·네트워크 재전송에는 같은 최초 첨삭만 재사용하며, 다른 종류의 진행 Job은 충돌로 처리한다.

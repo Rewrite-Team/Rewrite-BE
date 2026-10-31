@@ -37,7 +37,7 @@ public class LlmJobStreamService {
     private static final String REVIEW_QUESTIONS_EVENT = SseEventName.REVIEW_QUESTIONS.value();
     private static final String INTERVIEW_FEEDBACK_DELTA_EVENT = SseEventName.INTERVIEW_FEEDBACK_DELTA.value();
 
-    private final LlmJobService llmJobService;
+    private final LlmJobAccessService llmJobAccessService;
     private final LlmJobRepository llmJobRepository;
     private final ReviewJobQuestionResultRepository questionResultRepository;
     private final SseHeartbeatScheduler heartbeatScheduler;
@@ -53,7 +53,7 @@ public class LlmJobStreamService {
      */
     public SseEmitter openMyJobStream(String jobId) {
         // 접근할 수 없는 Job은 연결을 등록하기 전에 거부한다.
-        llmJobService.findMyJob(jobId);
+        llmJobAccessService.findMyJob(jobId);
 
         String connectionId = UUID.randomUUID().toString();
         BufferedSseConnection stream = new BufferedSseConnection(
@@ -66,7 +66,7 @@ public class LlmJobStreamService {
             connections.computeIfAbsent(jobId, ignored -> new ConcurrentHashMap<>())
                     .put(connectionId, connection);
             // 첫 소유권 조회와 연결 등록 사이에 진행된 상태도 초기 스냅샷에 반영한다.
-            LlmJob job = llmJobService.findMyJob(jobId);
+            LlmJob job = llmJobAccessService.findMyJob(jobId);
             sendInitial(connection, job);
             if (job.getStatus().isTerminal()) {
                 stream.close();

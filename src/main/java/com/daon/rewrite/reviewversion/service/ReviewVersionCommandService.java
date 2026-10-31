@@ -13,7 +13,7 @@ import com.daon.rewrite.llmjob.entity.LlmJobStatus;
 import com.daon.rewrite.llmjob.entity.LlmJobType;
 import com.daon.rewrite.llmjob.repository.LlmJobRepository;
 import com.daon.rewrite.llmjob.service.LlmJobCreatedEvent;
-import com.daon.rewrite.llmjob.service.LlmJobService;
+import com.daon.rewrite.llmjob.service.RunningCoverLetterJobFinder;
 import com.daon.rewrite.reviewversion.entity.ReviewVersion;
 import com.daon.rewrite.reviewversion.entity.ReviewVersionQuestionResult;
 import com.daon.rewrite.reviewversion.repository.ReviewVersionQuestionResultRepository;
@@ -51,7 +51,7 @@ public class ReviewVersionCommandService {
     private final ReviewVersionRepository reviewVersionRepository;
     private final ReviewVersionQuestionResultRepository questionResultRepository;
     private final LlmJobRepository llmJobRepository;
-    private final LlmJobService llmJobService;
+    private final RunningCoverLetterJobFinder runningJobFinder;
     private final ReviewRetrySnapshotService retrySnapshotService;
     private final IdGenerator idGenerator;
     private final Clock clock;
@@ -107,7 +107,7 @@ public class ReviewVersionCommandService {
             throw new BusinessException(ErrorCode.CONFLICT);
         }
 
-        LlmJob runningJob = llmJobService.findRunningCoverLetterJob(coverLetter.getId());
+        LlmJob runningJob = runningJobFinder.find(coverLetter.getId());
         // 새 요구사항 검증보다 먼저 기존 작업을 반환해 중복 요청으로 실행 중인 입력이 바뀌지 않게 한다.
         if (runningJob != null && runningJob.getType() == LlmJobType.COVER_LETTER_RE_REVIEW) {
             return new RequestReReviewResult(coverLetter, runningJob);

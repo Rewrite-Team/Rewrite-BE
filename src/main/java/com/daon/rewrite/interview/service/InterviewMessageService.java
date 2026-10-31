@@ -19,7 +19,7 @@ import com.daon.rewrite.llmjob.entity.LlmJobRequestRefType;
 import com.daon.rewrite.llmjob.entity.LlmJobType;
 import com.daon.rewrite.llmjob.repository.LlmJobRepository;
 import com.daon.rewrite.llmjob.service.LlmJobCreatedEvent;
-import com.daon.rewrite.llmjob.service.LlmJobService;
+import com.daon.rewrite.llmjob.service.RunningCoverLetterJobFinder;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -47,7 +47,7 @@ public class InterviewMessageService {
     private final InterviewThreadRepository interviewThreadRepository;
     private final InterviewMessageRepository interviewMessageRepository;
     private final LlmJobRepository llmJobRepository;
-    private final LlmJobService llmJobService;
+    private final RunningCoverLetterJobFinder runningJobFinder;
     private final IdGenerator idGenerator;
     private final Clock clock;
     private final ApplicationEventPublisher eventPublisher;
@@ -100,7 +100,7 @@ public class InterviewMessageService {
         CoverLetter coverLetter = coverLetterRepository
                 .findActiveByIdAndOwnerIdForUpdate(coverLetterId, currentUser.id())
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
-        if (llmJobService.findRunningCoverLetterJob(coverLetter.getId()) != null) {
+        if (runningJobFinder.find(coverLetter.getId()) != null) {
             throw new BusinessException(ErrorCode.LLM_JOB_ALREADY_RUNNING);
         }
 

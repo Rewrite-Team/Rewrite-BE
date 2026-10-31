@@ -18,7 +18,7 @@ import com.daon.rewrite.llmjob.entity.LlmJobTargetType;
 import com.daon.rewrite.llmjob.entity.LlmJobType;
 import com.daon.rewrite.llmjob.repository.LlmJobRepository;
 import com.daon.rewrite.llmjob.service.LlmJobCreatedEvent;
-import com.daon.rewrite.llmjob.service.LlmJobService;
+import com.daon.rewrite.llmjob.service.RunningCoverLetterJobFinder;
 import com.daon.rewrite.reviewversion.repository.ReviewVersionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -47,7 +47,7 @@ public class KeywordAnalysisService {
     private final KeywordAnalysisKeywordRepository keywordAnalysisKeywordRepository;
     private final ReviewVersionRepository reviewVersionRepository;
     private final LlmJobRepository llmJobRepository;
-    private final LlmJobService llmJobService;
+    private final RunningCoverLetterJobFinder runningJobFinder;
     private final IdGenerator idGenerator;
     private final Clock clock;
     private final ApplicationEventPublisher eventPublisher;
@@ -68,7 +68,7 @@ public class KeywordAnalysisService {
         if (coverLetter.getLatestReviewedVersionId() == null) {
             throw new BusinessException(ErrorCode.CONFLICT);
         }
-        LlmJob runningJob = llmJobService.findRunningCoverLetterJob(coverLetter.getId());
+        LlmJob runningJob = runningJobFinder.find(coverLetter.getId());
         if (runningJob != null && runningJob.getType() == LlmJobType.KEYWORD_ANALYSIS) {
             KeywordAnalysis keywordAnalysis = keywordAnalysisRepository.findByCoverLetterId(coverLetter.getId())
                     .orElseThrow(() -> new BusinessException(ErrorCode.INTERNAL_ERROR));
