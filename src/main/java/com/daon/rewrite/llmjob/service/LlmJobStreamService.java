@@ -27,7 +27,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * 모든 LLM Job의 상태와 도메인별 중간 결과를 SSE 연결에 전달한다.
- * 상태·첨삭 완료 문항은 DB를 다시 조회하고, 면접 피드백 조각은 Worker가 검증 후 전달한 내용을 사용한다.
+ * 상태·첨삭 완료 문항은 DB를 다시 조회하고, 면접 피드백 조각은 Executor가 검증 후 전달한 내용을 사용한다.
  * 재연결은 현재 상태·완료 문항 스냅샷과 이 인스턴스에 남은 피드백 조각으로 복구한다.
  * Last-Event-ID 기반의 영속 이벤트 replay는 제공하지 않는다.
  */
@@ -81,10 +81,10 @@ public class LlmJobStreamService {
     }
 
     /**
-     * Worker가 전체 응답을 파싱·검증한 뒤 호출하며, 완성된 content를 화면 표시용 조각으로 전송한다.
+     * Executor가 전체 응답을 파싱·검증한 뒤 호출하며, 완성된 content를 화면 표시용 조각으로 전송한다.
      * 첫 delta는 전체 모델 응답을 검증한 이후에 전송된다.
      * 모든 조각을 먼저 보관해 동시 재연결도 1번부터 읽게 하고, 연결별 sequence로 중복 전송을 막는다.
-     * 메시지 저장과 Job 완료는 이 메서드가 반환된 뒤 Worker의 확정 단계에서 수행한다.
+     * 메시지 저장과 Job 완료는 이 메서드가 반환된 뒤 Executor의 확정 단계에서 수행한다.
      */
     public void publishValidatedFeedback(String jobId, String content) {
         List<InterviewFeedbackDeltaResponse> deltas = splitFeedback(content);

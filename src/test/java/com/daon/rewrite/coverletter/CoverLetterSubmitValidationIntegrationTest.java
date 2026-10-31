@@ -14,8 +14,8 @@ import com.daon.rewrite.llmjob.entity.LlmJobStatus;
 import com.daon.rewrite.llmjob.entity.LlmJobTargetType;
 import com.daon.rewrite.llmjob.entity.LlmJobType;
 import com.daon.rewrite.llmjob.repository.LlmJobRepository;
-import com.daon.rewrite.reviewversion.job.FirstReviewJobWorker;
-import com.daon.rewrite.reviewversion.job.ReReviewJobWorker;
+import com.daon.rewrite.reviewversion.job.FirstReviewJobExecutor;
+import com.daon.rewrite.reviewversion.job.ReReviewJobExecutor;
 import com.daon.rewrite.reviewversion.repository.ReviewVersionRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,8 +43,8 @@ class CoverLetterSubmitValidationIntegrationTest {
     @Autowired private ReviewVersionRepository versionRepository;
 
     // 제출 성공 후에도 Job을 PENDING에 유지해 요청 트랜잭션의 검증·생성 결과만 확인한다.
-    @MockitoBean private FirstReviewJobWorker firstReviewJobWorker;
-    @MockitoBean private ReReviewJobWorker reReviewJobWorker;
+    @MockitoBean private FirstReviewJobExecutor firstReviewJobExecutor;
+    @MockitoBean private ReReviewJobExecutor reReviewJobExecutor;
 
     @Test
     void unfinishedStepsCanBeSavedButSubmitReportsEveryRequiredFieldInOrder() {

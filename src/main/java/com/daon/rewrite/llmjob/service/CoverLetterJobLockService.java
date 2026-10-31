@@ -11,7 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 /**
- * worker의 상태 변경에 필요한 CoverLetter와 LlmJob을 항상 같은 순서로 잠근다.
+ * executor의 상태 변경에 필요한 CoverLetter와 LlmJob을 항상 같은 순서로 잠근다.
  * Job 생성·자기소개서 변경 경로와 CoverLetter → LlmJob 순서를 맞춰 반대 순서의 잠금 경합을 피한다.
  * 자체 트랜잭션은 시작하지 않으며, 호출자의 쓰기 트랜잭션 동안 두 행의 잠금을 유지한다.
  */

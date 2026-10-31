@@ -31,7 +31,7 @@ import java.util.stream.Collectors;
  */
 @Service
 @RequiredArgsConstructor
-class FirstReviewJobTransactionService {
+class FirstReviewJobLifecycleService {
 
     private static final String STARTED_MESSAGE = "첨삭을 시작합니다.";
     private static final String FAILED_MESSAGE = "LLM 첨삭에 실패했습니다.";
@@ -51,7 +51,7 @@ class FirstReviewJobTransactionService {
      * 재사용 문항은 호출 대상에서 제외하며, 이미 시작했거나 종료된 Job이면 null을 반환한다.
      */
     @Transactional
-    public ReviewWork start(String jobId) {
+    public ReviewJobInput start(String jobId) {
         CoverLetterJobLockService.LockedCoverLetterJob locked = coverLetterJobLockService.lock(jobId);
         LlmJob job = validateFirstReviewJob(locked.job());
         if (job.getStatus() != LlmJobStatus.PENDING) {
@@ -71,7 +71,7 @@ class FirstReviewJobTransactionService {
         }
 
         job.startProcessing(STARTED_MESSAGE);
-        return new ReviewWork(
+        return new ReviewJobInput(
                 new ReviewRequest(
                         coverLetter.getTitle(),
                         coverLetter.getCompanyName(),
@@ -98,32 +98,16 @@ class FirstReviewJobTransactionService {
     /** 완료 문항 수를 유지한 채 Job·자기소개서를 함께 실패로 전환한다. 이미 종료된 Job은 변경하지 않는다. */
     @Transactional
     public void fail(String jobId, ReviewClientException.Reason reason) {
-        CoverLetterJobLockService.LockedCoverLetterJob locked = coverLetterJobLockService.lock(jobId);
-        LlmJob job = validateFirstReviewJob(locked.job());
-        if (job.getStatus().isTerminal()) {
-            return;
-        }
-
-        CoverLetter coverLetter = locked.coverLetter();
-
-        Instant now = Instant.now(clock);
-        job.markFailed(
-                job.getProgressCurrent(),
-                FAILED_MESSAGE,
-                errorCode(reason),
-                errorMessage(reason),
-                now
-        );
-        coverLetter.failReview(now);
+        markFailed(jobId, errorCode(reason), errorMessage(reason));
     }
 
     /** 분류된 LLM 실패 외의 오류를 내부 오류로 기록하며, 이미 확정된 종료 상태는 유지한다. */
     @Transactional
     public void failUnexpected(String jobId) {
-        fail(jobId, UNEXPECTED_ERROR_CODE, UNEXPECTED_ERROR_MESSAGE);
+        markFailed(jobId, UNEXPECTED_ERROR_CODE, UNEXPECTED_ERROR_MESSAGE);
     }
 
-    private void fail(String jobId, String errorCode, String errorMessage) {
+    private void markFailed(String jobId, String errorCode, String errorMessage) {
         CoverLetterJobLockService.LockedCoverLetterJob locked = coverLetterJobLockService.lock(jobId);
         LlmJob job = validateFirstReviewJob(locked.job());
         if (job.getStatus().isTerminal()) {

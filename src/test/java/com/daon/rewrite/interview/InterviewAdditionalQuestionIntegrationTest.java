@@ -4,7 +4,7 @@ import com.daon.rewrite.auth.CurrentUserProvider;
 import com.daon.rewrite.coverletter.entity.CoverLetter;
 import com.daon.rewrite.coverletter.repository.CoverLetterRepository;
 import com.daon.rewrite.interview.entity.InterviewSession;
-import com.daon.rewrite.interview.job.InterviewQuestionGenerationJobWorker;
+import com.daon.rewrite.interview.job.InterviewQuestionGenerationJobExecutor;
 import com.daon.rewrite.interview.repository.InterviewSessionRepository;
 import com.daon.rewrite.llmjob.entity.LlmJob;
 import com.daon.rewrite.llmjob.entity.LlmJobRequestRefType;
@@ -55,7 +55,7 @@ class InterviewAdditionalQuestionIntegrationTest {
     @Autowired private ApplicationEvents applicationEvents;
 
     // 실제 질문 생성을 억제해 HTTP 요청이 만든 Job과 이벤트만 확인한다.
-    @MockitoBean private InterviewQuestionGenerationJobWorker worker;
+    @MockitoBean private InterviewQuestionGenerationJobExecutor executor;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 

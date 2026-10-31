@@ -815,7 +815,7 @@ API-019는 path의 `versionId`를 유지해 사용자가 열어 둔 버전이 �
 ### 결정
 
 - API-014 최초 첨삭 재시도와 API-024 재첨삭 재시도는 새 Job·`ReviewVersion`을 만드는 Decision 102를 유지한다.
-- 두 API는 Job 생성 transaction에서 같은 규칙으로 문항별 입력 스냅샷과 재사용 결과를 저장한다. Worker는 이를 읽어 `PROCESSING` 문항만 호출한다.
+- 두 API는 Job 생성 transaction에서 같은 규칙으로 문항별 입력 스냅샷과 재사용 결과를 저장한다. Executor는 이를 읽어 `PROCESSING` 문항만 호출한다.
 - 직전 시도의 Job이 같은 종류의 `FAILED`이면 그 시도의 `COMPLETED` 문항 중 질문·순서·글자 수 제한·입력 답변이 현재와 같은 문항을 재사용한다. 재첨삭은 같은 기준 성공 버전의 시도만 대상이다.
 - 재사용 문항은 AI 리포트·수정본·최종 작성본을 `COMPLETED` 임시 결과로 복사하고 `progress.current`에 먼저 반영한다. 나머지 문항은 `PROCESSING`으로 두고 새로 생성하며, 성공할 때마다 진행률을 이어서 증가시킨다.
 - 재첨삭 `requestInstruction`이 비어 있으면 직전 값을 이어받아 재사용한다. 값이 있고 직전과 다르면 재사용하지 않고 전체 문항을 새로 생성한다.

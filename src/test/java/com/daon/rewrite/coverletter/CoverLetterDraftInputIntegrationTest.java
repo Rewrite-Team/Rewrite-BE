@@ -9,8 +9,8 @@ import com.daon.rewrite.coverletter.service.SaveQuestionInput;
 import com.daon.rewrite.global.exception.BusinessException;
 import com.daon.rewrite.global.exception.ErrorCode;
 import com.daon.rewrite.global.response.ErrorResponse.ErrorDetail;
-import com.daon.rewrite.reviewversion.job.FirstReviewJobWorker;
-import com.daon.rewrite.reviewversion.job.ReReviewJobWorker;
+import com.daon.rewrite.reviewversion.job.FirstReviewJobExecutor;
+import com.daon.rewrite.reviewversion.job.ReReviewJobExecutor;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
@@ -35,9 +35,9 @@ class CoverLetterDraftInputIntegrationTest {
     @Autowired private CoverLetterRepository coverLetterRepository;
     @Autowired private CoverLetterQuestionRepository questionRepository;
 
-    // 입력 저장 검증에 외부 첨삭 실행이 섞이지 않도록 비동기 Worker를 대체한다.
-    @MockitoBean private FirstReviewJobWorker firstReviewJobWorker;
-    @MockitoBean private ReReviewJobWorker reReviewJobWorker;
+    // 입력 저장 검증에 외부 첨삭 실행이 섞이지 않도록 비동기 Executor를 대체한다.
+    @MockitoBean private FirstReviewJobExecutor firstReviewJobExecutor;
+    @MockitoBean private ReReviewJobExecutor reReviewJobExecutor;
 
     @Test
     void partialDraftStripsWhitespaceAndReplacesMissingValuesWithNull() {

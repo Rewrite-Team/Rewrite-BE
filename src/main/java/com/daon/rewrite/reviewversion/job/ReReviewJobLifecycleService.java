@@ -32,7 +32,7 @@ import java.util.stream.Collectors;
  */
 @Service
 @RequiredArgsConstructor
-class ReReviewJobTransactionService {
+class ReReviewJobLifecycleService {
 
     private static final String STARTED_MESSAGE = "재첨삭을 시작합니다.";
     private static final String FAILED_MESSAGE = "LLM 재첨삭에 실패했습니다.";
@@ -49,10 +49,10 @@ class ReReviewJobTransactionService {
 
     /**
      * 요청 시 고정한 문항 입력·요구사항과 현재 자기소개서의 공통 문맥을 읽고 PROCESSING으로 전환한다.
-     * Worker 실행 시 최신 버전을 다시 선택하지 않으며, 이미 시작했거나 종료된 Job이면 null을 반환한다.
+     * Executor 실행 시 최신 버전을 다시 선택하지 않으며, 이미 시작했거나 종료된 Job이면 null을 반환한다.
      */
     @Transactional
-    public ReviewWork start(String jobId) {
+    public ReviewJobInput start(String jobId) {
         CoverLetterJobLockService.LockedCoverLetterJob locked = coverLetterJobLockService.lock(jobId);
         LlmJob job = validateReReviewJob(locked.job());
         if (job.getStatus() != LlmJobStatus.PENDING) {
@@ -77,7 +77,7 @@ class ReReviewJobTransactionService {
         }
 
         job.startProcessing(STARTED_MESSAGE);
-        return new ReviewWork(new ReviewRequest(
+        return new ReviewJobInput(new ReviewRequest(
                 coverLetter.getTitle(),
                 coverLetter.getCompanyName(),
                 coverLetter.getPositionTitle(),
@@ -103,28 +103,16 @@ class ReReviewJobTransactionService {
     /** 이번 Job·표시 상태만 실패로 전환한다. latestReviewedVersionId와 성공 문항 결과는 유지한다. */
     @Transactional
     public void fail(String jobId, ReviewClientException.Reason reason) {
-        CoverLetterJobLockService.LockedCoverLetterJob locked = coverLetterJobLockService.lock(jobId);
-        LlmJob job = validateReReviewJob(locked.job());
-        if (job.getStatus().isTerminal()) {
-            return;
-        }
-
-        CoverLetter coverLetter = locked.coverLetter();
-
-        Instant now = Instant.now(clock);
-        job.markFailed(
-                job.getProgressCurrent(),
-                FAILED_MESSAGE,
-                errorCode(reason),
-                errorMessage(reason),
-                now
-        );
-        coverLetter.failReview(now);
+        markFailed(jobId, errorCode(reason), errorMessage(reason));
     }
 
     /** 예상 밖 오류는 내부 오류로 기록하며, 취소·완료·실패 등 이미 종료된 Job은 변경하지 않는다. */
     @Transactional
     public void failUnexpected(String jobId) {
+        markFailed(jobId, UNEXPECTED_ERROR_CODE, UNEXPECTED_ERROR_MESSAGE);
+    }
+
+    private void markFailed(String jobId, String errorCode, String errorMessage) {
         CoverLetterJobLockService.LockedCoverLetterJob locked = coverLetterJobLockService.lock(jobId);
         LlmJob job = validateReReviewJob(locked.job());
         if (job.getStatus().isTerminal()) {
@@ -132,13 +120,7 @@ class ReReviewJobTransactionService {
         }
         CoverLetter coverLetter = locked.coverLetter();
         Instant now = Instant.now(clock);
-        job.markFailed(
-                job.getProgressCurrent(),
-                FAILED_MESSAGE,
-                UNEXPECTED_ERROR_CODE,
-                UNEXPECTED_ERROR_MESSAGE,
-                now
-        );
+        job.markFailed(job.getProgressCurrent(), FAILED_MESSAGE, errorCode, errorMessage, now);
         coverLetter.failReview(now);
     }
 

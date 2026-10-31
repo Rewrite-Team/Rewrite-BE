@@ -17,21 +17,21 @@ import java.util.List;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class InterviewQuestionGenerationJobWorker {
+public class InterviewQuestionGenerationJobExecutor {
 
-    private final InterviewQuestionGenerationJobTransactionService transactionService;
+    private final InterviewQuestionGenerationJobLifecycleService lifecycleService;
     private final InterviewQuestionGenerationClient client;
 
     public void execute(String jobId) {
         try {
-            InterviewQuestionGenerationWork work = transactionService.start(jobId);
+            InterviewQuestionGenerationJobInput input = lifecycleService.start(jobId);
             // 이미 시작했거나 취소·종료된 Job은 중복 실행하지 않는다.
-            if (work == null) {
+            if (input == null) {
                 return;
             }
             // 요청 개수·빈 질문·기존 질문과의 중복 검증을 마친 결과만 저장 단계로 넘긴다.
-            List<InterviewQuestionGenerationResult> results = client.generate(work.request());
-            transactionService.complete(jobId, results);
+            List<InterviewQuestionGenerationResult> results = client.generate(input.request());
+            lifecycleService.complete(jobId, results);
         } catch (InterviewQuestionGenerationClientException exception) {
             failByClientException(jobId, exception);
         } catch (RuntimeException exception) {
@@ -41,7 +41,7 @@ public class InterviewQuestionGenerationJobWorker {
 
     private void failByClientException(String jobId, InterviewQuestionGenerationClientException exception) {
         try {
-            transactionService.fail(jobId, exception.getReason());
+            lifecycleService.fail(jobId, exception.getReason());
         } catch (RuntimeException failureException) {
             log.error("Failed to mark interview question generation job as failed. jobId={}", jobId, failureException);
         }
@@ -50,7 +50,7 @@ public class InterviewQuestionGenerationJobWorker {
     // 실패 상태 저장 자체의 오류와 최초 처리 오류를 각각 남겨 비동기 실행 원인을 보존한다.
     private void failByUnexpectedException(String jobId, RuntimeException exception) {
         try {
-            transactionService.failUnexpected(jobId);
+            lifecycleService.failUnexpected(jobId);
         } catch (RuntimeException failureException) {
             log.error("Failed to mark unexpected interview question generation failure. jobId={}", jobId, failureException);
         }

@@ -11,7 +11,7 @@ import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
- * 질문 생성 Job의 요청 트랜잭션이 커밋된 뒤 초기·추가 질문 생성 Worker를 별도 스레드에서 시작한다.
+ * 질문 생성 Job의 요청 트랜잭션이 커밋된 뒤 초기·추가 질문 생성 Executor를 별도 스레드에서 시작한다.
  * 공통 Job 이벤트 중 질문 생성 두 종류만 처리하며, 답변 피드백은 전용 리스너가 담당한다.
  */
 @Component
@@ -19,7 +19,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 class InterviewQuestionGenerationJobEventListener {
 
     private final LlmJobRepository llmJobRepository;
-    private final InterviewQuestionGenerationJobWorker worker;
+    private final InterviewQuestionGenerationJobExecutor executor;
 
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
@@ -29,7 +29,7 @@ class InterviewQuestionGenerationJobEventListener {
 
     private void dispatch(LlmJob job) {
         if (job.getType().isInterviewQuestionGeneration()) {
-            worker.execute(job.getId());
+            executor.execute(job.getId());
         }
     }
 }

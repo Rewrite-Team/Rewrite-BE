@@ -60,7 +60,7 @@ class InterviewMessageQueryIntegrationTest {
     @Autowired private InterviewThreadRepository threadRepository;
     @Autowired private InterviewMessageRepository messageRepository;
     @Autowired private LlmJobRepository jobRepository;
-    @Autowired private InterviewMessageFeedbackJobTransactionService feedbackTransactionService;
+    @Autowired private InterviewMessageFeedbackJobLifecycleService feedbackLifecycleService;
     @Autowired private EntityManager entityManager;
 
     // 자동 Job 실행·외부 호출을 배제하고 조회 및 실제 입력 준비 서비스까지만 검증한다.
@@ -161,14 +161,14 @@ class InterviewMessageQueryIntegrationTest {
         assertThat(stored.getFollowUpQuestion()).isEqualTo("어떤 지표로 결과를 확인했나요?");
 
         // LLM 호출 전 입력 준비만 직접 실행해 이전 assistant의 전체 content가 문맥에 포함되는지 확인한다.
-        InterviewMessageFeedbackWork work = feedbackTransactionService.start(job.getId());
+        InterviewMessageFeedbackJobInput input = feedbackLifecycleService.start(job.getId());
 
-        assertThat(work).isNotNull();
-        assertThat(work.request().originalQuestion()).isEqualTo(QUESTION);
-        assertThat(work.request().messages()).extracting(InterviewMessageFeedbackMessage::role)
+        assertThat(input).isNotNull();
+        assertThat(input.request().originalQuestion()).isEqualTo(QUESTION);
+        assertThat(input.request().messages()).extracting(InterviewMessageFeedbackMessage::role)
                 .containsExactly(InterviewMessageRole.USER, InterviewMessageRole.ASSISTANT,
                         InterviewMessageRole.USER);
-        assertThat(work.request().messages()).extracting(InterviewMessageFeedbackMessage::content)
+        assertThat(input.request().messages()).extracting(InterviewMessageFeedbackMessage::content)
                 .containsExactly("첫 답변", FEEDBACK_CONTENT, "응답 시간을 측정했습니다.");
         verifyNoInteractions(feedbackClient, questionClient, feedbackEventListener, questionEventListener);
     }

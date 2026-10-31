@@ -36,7 +36,7 @@ import java.util.List;
  */
 @Service
 @RequiredArgsConstructor
-class InterviewMessageFeedbackJobTransactionService {
+class InterviewMessageFeedbackJobLifecycleService {
 
     private static final String INTERVIEW_MESSAGE_ID_PREFIX = "im";
     private static final String STARTED_MESSAGE = "면접 답변 피드백 생성을 시작합니다.";
@@ -60,7 +60,7 @@ class InterviewMessageFeedbackJobTransactionService {
      * 소속 자기소개서·ACTIVE 세션/thread를 확인한 뒤 PROCESSING으로 전환하며, PENDING이 아니면 null을 반환한다.
      */
     @Transactional
-    public InterviewMessageFeedbackWork start(String jobId) {
+    public InterviewMessageFeedbackJobInput start(String jobId) {
         CoverLetterJobLockService.LockedCoverLetterJob locked = coverLetterJobLockService.lock(jobId);
         LlmJob job = validateInterviewMessageFeedbackJob(locked.job());
         if (job.getStatus() != LlmJobStatus.PENDING) {
@@ -82,7 +82,7 @@ class InterviewMessageFeedbackJobTransactionService {
         }
 
         job.startProcessing(STARTED_MESSAGE);
-        return new InterviewMessageFeedbackWork(new InterviewMessageFeedbackRequest(
+        return new InterviewMessageFeedbackJobInput(new InterviewMessageFeedbackRequest(
                 userMessage.getThread().getInterviewQuestion().getQuestion(),
                 messages.stream()
                         .map(message -> new InterviewMessageFeedbackMessage(message.getRole(), message.getContent()))

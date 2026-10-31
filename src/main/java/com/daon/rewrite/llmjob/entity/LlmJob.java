@@ -14,7 +14,7 @@ import java.time.Instant;
 
 /**
  * 첨삭·키워드·면접 비동기 작업의 상태, 진행률, 재시도 정보와 입력·결과 참조를 기록한다.
- * 실제 LLM 호출과 결과 저장은 도메인별 worker·트랜잭션 서비스가 담당한다.
+ * 실제 LLM 호출과 결과 저장은 도메인별 executor·생명주기 서비스가 담당한다.
  * 완료·실패 전환의 선행 상태와 관련 도메인 검증도 호출자가 수행하며, 이 엔티티의 변경은 호출자 트랜잭션에 반영된다.
  */
 @Getter
@@ -32,7 +32,7 @@ public class LlmJob {
     @Column(name = "id", nullable = false, length = 64)
     private String id;
 
-    // 실행할 도메인 작업을 구분한다. 이벤트 리스너는 이 값에 맞는 worker를 선택한다.
+    // 실행할 도메인 작업을 구분한다. 이벤트 리스너는 이 값에 맞는 executor를 선택한다.
     @Enumerated(EnumType.STRING)
     @Column(name = "type", nullable = false, length = 40)
     private LlmJobType type;
@@ -242,8 +242,8 @@ public class LlmJob {
     }
 
     /**
-     * 대기 중인 Job을 PROCESSING으로 전환해 worker의 중복 시작을 거부한다.
-     * 입력 준비와 관련 도메인 상태 확인을 마친 트랜잭션 서비스가 호출한다.
+     * 대기 중인 Job을 PROCESSING으로 전환해 executor의 중복 시작을 거부한다.
+     * 입력 준비와 관련 도메인 상태 확인을 마친 생명주기 서비스가 호출한다.
      */
     public void startProcessing(String progressMessage) {
         if (this.status != LlmJobStatus.PENDING) {

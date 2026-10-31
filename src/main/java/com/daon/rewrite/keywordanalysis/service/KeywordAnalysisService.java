@@ -32,7 +32,7 @@ import java.util.List;
 /**
  * 최신 성공 첨삭 버전을 기준으로 키워드 분석을 시작하고 현재 분석 상태·결과를 조회한다.
  * 자기소개서별 분석 리소스는 하나를 재사용하며, 각 실행은 새 LlmJob으로 추적한다.
- * 외부 LLM 호출과 완료 결과 교체는 커밋 후 실행되는 키워드 worker·트랜잭션 서비스가 담당한다.
+ * 외부 LLM 호출과 완료 결과 교체는 커밋 후 실행되는 키워드 executor·생명주기 서비스가 담당한다.
  */
 @Service
 @RequiredArgsConstructor
@@ -78,7 +78,7 @@ public class KeywordAnalysisService {
             throw new BusinessException(ErrorCode.LLM_JOB_ALREADY_RUNNING);
         }
 
-        // 기준 버전 ID는 여기서 선택하고, 해당 버전의 finalAnswer 본문은 worker 시작 시 읽는다.
+        // 기준 버전 ID는 여기서 선택하고, 해당 버전의 finalAnswer 본문은 executor 시작 시 읽는다.
         String selectedSourceReviewVersionId = coverLetter.getLatestReviewedVersionId();
         Instant now = Instant.now(clock);
         KeywordAnalysis keywordAnalysis = keywordAnalysisRepository.findByCoverLetterId(coverLetter.getId())
@@ -98,7 +98,7 @@ public class KeywordAnalysisService {
                 coverLetter.getId(),
                 now
         ));
-        // 생성 트랜잭션이 커밋된 뒤 KeywordAnalysisJobEventListener가 worker를 실행한다.
+        // 생성 트랜잭션이 커밋된 뒤 KeywordAnalysisJobEventListener가 executor를 실행한다.
         eventPublisher.publishEvent(new LlmJobCreatedEvent(job.getId()));
 
         return new StartKeywordAnalysisResult(keywordAnalysis, job);

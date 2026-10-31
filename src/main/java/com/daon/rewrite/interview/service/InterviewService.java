@@ -38,7 +38,7 @@ import java.util.stream.Collectors;
 
 /**
  * 자기소개서별 면접 세션의 시작·재사용, 질문 목록 조회와 추가 질문 생성 요청을 처리한다.
- * 질문과 대화방의 실제 생성은 커밋 후 worker에 위임하고, 기존 세션·질문·대화는 재첨삭 후에도 유지한다.
+ * 질문과 대화방의 실제 생성은 커밋 후 executor에 위임하고, 기존 세션·질문·대화는 재첨삭 후에도 유지한다.
  * 새 질문 작업은 CoverLetter 잠금 안에서 기준 버전과 진행 Job을 확인해 같은 자기소개서의 작업과 직렬화한다.
  */
 @Service
@@ -144,7 +144,7 @@ public class InterviewService {
      * 최신 성공 첨삭 버전이 있는 자기소개서에서 초기 질문 5개를 생성할 작업을 시작한다.
      * ACTIVE 세션이면 기존 세션과 null Job을, 같은 초기 생성이 진행 중이면 기존 세션과 Job을 반환한다.
      * 세션이 없으면 생성하고 FAILED이면 같은 세션을 재사용해 QUESTION_GENERATING으로 전환한다.
-     * 새 세션 상태와 Job은 함께 저장하며, 커밋 후 이벤트 리스너가 worker를 실행한다.
+     * 새 세션 상태와 Job은 함께 저장하며, 커밋 후 이벤트 리스너가 executor를 실행한다.
      */
     @Transactional
     public StartInterviewResult startMyInterview(String coverLetterId) {
@@ -154,7 +154,7 @@ public class InterviewService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
 
         validateReviewedCoverLetter(coverLetter);
-        // 기준 버전 ID는 요청 시 선택하며, 해당 버전의 finalAnswer 본문은 worker 시작 시 읽는다.
+        // 기준 버전 ID는 요청 시 선택하며, 해당 버전의 finalAnswer 본문은 executor 시작 시 읽는다.
         String selectedSourceReviewVersionId = coverLetter.getLatestReviewedVersionId();
 
         InterviewSession existingSession = interviewSessionRepository
@@ -196,7 +196,7 @@ public class InterviewService {
     /**
      * ACTIVE 세션에 요청 시점의 최신 성공 버전을 기준으로 질문 1개를 추가할 Job을 만든다.
      * 대상 자기소개서를 먼저 잠그고 같은 추가 생성 Job은 재사용하며, 다른 진행 작업은 충돌로 처리한다.
-     * 기존 세션은 ACTIVE를 유지한다. 질문·thread 저장과 추가 실패 처리는 별도 worker의 Job 실행으로 이어진다.
+     * 기존 세션은 ACTIVE를 유지한다. 질문·thread 저장과 추가 실패 처리는 별도 executor의 Job 실행으로 이어진다.
      */
     @Transactional
     public AddInterviewQuestionResult addMyInterviewQuestion(String interviewSessionId) {
