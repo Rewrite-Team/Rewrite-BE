@@ -42,10 +42,6 @@ class InterviewMessageFeedbackJobLifecycleService {
     private static final String STARTED_MESSAGE = "면접 답변 피드백 생성을 시작합니다.";
     private static final String COMPLETED_MESSAGE = "면접 답변 피드백 생성이 완료되었습니다.";
     private static final String FAILED_MESSAGE = "면접 답변 피드백 생성에 실패했습니다.";
-    private static final String PROVIDER_ERROR_CODE = "LLM_PROVIDER_ERROR";
-    private static final String PROVIDER_ERROR_MESSAGE = "LLM 응답 생성에 실패했습니다.";
-    private static final String OUTPUT_VALIDATION_ERROR_CODE = "LLM_OUTPUT_VALIDATION_FAILED";
-    private static final String OUTPUT_VALIDATION_ERROR_MESSAGE = "LLM 출력 형식이 올바르지 않습니다.";
     private static final String UNEXPECTED_ERROR_CODE = "INTERNAL_ERROR";
     private static final String UNEXPECTED_ERROR_MESSAGE = "면접 답변 피드백 처리 중 오류가 발생했습니다.";
 
@@ -134,8 +130,8 @@ class InterviewMessageFeedbackJobLifecycleService {
         job.markFailed(
                 job.getProgressCurrent(),
                 FAILED_MESSAGE,
-                errorCode(reason),
-                errorMessage(reason),
+                reason.failureKind().errorCode(),
+                reason.failureKind().errorMessage(),
                 Instant.now(clock)
         );
     }
@@ -186,19 +182,5 @@ class InterviewMessageFeedbackJobLifecycleService {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR);
         }
         return message;
-    }
-
-    private String errorCode(InterviewMessageFeedbackClientException.Reason reason) {
-        if (reason == InterviewMessageFeedbackClientException.Reason.OUTPUT_VALIDATION_FAILED) {
-            return OUTPUT_VALIDATION_ERROR_CODE;
-        }
-        return PROVIDER_ERROR_CODE;
-    }
-
-    private String errorMessage(InterviewMessageFeedbackClientException.Reason reason) {
-        if (reason == InterviewMessageFeedbackClientException.Reason.OUTPUT_VALIDATION_FAILED) {
-            return OUTPUT_VALIDATION_ERROR_MESSAGE;
-        }
-        return PROVIDER_ERROR_MESSAGE;
     }
 }

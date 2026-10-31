@@ -54,10 +54,6 @@ class InterviewQuestionGenerationJobLifecycleService {
     private static final String STARTED_MESSAGE = "면접 질문 생성을 시작합니다.";
     private static final String COMPLETED_MESSAGE = "면접 질문 생성이 완료되었습니다.";
     private static final String FAILED_MESSAGE = "면접 질문 생성에 실패했습니다.";
-    private static final String PROVIDER_ERROR_CODE = "LLM_PROVIDER_ERROR";
-    private static final String PROVIDER_ERROR_MESSAGE = "LLM 응답 생성에 실패했습니다.";
-    private static final String OUTPUT_VALIDATION_ERROR_CODE = "LLM_OUTPUT_VALIDATION_FAILED";
-    private static final String OUTPUT_VALIDATION_ERROR_MESSAGE = "LLM 출력 형식이 올바르지 않습니다.";
     private static final String UNEXPECTED_ERROR_CODE = "INTERNAL_ERROR";
     private static final String UNEXPECTED_ERROR_MESSAGE = "면접 질문 생성 처리 중 오류가 발생했습니다.";
 
@@ -206,8 +202,8 @@ class InterviewQuestionGenerationJobLifecycleService {
         job.markFailed(
                 job.getProgressCurrent(),
                 FAILED_MESSAGE,
-                errorCode(reason),
-                errorMessage(reason),
+                reason.failureKind().errorCode(),
+                reason.failureKind().errorMessage(),
                 now
         );
         interviewSessionRepository.findByCoverLetterId(job.getTargetId())
@@ -306,20 +302,6 @@ class InterviewQuestionGenerationJobLifecycleService {
 
     private String sourceReviewVersionId(LlmJob job) {
         return job.getRequestRefId();
-    }
-
-    private String errorCode(InterviewQuestionGenerationClientException.Reason reason) {
-        if (reason == InterviewQuestionGenerationClientException.Reason.OUTPUT_VALIDATION_FAILED) {
-            return OUTPUT_VALIDATION_ERROR_CODE;
-        }
-        return PROVIDER_ERROR_CODE;
-    }
-
-    private String errorMessage(InterviewQuestionGenerationClientException.Reason reason) {
-        if (reason == InterviewQuestionGenerationClientException.Reason.OUTPUT_VALIDATION_FAILED) {
-            return OUTPUT_VALIDATION_ERROR_MESSAGE;
-        }
-        return PROVIDER_ERROR_MESSAGE;
     }
 
     private enum GenerationMode {
