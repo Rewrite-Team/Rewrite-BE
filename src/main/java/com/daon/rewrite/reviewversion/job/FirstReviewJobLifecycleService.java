@@ -15,6 +15,7 @@ import com.daon.rewrite.reviewversion.client.ReviewRequest;
 import com.daon.rewrite.reviewversion.entity.ReviewJobQuestionResult;
 import com.daon.rewrite.reviewversion.entity.ReviewJobQuestionResultStatus;
 import com.daon.rewrite.reviewversion.repository.ReviewJobQuestionResultRepository;
+import com.daon.rewrite.reviewversion.service.ReviewVersionCompletionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,7 +32,7 @@ import java.util.stream.Collectors;
  */
 @Service
 @RequiredArgsConstructor
-class FirstReviewJobLifecycleService {
+class FirstReviewJobLifecycleService implements ReviewJobLifecycle {
 
     private static final String STARTED_MESSAGE = "첨삭을 시작합니다.";
     private static final String FAILED_MESSAGE = "LLM 첨삭에 실패했습니다.";
@@ -45,11 +46,18 @@ class FirstReviewJobLifecycleService {
     private final CoverLetterJobLockService coverLetterJobLockService;
     private final ReviewJobQuestionResultRepository jobQuestionResultRepository;
     private final Clock clock;
+    private final ReviewVersionCompletionService reviewVersionCompletionService;
+
+    @Override
+    public LlmJobType jobType() {
+        return LlmJobType.COVER_LETTER_REVIEW;
+    }
 
     /**
      * 제출 때 저장한 문항별 임시 입력을 읽어 외부 호출에 필요한 값만 반환한다.
      * 재사용 문항은 호출 대상에서 제외하며, 이미 시작했거나 종료된 Job이면 null을 반환한다.
      */
+    @Override
     @Transactional
     public ReviewJobInput start(String jobId) {
         CoverLetterJobLockService.LockedCoverLetterJob locked = coverLetterJobLockService.lock(jobId);
@@ -96,15 +104,23 @@ class FirstReviewJobLifecycleService {
     }
 
     /** 완료 문항 수를 유지한 채 Job·자기소개서를 함께 실패로 전환한다. 이미 종료된 Job은 변경하지 않는다. */
+    @Override
     @Transactional
     public void fail(String jobId, ReviewClientException.Reason reason) {
         markFailed(jobId, errorCode(reason), errorMessage(reason));
     }
 
     /** 분류된 LLM 실패 외의 오류를 내부 오류로 기록하며, 이미 확정된 종료 상태는 유지한다. */
+    @Override
     @Transactional
     public void failUnexpected(String jobId) {
         markFailed(jobId, UNEXPECTED_ERROR_CODE, UNEXPECTED_ERROR_MESSAGE);
+    }
+
+    /** 전체 확정은 ReviewVersionCompletionService가 자기 트랜잭션에서 수행한다. */
+    @Override
+    public void complete(String jobId) {
+        reviewVersionCompletionService.completeFirstReview(jobId);
     }
 
     private void markFailed(String jobId, String errorCode, String errorMessage) {
