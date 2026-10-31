@@ -17,13 +17,11 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * 모든 LLM Job의 상태와 도메인별 중간 결과를 SSE 연결에 전달한다.
@@ -38,7 +36,6 @@ public class LlmJobStreamService {
     private static final String JOB_STATE_EVENT = SseEventName.JOB_STATE.value();
     private static final String REVIEW_QUESTIONS_EVENT = SseEventName.REVIEW_QUESTIONS.value();
     private static final String INTERVIEW_FEEDBACK_DELTA_EVENT = SseEventName.INTERVIEW_FEEDBACK_DELTA.value();
-    private static final int FEEDBACK_CHUNK_SIZE = 40;
 
     private final LlmJobService llmJobService;
     private final LlmJobRepository llmJobRepository;
@@ -46,9 +43,9 @@ public class LlmJobStreamService {
     private final SseHeartbeatScheduler heartbeatScheduler;
 
     // 한 Job을 여러 탭에서 구독할 수 있으므로 전송 이력은 연결별로 관리한다.
-    private final Map<String, Map<String, JobConnection>> connections = new ConcurrentHashMap<>();
-    // 초기화 버퍼와 별개인 Job별 재연결 자료다. 프로세스 메모리에만 보관하며 Job 종료 확인 시 제거한다.
-    private final Map<String, List<InterviewFeedbackDeltaResponse>> feedbackBuffers = new ConcurrentHashMap<>();
+    private final Map<String, Map<String, JobStreamConnection>> connections = new ConcurrentHashMap<>();
+    // 초기화 버퍼와 별개인 Job별 재연결 자료다. Job 종료 확인 시 제거한다.
+    private final InterviewFeedbackDeltaBuffer feedbackBuffer = new InterviewFeedbackDeltaBuffer();
 
     /**
      * 소유권을 확인한 Job에 연결을 등록하고 초기 상태·도메인 스냅샷을 먼저 전송한다.
@@ -63,7 +60,7 @@ public class LlmJobStreamService {
                 heartbeatScheduler,
                 () -> removeConnection(jobId, connectionId)
         );
-        JobConnection connection = new JobConnection(stream);
+        JobStreamConnection connection = new JobStreamConnection(stream);
         synchronized (connection) {
             // 등록부터 초기화 완료까지 같은 연결의 polling·피드백 전송을 직렬화한다.
             connections.computeIfAbsent(jobId, ignored -> new ConcurrentHashMap<>())
@@ -87,8 +84,7 @@ public class LlmJobStreamService {
      * 메시지 저장과 Job 완료는 이 메서드가 반환된 뒤 Executor의 확정 단계에서 수행한다.
      */
     public void publishValidatedFeedback(String jobId, String content) {
-        List<InterviewFeedbackDeltaResponse> deltas = splitFeedback(content);
-        feedbackBuffers.put(jobId, new CopyOnWriteArrayList<>(deltas));
+        List<InterviewFeedbackDeltaResponse> deltas = feedbackBuffer.store(jobId, content);
         connections.getOrDefault(jobId, Map.of()).values()
                 .forEach(connection -> {
                     synchronized (connection) {
@@ -107,16 +103,16 @@ public class LlmJobStreamService {
     void publishCommittedChanges() {
         Set<String> jobIds = ConcurrentHashMap.newKeySet();
         jobIds.addAll(connections.keySet());
-        jobIds.addAll(feedbackBuffers.keySet());
+        jobIds.addAll(feedbackBuffer.jobIds());
         jobIds.forEach(this::publishCommittedChange);
     }
 
     private void publishCommittedChange(String jobId) {
-        Map<String, JobConnection> jobConnections = connections.getOrDefault(jobId, Map.of());
+        Map<String, JobStreamConnection> jobConnections = connections.getOrDefault(jobId, Map.of());
         if (jobConnections.isEmpty()) {
             LlmJob job = llmJobRepository.findById(jobId).orElse(null);
             if (job == null || job.getStatus().isTerminal()) {
-                feedbackBuffers.remove(jobId);
+                feedbackBuffer.remove(jobId);
             }
             return;
         }
@@ -143,14 +139,14 @@ public class LlmJobStreamService {
                 if (job.getStatus().isTerminal()) {
                     // 종료 상태를 반영한 뒤 닫는다. 완료 결과는 resultRef에 해당하는 도메인 API로 조회한다.
                     connection.stream().close();
-                    feedbackBuffers.remove(jobId);
+                    feedbackBuffer.remove(jobId);
                 }
             }
         });
     }
 
     /** job.state를 먼저 보내고 첨삭이면 완료 문항 전체를, 피드백 버퍼가 있으면 조각을 이어 보낸다. */
-    private void sendInitial(JobConnection connection, LlmJob job) {
+    private void sendInitial(JobStreamConnection connection, LlmJob job) {
         LlmJobStateEventResponse state = LlmJobStateEventResponse.from(job);
         connection.stream().sendInitial(JOB_STATE_EVENT, state);
         connection.lastState(state);
@@ -164,13 +160,13 @@ public class LlmJobStreamService {
             completedQuestions.forEach(result -> connection.seenQuestionIds().add(result.getQuestion().getId()));
         }
         // 면접 피드백 버퍼가 유실되면 delta 없이 상태만 복구하고 완료 후 저장된 최종 메시지를 조회한다.
-        feedbackBuffers.getOrDefault(job.getId(), List.of()).stream()
+        feedbackBuffer.find(job.getId()).stream()
                 .filter(delta -> connection.seenDeltaSequences().add(delta.sequence()))
                 .forEach(delta -> connection.stream().sendInitial(INTERVIEW_FEEDBACK_DELTA_EVENT, delta));
     }
 
     private void publishNewQuestions(
-            JobConnection connection,
+            JobStreamConnection connection,
             List<ReviewJobQuestionResult> completedQuestions
     ) {
         completedQuestions.stream()
@@ -188,20 +184,6 @@ public class LlmJobStreamService {
         );
     }
 
-    /** code point 단위로 나눠 surrogate pair가 조각 경계에서 분리되지 않게 한다. sequence는 Job 안에서 1부터 시작한다. */
-    private List<InterviewFeedbackDeltaResponse> splitFeedback(String content) {
-        int[] codePoints = content.codePoints().toArray();
-        List<InterviewFeedbackDeltaResponse> deltas = new ArrayList<>();
-        for (int start = 0, sequence = 1; start < codePoints.length; start += FEEDBACK_CHUNK_SIZE, sequence++) {
-            int length = Math.min(FEEDBACK_CHUNK_SIZE, codePoints.length - start);
-            deltas.add(new InterviewFeedbackDeltaResponse(
-                    sequence,
-                    new String(codePoints, start, length)
-            ));
-        }
-        return List.copyOf(deltas);
-    }
-
     private boolean isReviewJob(LlmJob job) {
         return job.getType() == LlmJobType.COVER_LETTER_REVIEW
                 || job.getType() == LlmJobType.COVER_LETTER_RE_REVIEW;
@@ -209,45 +191,13 @@ public class LlmJobStreamService {
 
     // emitter 종료 콜백에서 호출한다. 중복 호출을 허용하며 재연결용 피드백 버퍼는 주기 조회가 정리한다.
     private void removeConnection(String jobId, String connectionId) {
-        Map<String, JobConnection> jobConnections = connections.get(jobId);
+        Map<String, JobStreamConnection> jobConnections = connections.get(jobId);
         if (jobConnections == null) {
             return;
         }
         jobConnections.remove(connectionId);
         if (jobConnections.isEmpty()) {
             connections.remove(jobId, jobConnections);
-        }
-    }
-
-    /** 초기 스냅샷과 동시 발행의 중복을 걸러낼 이력을 보관한다. 재연결하면 새 이력으로 시작한다. */
-    private static final class JobConnection {
-        private final BufferedSseConnection stream;
-        private final Set<String> seenQuestionIds = ConcurrentHashMap.newKeySet();
-        private final Set<Integer> seenDeltaSequences = ConcurrentHashMap.newKeySet();
-        private volatile LlmJobStateEventResponse lastState;
-
-        private JobConnection(BufferedSseConnection stream) {
-            this.stream = stream;
-        }
-
-        private BufferedSseConnection stream() {
-            return stream;
-        }
-
-        private Set<String> seenQuestionIds() {
-            return seenQuestionIds;
-        }
-
-        private Set<Integer> seenDeltaSequences() {
-            return seenDeltaSequences;
-        }
-
-        private LlmJobStateEventResponse lastState() {
-            return lastState;
-        }
-
-        private void lastState(LlmJobStateEventResponse lastState) {
-            this.lastState = lastState;
         }
     }
 }
