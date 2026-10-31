@@ -20,7 +20,8 @@ import com.daon.rewrite.reviewversion.repository.ReviewJobQuestionResultReposito
 import com.daon.rewrite.reviewversion.repository.ReviewVersionQuestionResultRepository;
 import com.daon.rewrite.reviewversion.repository.ReviewVersionRepository;
 import com.daon.rewrite.reviewversion.service.CompleteReviewResult;
-import com.daon.rewrite.reviewversion.service.ReviewVersionCommandService;
+import com.daon.rewrite.reviewversion.service.ReReviewRequestService;
+import com.daon.rewrite.reviewversion.service.ReviewVersionFinalAnswerService;
 import com.daon.rewrite.reviewversion.service.ReviewVersionCompletionService;
 import com.daon.rewrite.reviewversion.service.SaveFinalAnswerInput;
 import org.junit.jupiter.api.Test;
@@ -50,7 +51,8 @@ class ReviewVersionCompletionIntegrationTest {
     private static final Instant RESULT_COMPLETED_AT = Instant.parse("2026-01-01T00:00:00Z");
 
     @Autowired private CoverLetterService coverLetterService;
-    @Autowired private ReviewVersionCommandService commandService;
+    @Autowired private ReReviewRequestService reReviewRequestService;
+    @Autowired private ReviewVersionFinalAnswerService finalAnswerService;
     @Autowired private ReviewVersionCompletionService completionService;
     @Autowired private CoverLetterRepository coverLetterRepository;
     @Autowired private LlmJobRepository jobRepository;
@@ -236,13 +238,13 @@ class ReviewVersionCompletionIntegrationTest {
         startProcessing(firstAttempt);
         completeStagedResults(firstAttempt);
         CompleteReviewResult firstCompletion = completionService.completeFirstReview(firstJob.getId());
-        commandService.saveMyFinalAnswers(coverLetter.getId(), firstVersionId,
+        finalAnswerService.saveMyFinalAnswers(coverLetter.getId(), firstVersionId,
                 firstCompletion.questionResults().stream()
                         .map(result -> new SaveFinalAnswerInput(
                                 result.getId(), "이전 최종 작성본 " + result.getQuestionOrder()
                         ))
                         .toList());
-        LlmJob reReviewJob = commandService.requestMyReReview(coverLetter.getId(), "경험을 구체화해주세요.").job();
+        LlmJob reReviewJob = reReviewRequestService.requestMyReReview(coverLetter.getId(), "경험을 구체화해주세요.").job();
         String reReviewVersionId = versionRepository.findByLlmJobId(reReviewJob.getId()).orElseThrow().getId();
         return new ReviewAttempt(type, coverLetter.getId(), reReviewJob.getId(), reReviewVersionId, firstVersionId);
     }

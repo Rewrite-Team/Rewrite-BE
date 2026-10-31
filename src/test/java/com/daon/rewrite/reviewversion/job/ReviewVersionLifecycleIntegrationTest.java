@@ -18,7 +18,8 @@ import com.daon.rewrite.reviewversion.client.ReviewResult;
 import com.daon.rewrite.reviewversion.repository.ReviewVersionQuestionResultRepository;
 import com.daon.rewrite.reviewversion.repository.ReviewVersionRepository;
 import com.daon.rewrite.reviewversion.dto.ReviewVersionListResponse;
-import com.daon.rewrite.reviewversion.service.ReviewVersionCommandService;
+import com.daon.rewrite.reviewversion.service.ReReviewRequestService;
+import com.daon.rewrite.reviewversion.service.ReviewVersionFinalAnswerService;
 import com.daon.rewrite.reviewversion.service.ReviewVersionQueryService;
 import com.daon.rewrite.reviewversion.service.ReviewVersionCompletionService;
 import com.daon.rewrite.reviewversion.service.SaveFinalAnswerInput;
@@ -54,7 +55,8 @@ class ReviewVersionLifecycleIntegrationTest {
 
     @Autowired private CoverLetterService coverLetterService;
     @Autowired private CoverLetterDetailQueryService detailQueryService;
-    @Autowired private ReviewVersionCommandService versionCommandService;
+    @Autowired private ReReviewRequestService reReviewRequestService;
+    @Autowired private ReviewVersionFinalAnswerService finalAnswerService;
     @Autowired private ReviewVersionQueryService versionQueryService;
     @Autowired private ReviewVersionCompletionService completionService;
     @Autowired private ReviewVersionRepository versionRepository;
@@ -139,11 +141,11 @@ class ReviewVersionLifecycleIntegrationTest {
         String resultId = resultRepository.findByReviewVersionIdOrderByQuestionOrderAsc(successfulVersionId)
                 .getFirst().getId();
 
-        var reReview = versionCommandService.requestMyReReview(coverLetter.getId(), "다시 봐주세요");
+        var reReview = reReviewRequestService.requestMyReReview(coverLetter.getId(), "다시 봐주세요");
         String failedVersionId = versionRepository.findByLlmJobId(reReview.job().getId()).orElseThrow().getId();
         assertThat(versionRepository.findById(failedVersionId).orElseThrow().getVersionNumber()).isEqualTo(2);
         assertThat(reReview.job().getRequestRefId()).isEqualTo(successfulVersionId);
-        assertThat(versionCommandService.requestMyReReview(coverLetter.getId(), "다른 요구사항").job().getId())
+        assertThat(reReviewRequestService.requestMyReReview(coverLetter.getId(), "다른 요구사항").job().getId())
                 .isEqualTo(reReview.job().getId());
         assertThat(versionRepository.countByCoverLetterId(coverLetter.getId())).isEqualTo(2);
 
@@ -166,15 +168,15 @@ class ReviewVersionLifecycleIntegrationTest {
                 .isEqualTo(LlmJobStatus.FAILED);
         assertThat(coverLetterRepository.findById(coverLetter.getId()).orElseThrow().getLatestReviewedVersionId())
                 .isEqualTo(successfulVersionId);
-        assertThatThrownBy(() -> versionCommandService.saveMyFinalAnswers(
+        assertThatThrownBy(() -> finalAnswerService.saveMyFinalAnswers(
                 coverLetter.getId(), failedVersionId, List.of()))
                 .isInstanceOf(BusinessException.class)
                 .satisfies(exception -> assertThat(((BusinessException) exception).getErrorCode())
                         .isEqualTo(ErrorCode.REVIEW_VERSION_NOT_LATEST));
-        versionCommandService.saveMyFinalAnswers(coverLetter.getId(), successfulVersionId,
+        finalAnswerService.saveMyFinalAnswers(coverLetter.getId(), successfulVersionId,
                 List.of(new SaveFinalAnswerInput(resultId, "보존할 최종 작성본")));
 
-        var retry = versionCommandService.requestMyReReview(coverLetter.getId(), null);
+        var retry = reReviewRequestService.requestMyReReview(coverLetter.getId(), null);
         assertThat(versionRepository.findByLlmJobId(retry.job().getId()).orElseThrow().getVersionNumber())
                 .isEqualTo(3);
         assertThat(retry.job().getRequestRefId()).isEqualTo(successfulVersionId);
@@ -199,7 +201,7 @@ class ReviewVersionLifecycleIntegrationTest {
         assertThat(detailQueryService.findCurrent(coverLetter.getId()).reviewJob()).isNull();
         assertThat(detailQueryService.findVersion(coverLetter.getId(), failedVersionId)
                 .reviewVersion().value().getStatus()).isEqualTo(LlmJobStatus.FAILED);
-        assertThatThrownBy(() -> versionCommandService.saveMyFinalAnswers(
+        assertThatThrownBy(() -> finalAnswerService.saveMyFinalAnswers(
                 coverLetter.getId(), successfulVersionId,
                 List.of(new SaveFinalAnswerInput(resultId, "과거 버전 변경"))))
                 .isInstanceOf(BusinessException.class)
@@ -226,12 +228,12 @@ class ReviewVersionLifecycleIntegrationTest {
         var detail = detailQueryService.findVersion(coverLetter.getId(), versionId);
         assertThat(detail.reviewJob()).isNull();
         assertThat(detail.questions()).hasSize(1);
-        versionCommandService.saveMyFinalAnswers(coverLetter.getId(), versionId,
+        finalAnswerService.saveMyFinalAnswers(coverLetter.getId(), versionId,
                 List.of(new SaveFinalAnswerInput(detail.questions().getFirst().questionResultId(), "기존 최종 작성본")));
         assertThat(detailQueryService.findCurrent(coverLetter.getId()).questions().getFirst().finalAnswer())
                 .isEqualTo("기존 최종 작성본");
 
-        var reReview = versionCommandService.requestMyReReview(coverLetter.getId(), null);
+        var reReview = reReviewRequestService.requestMyReReview(coverLetter.getId(), null);
         assertThat(versionRepository.findByLlmJobId(reReview.job().getId()).orElseThrow().getVersionNumber())
                 .isEqualTo(2);
         assertThat(reReview.job().getRequestRefId()).isEqualTo(versionId);
@@ -296,7 +298,7 @@ class ReviewVersionLifecycleIntegrationTest {
         String firstVersionId = versionRepository.findByLlmJobId(first.job().getId()).orElseThrow().getId();
         var secondJob = type == LlmJobType.COVER_LETTER_REVIEW
                 ? coverLetterService.submit(coverLetter.getId()).job()
-                : versionCommandService.requestMyReReview(coverLetter.getId(), null).job();
+                : reReviewRequestService.requestMyReReview(coverLetter.getId(), null).job();
         String secondVersionId = versionRepository.findByLlmJobId(secondJob.getId()).orElseThrow().getId();
         // 이관·데이터 보정으로 번호가 비어 있어도 전체 개수에 의존하지 않아야 한다.
         jdbcTemplate.update("update review_versions set version_number = 3 where id = ?", secondVersionId);
@@ -323,7 +325,7 @@ class ReviewVersionLifecycleIntegrationTest {
 
         var retryJob = type == LlmJobType.COVER_LETTER_REVIEW
                 ? coverLetterService.submit(coverLetter.getId()).job()
-                : versionCommandService.requestMyReReview(coverLetter.getId(), null).job();
+                : reReviewRequestService.requestMyReReview(coverLetter.getId(), null).job();
 
         assertThat(versionRepository.findByLlmJobId(retryJob.getId()).orElseThrow().getVersionNumber())
                 .isEqualTo(4);
@@ -342,7 +344,7 @@ class ReviewVersionLifecycleIntegrationTest {
         String successfulVersionId = versionRepository.findByLlmJobId(first.job().getId()).orElseThrow().getId();
         jdbcTemplate.update("update review_versions set version_number = 9 where id = ?", successfulVersionId);
 
-        var reReview = versionCommandService.requestMyReReview(coverLetter.getId(), null);
+        var reReview = reReviewRequestService.requestMyReReview(coverLetter.getId(), null);
         String latestVersionId = versionRepository.findByLlmJobId(reReview.job().getId()).orElseThrow().getId();
         assertThat(versionRepository.findById(latestVersionId).orElseThrow().getVersionNumber()).isEqualTo(10);
         jdbcTemplate.update("update review_versions set created_at = ? where cover_letter_id = ?",

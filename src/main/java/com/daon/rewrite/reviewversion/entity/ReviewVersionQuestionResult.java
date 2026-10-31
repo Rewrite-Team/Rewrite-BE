@@ -134,7 +134,7 @@ public class ReviewVersionQuestionResult {
         return new ReviewVersionQuestionResult(id, reviewVersion, question, originalAnswer, aiReport, rewrittenAnswer);
     }
 
-    // 최신 성공 버전 여부와 전체 입력 검증은 ReviewVersionCommandService가 담당하고 여기서는 최종본과 길이만 갱신한다.
+    // 최신 성공 버전 여부와 전체 입력 검증은 ReviewVersionFinalAnswerService가 담당하고 여기서는 최종본과 길이만 갱신한다.
     public void updateFinalAnswer(String finalAnswer) {
         this.finalAnswer = finalAnswer;
         this.finalAnswerLength = countCodePoints(finalAnswer);

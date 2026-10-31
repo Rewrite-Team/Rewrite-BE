@@ -10,7 +10,8 @@ import com.daon.rewrite.reviewversion.dto.ReviewVersionListResponse;
 import com.daon.rewrite.reviewversion.dto.RequestReReviewRequest;
 import com.daon.rewrite.reviewversion.dto.RequestReReviewResponse;
 import com.daon.rewrite.reviewversion.dto.SaveFinalAnswersRequest;
-import com.daon.rewrite.reviewversion.service.ReviewVersionCommandService;
+import com.daon.rewrite.reviewversion.service.ReReviewRequestService;
+import com.daon.rewrite.reviewversion.service.ReviewVersionFinalAnswerService;
 import com.daon.rewrite.reviewversion.service.ReviewVersionQueryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -29,7 +30,8 @@ import org.springframework.web.bind.annotation.RestController;
 public class ReviewVersionController {
 
     private final ReviewVersionQueryService reviewVersionQueryService;
-    private final ReviewVersionCommandService reviewVersionCommandService;
+    private final ReReviewRequestService reReviewRequestService;
+    private final ReviewVersionFinalAnswerService reviewVersionFinalAnswerService;
     private final CoverLetterDetailQueryService coverLetterDetailQueryService;
 
     @GetMapping("/cover-letters/{coverLetterId}/review-versions")
@@ -81,7 +83,7 @@ public class ReviewVersionController {
             @RequestBody(required = false) RequestReReviewRequest request
     ) {
         return RequestReReviewResponse.from(
-                reviewVersionCommandService.requestMyReReview(
+                reReviewRequestService.requestMyReReview(
                         coverLetterId,
                         request == null ? null : request.requestInstruction()
                 )
@@ -141,7 +143,7 @@ public class ReviewVersionController {
             @PathVariable String versionId,
             @RequestBody SaveFinalAnswersRequest request
     ) {
-        reviewVersionCommandService.saveMyFinalAnswers(
+        reviewVersionFinalAnswerService.saveMyFinalAnswers(
                 coverLetterId,
                 versionId,
                 request == null ? null : request.toInputs()
