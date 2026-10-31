@@ -28,7 +28,7 @@ public class FirstReviewJobWorker {
             if (work == null) {
                 return;
             }
-            Optional<ReviewClientException.Reason> failureReason = jobRunner.run(jobId, work.request());
+            Optional<ReviewClientException.Reason> failureReason = jobRunner.run(jobId, work);
             // 하나라도 실패하면 Job 전체를 실패 처리하되, 성공 문항은 부분 결과 조회를 위해 보존한다.
             if (failureReason.isPresent()) {
                 transactionService.fail(jobId, failureReason.get());

@@ -116,7 +116,7 @@ public class CoverLetterDetailQueryService {
                     coverLetter,
                     toVersionResult(coverLetter, reviewVersion),
                     job,
-                    // 최초 첨삭 worker 시작 전처럼 임시 행이 없으면 원본으로 복원한다.
+                    // 문항 임시 행이 없는 이전 데이터는 원본으로 복원한다.
                     jobResults.isEmpty() ? findOriginalQuestions(coverLetter)
                             : jobResults.stream().map(this::fromJobResult).toList()
             );

@@ -20,6 +20,12 @@ public interface ReviewVersionRepository extends JpaRepository<ReviewVersion, St
 
     Optional<ReviewVersion> findByLlmJobId(String llmJobId);
 
+    /** 지정한 번호 바로 앞의 시도를 반환한다. 실패 후 재시도에서 직전 시도를 찾는 데 사용한다. */
+    Optional<ReviewVersion> findFirstByCoverLetterIdAndVersionNumberLessThanOrderByVersionNumberDesc(
+            String coverLetterId,
+            long versionNumber
+    );
+
     /** 다음 번호 생성과 최신 시도 판별에 사용하며, 아직 시도가 없으면 0을 반환한다. */
     @Query("""
             select coalesce(max(reviewVersion.versionNumber), 0)
