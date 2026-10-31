@@ -22,7 +22,7 @@ import com.daon.rewrite.coverletter.service.CoverLetterService;
 import com.daon.rewrite.llmjob.controller.LlmJobController;
 import com.daon.rewrite.llmjob.entity.LlmJob;
 import com.daon.rewrite.llmjob.repository.LlmJobRepository;
-import com.daon.rewrite.llmjob.service.LlmJobService;
+import com.daon.rewrite.llmjob.service.LlmJobAccessService;
 import com.daon.rewrite.llmjob.service.LlmJobStreamService;
 import com.daon.rewrite.reviewversion.repository.ReviewJobQuestionResultRepository;
 import jakarta.servlet.AsyncEvent;
@@ -57,7 +57,7 @@ class SseHeartbeatTest {
     private final CoverLetterRepository coverLetters = mock(CoverLetterRepository.class);
     private final LlmJobRepository jobs = mock(LlmJobRepository.class);
     private final ReviewJobQuestionResultRepository questions = mock(ReviewJobQuestionResultRepository.class);
-    private final LlmJobService jobService = mock(LlmJobService.class);
+    private final LlmJobAccessService jobService = mock(LlmJobAccessService.class);
     private final ThreadPoolTaskScheduler timer = mock(ThreadPoolTaskScheduler.class);
     private final List<HeartbeatTask> tasks = new ArrayList<>();
     private final List<MvcResult> requests = new ArrayList<>();

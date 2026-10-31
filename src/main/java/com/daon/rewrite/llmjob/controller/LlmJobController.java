@@ -4,7 +4,7 @@ import com.daon.rewrite.global.exception.ErrorCode;
 import com.daon.rewrite.global.openapi.ApiError;
 import com.daon.rewrite.global.openapi.RewriteApi;
 import com.daon.rewrite.llmjob.dto.LlmJobStateResponse;
-import com.daon.rewrite.llmjob.service.LlmJobService;
+import com.daon.rewrite.llmjob.service.LlmJobAccessService;
 import com.daon.rewrite.llmjob.service.LlmJobStreamService;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
@@ -19,13 +19,13 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
  * 도메인별 시작 API가 반환한 Job을 상태 조회와 SSE로 추적하는 공통 HTTP 진입점.
- * 조회는 LlmJobService에, 연결 등록·초기 상태 전송·후속 이벤트는 LlmJobStreamService에 맡긴다.
+ * 조회는 LlmJobAccessService에, 연결 등록·초기 상태 전송·후속 이벤트는 LlmJobStreamService에 맡긴다.
  */
 @RestController
 @RequiredArgsConstructor
 public class LlmJobController {
 
-    private final LlmJobService llmJobService;
+    private final LlmJobAccessService llmJobAccessService;
     private final LlmJobStreamService llmJobStreamService;
 
     @GetMapping("/llm-jobs/{jobId}")
@@ -46,7 +46,7 @@ public class LlmJobController {
             )
     )
     public LlmJobStateResponse findJob(@PathVariable String jobId) {
-        return LlmJobStateResponse.from(llmJobService.findMyJob(jobId));
+        return LlmJobStateResponse.from(llmJobAccessService.findMyJob(jobId));
     }
 
     @GetMapping(path = "/llm-jobs/{jobId}/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
