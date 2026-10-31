@@ -37,10 +37,6 @@ class ReReviewJobLifecycleService implements ReviewJobLifecycle {
 
     private static final String STARTED_MESSAGE = "재첨삭을 시작합니다.";
     private static final String FAILED_MESSAGE = "LLM 재첨삭에 실패했습니다.";
-    private static final String PROVIDER_ERROR_CODE = "LLM_PROVIDER_ERROR";
-    private static final String PROVIDER_ERROR_MESSAGE = "LLM 응답 생성에 실패했습니다.";
-    private static final String OUTPUT_VALIDATION_ERROR_CODE = "LLM_OUTPUT_VALIDATION_FAILED";
-    private static final String OUTPUT_VALIDATION_ERROR_MESSAGE = "LLM 출력 형식이 올바르지 않습니다.";
     private static final String UNEXPECTED_ERROR_CODE = "INTERNAL_ERROR";
     private static final String UNEXPECTED_ERROR_MESSAGE = "재첨삭 처리 중 오류가 발생했습니다.";
 
@@ -112,7 +108,7 @@ class ReReviewJobLifecycleService implements ReviewJobLifecycle {
     @Override
     @Transactional
     public void fail(String jobId, ReviewClientException.Reason reason) {
-        markFailed(jobId, errorCode(reason), errorMessage(reason));
+        markFailed(jobId, reason.failureKind().errorCode(), reason.failureKind().errorMessage());
     }
 
     /** 예상 밖 오류는 내부 오류로 기록하며, 취소·완료·실패 등 이미 종료된 Job은 변경하지 않는다. */
@@ -146,19 +142,5 @@ class ReReviewJobLifecycleService implements ReviewJobLifecycle {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR);
         }
         return job;
-    }
-
-    private String errorCode(ReviewClientException.Reason reason) {
-        if (reason == ReviewClientException.Reason.OUTPUT_VALIDATION_FAILED) {
-            return OUTPUT_VALIDATION_ERROR_CODE;
-        }
-        return PROVIDER_ERROR_CODE;
-    }
-
-    private String errorMessage(ReviewClientException.Reason reason) {
-        if (reason == ReviewClientException.Reason.OUTPUT_VALIDATION_FAILED) {
-            return OUTPUT_VALIDATION_ERROR_MESSAGE;
-        }
-        return PROVIDER_ERROR_MESSAGE;
     }
 }

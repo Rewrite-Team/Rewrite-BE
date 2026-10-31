@@ -1,5 +1,7 @@
 package com.daon.rewrite.keywordanalysis.client;
 
+import com.daon.rewrite.llmjob.entity.LlmJobFailureKind;
+
 /**
  * 외부 호출 실패와 JSON 변환·출력 내용 검증 실패를 구분해 Job 계층에 전달한다.
  * Executor가 reason을 실패 처리에 넘기면 생명주기 서비스가 최종 Job 오류 코드로 변환한다.
@@ -42,7 +44,17 @@ public class KeywordAnalysisClientException extends RuntimeException {
     }
 
     public enum Reason {
-        PROVIDER_ERROR,
-        OUTPUT_VALIDATION_FAILED
+        PROVIDER_ERROR(LlmJobFailureKind.PROVIDER_ERROR),
+        OUTPUT_VALIDATION_FAILED(LlmJobFailureKind.OUTPUT_VALIDATION_FAILED);
+
+        private final LlmJobFailureKind failureKind;
+
+        Reason(LlmJobFailureKind failureKind) {
+            this.failureKind = failureKind;
+        }
+
+        public LlmJobFailureKind failureKind() {
+            return failureKind;
+        }
     }
 }
