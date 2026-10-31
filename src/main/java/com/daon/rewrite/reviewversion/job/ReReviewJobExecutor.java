@@ -15,23 +15,23 @@ import java.util.Optional;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class ReReviewJobWorker {
+public class ReReviewJobExecutor {
 
-    private final ReReviewJobTransactionService transactionService;
+    private final ReReviewJobLifecycleService lifecycleService;
     private final ReviewQuestionJobRunner jobRunner;
     private final ReviewVersionCompletionService reviewVersionCompletionService;
 
     public void execute(String jobId) {
         try {
-            ReviewWork work = transactionService.start(jobId);
+            ReviewJobInput input = lifecycleService.start(jobId);
             // 이미 시작되었거나 취소·종료된 Job은 다시 실행하지 않는다.
-            if (work == null) {
+            if (input == null) {
                 return;
             }
-            Optional<ReviewClientException.Reason> failureReason = jobRunner.run(jobId, work);
+            Optional<ReviewClientException.Reason> failureReason = jobRunner.run(jobId, input);
             // 실패 문항이 있으면 이번 Job을 실패 처리하고, 성공 문항과 이전 성공 버전은 보존한다.
             if (failureReason.isPresent()) {
-                transactionService.fail(jobId, failureReason.get());
+                lifecycleService.fail(jobId, failureReason.get());
                 return;
             }
             // 전체 확정 단계도 취소 여부를 다시 확인해 늦게 도착한 결과가 취소를 덮어쓰지 않게 한다.
@@ -39,7 +39,7 @@ public class ReReviewJobWorker {
         } catch (RuntimeException exception) {
             // 실패 상태 저장까지 실패하더라도 최초 원인과 저장 오류를 각각 남긴다.
             try {
-                transactionService.failUnexpected(jobId);
+                lifecycleService.failUnexpected(jobId);
             } catch (RuntimeException failureException) {
                 log.error("재첨삭 실패 상태 저장에 실패했습니다. jobId={}", jobId, failureException);
             }

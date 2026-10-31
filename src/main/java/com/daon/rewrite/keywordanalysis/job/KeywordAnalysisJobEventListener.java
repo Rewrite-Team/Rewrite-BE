@@ -11,15 +11,15 @@ import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
- * 분석 리소스와 Job 생성이 커밋된 뒤 키워드 분석 Worker를 비동기로 시작한다.
- * 공통 Job 생성 이벤트 중 KEYWORD_ANALYSIS만 처리하며, DB 상태 변경은 Worker의 트랜잭션 서비스가 담당한다.
+ * 분석 리소스와 Job 생성이 커밋된 뒤 키워드 분석 Executor를 비동기로 시작한다.
+ * 공통 Job 생성 이벤트 중 KEYWORD_ANALYSIS만 처리하며, DB 상태 변경은 Executor의 생명주기 서비스가 담당한다.
  */
 @Component
 @RequiredArgsConstructor
 class KeywordAnalysisJobEventListener {
 
     private final LlmJobRepository llmJobRepository;
-    private final KeywordAnalysisJobWorker worker;
+    private final KeywordAnalysisJobExecutor executor;
 
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
@@ -29,7 +29,7 @@ class KeywordAnalysisJobEventListener {
 
     private void dispatch(LlmJob job) {
         if (job.getType() == LlmJobType.KEYWORD_ANALYSIS) {
-            worker.execute(job.getId());
+            executor.execute(job.getId());
         }
     }
 }

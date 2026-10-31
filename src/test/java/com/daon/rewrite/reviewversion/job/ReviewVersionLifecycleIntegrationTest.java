@@ -47,7 +47,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 
-/** 실제 Worker와 DB를 사용해 실패·재시도·중복 제출에 따른 시도 버전과 최신 성공 버전의 분리를 확인한다. */
+/** 실제 Executor와 DB를 사용해 실패·재시도·중복 제출에 따른 시도 버전과 최신 성공 버전의 분리를 확인한다. */
 @SpringBootTest
 @ActiveProfiles("test")
 class ReviewVersionLifecycleIntegrationTest {
@@ -61,11 +61,11 @@ class ReviewVersionLifecycleIntegrationTest {
     @Autowired private ReviewVersionQuestionResultRepository resultRepository;
     @Autowired private CoverLetterRepository coverLetterRepository;
     @Autowired private CoverLetterQuestionRepository questionRepository;
-    @Autowired private FirstReviewJobWorker firstReviewJobWorker;
-    @Autowired private ReReviewJobWorker reReviewJobWorker;
+    @Autowired private FirstReviewJobExecutor firstReviewJobExecutor;
+    @Autowired private ReReviewJobExecutor reReviewJobExecutor;
     @Autowired private JdbcTemplate jdbcTemplate;
 
-    // 자동 실행을 억제해 테스트가 Worker 실행 시점을 정하고, client 응답으로 문항별 성공·실패를 제어한다.
+    // 자동 실행을 억제해 테스트가 Executor 실행 시점을 정하고, client 응답으로 문항별 성공·실패를 제어한다.
     @MockitoBean private ReviewJobEventListener eventListener;
     @MockitoBean private ReviewClient reviewClient;
 
@@ -95,7 +95,7 @@ class ReviewVersionLifecycleIntegrationTest {
             }
             return new ReviewResult(questionId, "첨삭 리포트", "수정된 답변");
         });
-        firstReviewJobWorker.execute(first.job().getId());
+        firstReviewJobExecutor.execute(first.job().getId());
 
         var failed = detailQueryService.findVersion(coverLetter.getId(), firstVersionId);
         assertThat(failed.reviewVersion().value().getStatus()).isEqualTo(LlmJobStatus.FAILED);
@@ -119,7 +119,7 @@ class ReviewVersionLifecycleIntegrationTest {
 
         when(reviewClient.reviewQuestion(any(), anyString())).thenAnswer(invocation ->
                 new ReviewResult(invocation.getArgument(1), "새 리포트", "새 수정본"));
-        firstReviewJobWorker.execute(retry.job().getId());
+        firstReviewJobExecutor.execute(retry.job().getId());
 
         assertThat(versionRepository.findByLlmJobId(retry.job().getId()).orElseThrow().getStatus())
                 .isEqualTo(LlmJobStatus.COMPLETED);
@@ -135,7 +135,7 @@ class ReviewVersionLifecycleIntegrationTest {
                 new ReviewResult(invocation.getArgument(1), "첫 리포트", "첫 수정본"));
 
         SubmitCoverLetterResult first = coverLetterService.submit(coverLetter.getId());
-        firstReviewJobWorker.execute(first.job().getId());
+        firstReviewJobExecutor.execute(first.job().getId());
         String successfulVersionId = versionRepository.findByLlmJobId(first.job().getId()).orElseThrow().getId();
         String resultId = resultRepository.findByReviewVersionIdOrderByQuestionOrderAsc(successfulVersionId)
                 .getFirst().getId();
@@ -150,7 +150,7 @@ class ReviewVersionLifecycleIntegrationTest {
 
         when(reviewClient.reviewQuestion(any(), anyString())).thenThrow(
                 ReviewClientException.providerError(new IllegalStateException("test failure")));
-        reReviewJobWorker.execute(reReview.job().getId());
+        reReviewJobExecutor.execute(reReview.job().getId());
 
         var versions = versionQueryService.findMyReviewVersions(coverLetter.getId());
         assertThat(versions).hasSize(2);
@@ -184,7 +184,7 @@ class ReviewVersionLifecycleIntegrationTest {
         doAnswer(invocation -> new ReviewResult(invocation.getArgument(1), "재첨삭 리포트", "재첨삭 수정본"))
                 .when(reviewClient).reviewQuestion(any(), anyString());
         String retryVersionId = versionRepository.findByLlmJobId(retry.job().getId()).orElseThrow().getId();
-        reReviewJobWorker.execute(retry.job().getId());
+        reReviewJobExecutor.execute(retry.job().getId());
 
         assertThat(versionRepository.findById(retryVersionId).orElseThrow().getStatus())
                 .isEqualTo(LlmJobStatus.COMPLETED);
@@ -214,7 +214,7 @@ class ReviewVersionLifecycleIntegrationTest {
         when(reviewClient.reviewQuestion(any(), anyString())).thenAnswer(invocation ->
                 new ReviewResult(invocation.getArgument(1), "기존 리포트", "기존 수정본"));
         SubmitCoverLetterResult first = coverLetterService.submit(coverLetter.getId());
-        firstReviewJobWorker.execute(first.job().getId());
+        firstReviewJobExecutor.execute(first.job().getId());
         String versionId = versionRepository.findByLlmJobId(first.job().getId()).orElseThrow().getId();
         // Job 연결 없이 남아 있는 기존 성공 버전을 재현해 조회·수정 호환성을 확인한다.
         jdbcTemplate.update("update review_versions set llm_job_id = null where id = ?", versionId);
@@ -293,7 +293,7 @@ class ReviewVersionLifecycleIntegrationTest {
                     ReviewClientException.providerError(new IllegalStateException("test failure")));
         }
         var first = coverLetterService.submit(coverLetter.getId());
-        firstReviewJobWorker.execute(first.job().getId());
+        firstReviewJobExecutor.execute(first.job().getId());
         String firstVersionId = versionRepository.findByLlmJobId(first.job().getId()).orElseThrow().getId();
         var secondJob = type == LlmJobType.COVER_LETTER_REVIEW
                 ? coverLetterService.submit(coverLetter.getId()).job()
@@ -304,9 +304,9 @@ class ReviewVersionLifecycleIntegrationTest {
         doThrow(ReviewClientException.providerError(new IllegalStateException("test failure")))
                 .when(reviewClient).reviewQuestion(any(), anyString());
         if (type == LlmJobType.COVER_LETTER_REVIEW) {
-            firstReviewJobWorker.execute(secondJob.getId());
+            firstReviewJobExecutor.execute(secondJob.getId());
         } else {
-            reReviewJobWorker.execute(secondJob.getId());
+            reReviewJobExecutor.execute(secondJob.getId());
         }
 
         boolean hasSuccessfulVersion = type == LlmJobType.COVER_LETTER_RE_REVIEW;
@@ -343,7 +343,7 @@ class ReviewVersionLifecycleIntegrationTest {
         when(reviewClient.reviewQuestion(any(), anyString())).thenAnswer(invocation ->
                 new ReviewResult(invocation.getArgument(1), "첫 리포트", "첫 수정본"));
         var first = coverLetterService.submit(coverLetter.getId());
-        firstReviewJobWorker.execute(first.job().getId());
+        firstReviewJobExecutor.execute(first.job().getId());
         String successfulVersionId = versionRepository.findByLlmJobId(first.job().getId()).orElseThrow().getId();
         jdbcTemplate.update("update review_versions set version_number = 9 where id = ?", successfulVersionId);
 
@@ -376,7 +376,7 @@ class ReviewVersionLifecycleIntegrationTest {
         when(reviewClient.reviewQuestion(any(), anyString())).thenThrow(
                 ReviewClientException.providerError(new IllegalStateException("test failure")));
         var first = coverLetterService.submit(coverLetter.getId());
-        firstReviewJobWorker.execute(first.job().getId());
+        firstReviewJobExecutor.execute(first.job().getId());
         var retry = coverLetterService.submit(coverLetter.getId());
         String firstVersionId = versionRepository.findByLlmJobId(first.job().getId()).orElseThrow().getId();
         String retryVersionId = versionRepository.findByLlmJobId(retry.job().getId()).orElseThrow().getId();

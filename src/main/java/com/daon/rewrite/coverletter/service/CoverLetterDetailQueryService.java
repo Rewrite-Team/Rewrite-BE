@@ -51,7 +51,7 @@ public class CoverLetterDetailQueryService {
     /**
      * 진행·실패 중이면 해당 첨삭 시도를, 완료 상태이면 최신 성공 버전을 현재 상세로 선택한다.
      * 문항은 현재 Job의 임시 결과 → 선택한 버전의 확정 결과 → 원본 순서로 찾는다.
-     * 여러 조회 사이의 worker 커밋으로 상태와 문항이 섞이지 않도록 REPEATABLE_READ 스냅샷에서 읽는다.
+     * 여러 조회 사이의 executor 커밋으로 상태와 문항이 섞이지 않도록 REPEATABLE_READ 스냅샷에서 읽는다.
      */
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public CoverLetterDetailResult findCurrent(String coverLetterId) {
@@ -87,7 +87,7 @@ public class CoverLetterDetailQueryService {
             }
         }
 
-        // WRITING 또는 최초 첨삭 worker가 임시 문항을 만들기 전에는 저장된 원본을 보여준다.
+        // WRITING 또는 최초 첨삭 executor가 임시 문항을 만들기 전에는 저장된 원본을 보여준다.
         return new CoverLetterDetailResult(
                 coverLetter,
                 reviewVersion,

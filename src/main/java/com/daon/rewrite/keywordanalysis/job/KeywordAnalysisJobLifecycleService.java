@@ -40,7 +40,7 @@ import java.util.List;
  */
 @Service
 @RequiredArgsConstructor
-class KeywordAnalysisJobTransactionService {
+class KeywordAnalysisJobLifecycleService {
 
     private static final String KEYWORD_ID_PREFIX = "kak";
     private static final String STARTED_MESSAGE = "키워드 분석을 시작합니다.";
@@ -68,7 +68,7 @@ class KeywordAnalysisJobTransactionService {
      * 기준 버전 ID는 API 요청에서 선택한 값이며, 그 버전의 finalAnswer 본문은 이 시점에 읽는다.
      */
     @Transactional
-    public KeywordAnalysisWork start(String jobId) {
+    public KeywordAnalysisJobInput start(String jobId) {
         CoverLetterJobLockService.LockedCoverLetterJob locked = coverLetterJobLockService.lock(jobId);
         LlmJob job = validateKeywordAnalysisJob(locked.job());
         if (job.getStatus() != LlmJobStatus.PENDING) {
@@ -98,7 +98,7 @@ class KeywordAnalysisJobTransactionService {
         }
 
         job.startProcessing(STARTED_MESSAGE);
-        return new KeywordAnalysisWork(new KeywordAnalysisRequest(
+        return new KeywordAnalysisJobInput(new KeywordAnalysisRequest(
                 coverLetter.getTitle(),
                 coverLetter.getCompanyName(),
                 coverLetter.getPositionTitle(),

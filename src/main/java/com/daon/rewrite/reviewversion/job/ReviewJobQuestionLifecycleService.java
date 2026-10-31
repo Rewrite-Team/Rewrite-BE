@@ -24,7 +24,7 @@ import java.time.Instant;
  */
 @Service
 @RequiredArgsConstructor
-class ReviewJobQuestionTransactionService {
+class ReviewJobQuestionLifecycleService {
 
     private final LlmJobRepository llmJobRepository;
     private final ReviewJobQuestionResultRepository questionResultRepository;
@@ -54,7 +54,7 @@ class ReviewJobQuestionTransactionService {
         return true;
     }
 
-    /** 재시도까지 실패한 문항만 표시한다. Job 전체의 실패 전환은 Runner의 집계를 받은 Worker가 담당한다. */
+    /** 재시도까지 실패한 문항만 표시한다. Job 전체의 실패 전환은 Runner의 집계를 받은 Executor가 담당한다. */
     @Transactional
     public void failQuestion(String jobId, String questionId) {
         LlmJob job = findReviewJobForUpdate(jobId);

@@ -16,7 +16,7 @@ import java.util.concurrent.Executor;
 /**
  * 전체 자기소개서 문맥을 공유하는 문항별 호출을 reviewQuestionExecutor에 제출하며, 재사용 문항은 제출하지 않는다.
  * 각 문항은 LLM 호출·출력 검증 실패에 한해 최대 1회 재시도하고, 성공 결과는 문항별 트랜잭션으로 저장한다.
- * 저장 오류 등 나머지 예외는 Worker의 예상 밖 오류 처리 경계로 전파한다.
+ * 저장 오류 등 나머지 예외는 Executor의 예상 밖 오류 처리 경계로 전파한다.
  */
 @Service
 class ReviewQuestionJobRunner {
@@ -24,28 +24,28 @@ class ReviewQuestionJobRunner {
     private static final int MAX_ATTEMPTS = 2;
 
     private final ReviewClient reviewClient;
-    private final ReviewJobQuestionTransactionService transactionService;
+    private final ReviewJobQuestionLifecycleService lifecycleService;
     private final Executor executor;
 
     ReviewQuestionJobRunner(
             ReviewClient reviewClient,
-            ReviewJobQuestionTransactionService transactionService,
+            ReviewJobQuestionLifecycleService lifecycleService,
             @Qualifier("reviewQuestionExecutor") Executor executor
     ) {
         this.reviewClient = reviewClient;
-        this.transactionService = transactionService;
+        this.lifecycleService = lifecycleService;
         this.executor = executor;
     }
 
     /**
      * 문항 task의 종료를 기다린 뒤 요청 문항 순서에서 첫 실패 사유를 반환한다. 분류된 실패가 없으면 empty다.
-     * 호출 완료 순서와 대표 오류 선정 순서는 독립적이며, Job 전체의 성공·실패 확정은 Worker가 담당한다.
+     * 호출 완료 순서와 대표 오류 선정 순서는 독립적이며, Job 전체의 성공·실패 확정은 Executor가 담당한다.
      */
-    Optional<ReviewClientException.Reason> run(String jobId, ReviewWork work) {
-        ReviewRequest request = work.request();
+    Optional<ReviewClientException.Reason> run(String jobId, ReviewJobInput input) {
+        ReviewRequest request = input.request();
         // 직전 실패 시도에서 재사용한 문항은 전체 문맥으로만 전달하고 LLM을 다시 호출하지 않는다.
         List<CompletableFuture<Optional<ReviewClientException.Reason>>> futures = request.questions().stream()
-                .filter(question -> work.pendingQuestionIds().contains(question.questionId()))
+                .filter(question -> input.pendingQuestionIds().contains(question.questionId()))
                 .map(question -> CompletableFuture.supplyAsync(
                         () -> reviewQuestion(jobId, request, question),
                         executor
@@ -74,14 +74,14 @@ class ReviewQuestionJobRunner {
                 // 전체 문맥으로 대상 문항 하나를 생성·검증한 뒤에만 저장 트랜잭션을 연다.
                 ReviewResult result = reviewClient.reviewQuestion(request, question.questionId());
                 // 실행 중 취소된 Job의 늦은 응답은 저장 서비스가 무시하고 전체 확정 단계에서도 취소를 확인한다.
-                transactionService.completeQuestion(jobId, result);
+                lifecycleService.completeQuestion(jobId, result);
                 return Optional.empty();
             } catch (ReviewClientException exception) {
                 if (attempt < MAX_ATTEMPTS) {
-                    transactionService.markRetry(jobId);
+                    lifecycleService.markRetry(jobId);
                     continue;
                 }
-                transactionService.failQuestion(jobId, question.questionId());
+                lifecycleService.failQuestion(jobId, question.questionId());
                 return Optional.of(exception.getReason());
             }
         }

@@ -45,7 +45,7 @@ import java.util.List;
  */
 @Service
 @RequiredArgsConstructor
-class InterviewQuestionGenerationJobTransactionService {
+class InterviewQuestionGenerationJobLifecycleService {
 
     private static final int INITIAL_QUESTION_COUNT = 5;
     private static final int ADDITIONAL_QUESTION_COUNT = 1;
@@ -76,7 +76,7 @@ class InterviewQuestionGenerationJobTransactionService {
      * 기준 버전 ID는 요청 시 고정되며 답변 본문은 이 시점에 읽는다. PENDING이 아닌 Job은 null을 반환한다.
      */
     @Transactional
-    public InterviewQuestionGenerationWork start(String jobId) {
+    public InterviewQuestionGenerationJobInput start(String jobId) {
         CoverLetterJobLockService.LockedCoverLetterJob locked = coverLetterJobLockService.lock(jobId);
         LlmJob job = validateInterviewQuestionGenerationJob(locked.job());
         if (job.getStatus() != LlmJobStatus.PENDING) {
@@ -108,7 +108,7 @@ class InterviewQuestionGenerationJobTransactionService {
         }
 
         job.startProcessing(STARTED_MESSAGE);
-        return new InterviewQuestionGenerationWork(new InterviewQuestionGenerationRequest(
+        return new InterviewQuestionGenerationJobInput(new InterviewQuestionGenerationRequest(
                 coverLetter.getCompanyName(),
                 coverLetter.getPositionTitle(),
                 coverLetter.getPreferences(),

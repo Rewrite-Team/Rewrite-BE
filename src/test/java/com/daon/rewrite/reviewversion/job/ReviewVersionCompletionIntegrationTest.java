@@ -57,11 +57,11 @@ class ReviewVersionCompletionIntegrationTest {
     @Autowired private ReviewVersionRepository versionRepository;
     @Autowired private ReviewVersionQuestionResultRepository resultRepository;
     @Autowired private ReviewJobQuestionResultRepository stagedResultRepository;
-    @Autowired private FirstReviewJobTransactionService firstReviewTransactions;
-    @Autowired private ReReviewJobTransactionService reReviewTransactions;
+    @Autowired private FirstReviewJobLifecycleService firstReviewLifecycle;
+    @Autowired private ReReviewJobLifecycleService reReviewLifecycle;
     @Autowired private JdbcTemplate jdbcTemplate;
 
-    // 자동 Worker·외부 호출을 막고 시작·전체 확정 서비스를 테스트에서 직접 호출한다.
+    // 자동 Executor·외부 호출을 막고 시작·전체 확정 서비스를 테스트에서 직접 호출한다.
     @MockitoBean private ReviewJobEventListener eventListener;
     @MockitoBean private ReviewClient reviewClient;
 
@@ -144,7 +144,7 @@ class ReviewVersionCompletionIntegrationTest {
         ReviewAttempt attempt = createAttempt(LlmJobType.COVER_LETTER_REVIEW);
         startProcessing(attempt);
         completeStagedResults(attempt);
-        firstReviewTransactions.fail(attempt.jobId(), ReviewClientException.Reason.PROVIDER_ERROR);
+        firstReviewLifecycle.fail(attempt.jobId(), ReviewClientException.Reason.PROVIDER_ERROR);
 
         assertRejectedWithoutStoredChanges(attempt);
     }
@@ -249,9 +249,9 @@ class ReviewVersionCompletionIntegrationTest {
 
     private void startProcessing(ReviewAttempt attempt) {
         if (attempt.type() == LlmJobType.COVER_LETTER_REVIEW) {
-            firstReviewTransactions.start(attempt.jobId());
+            firstReviewLifecycle.start(attempt.jobId());
         } else {
-            reReviewTransactions.start(attempt.jobId());
+            reReviewLifecycle.start(attempt.jobId());
         }
     }
 
