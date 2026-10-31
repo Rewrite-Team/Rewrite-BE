@@ -121,6 +121,30 @@ public class ReviewJobQuestionResult {
     }
 
     /**
+     * 직전 실패 시도에서 완료한 문항의 입력 스냅샷과 AI 결과를 새 Job의 완료 문항으로 복사한다.
+     * 리포트·수정본·최종 작성본을 그대로 유지하며 LLM을 다시 호출하지 않는다.
+     */
+    public static ReviewJobQuestionResult reused(
+            String id,
+            LlmJob llmJob,
+            ReviewJobQuestionResult source,
+            Instant reusedAt
+    ) {
+        if (source.status != ReviewJobQuestionResultStatus.COMPLETED) {
+            throw new IllegalStateException("완료된 문항 결과만 재사용할 수 있습니다.");
+        }
+        ReviewJobQuestionResult result = new ReviewJobQuestionResult(id, llmJob, source.question, source.inputAnswer);
+        result.aiReport = source.aiReport;
+        result.rewrittenAnswer = source.rewrittenAnswer;
+        result.rewrittenAnswerLength = source.rewrittenAnswerLength;
+        result.finalAnswer = source.finalAnswer;
+        result.finalAnswerLength = source.finalAnswerLength;
+        result.status = ReviewJobQuestionResultStatus.COMPLETED;
+        result.completedAt = reusedAt;
+        return result;
+    }
+
+    /**
      * 외부 출력 검증을 통과한 리포트·수정본으로 이 문항의 완료 상태를 기록한다.
      * 부분 결과의 finalAnswer도 새 수정본으로 초기화하며 전체 Job 완료 여부는 별도로 판단한다.
      */

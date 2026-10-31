@@ -17,6 +17,7 @@ import com.daon.rewrite.llmjob.service.LlmJobCreatedEvent;
 import com.daon.rewrite.llmjob.service.LlmJobService;
 import com.daon.rewrite.reviewversion.entity.ReviewVersion;
 import com.daon.rewrite.reviewversion.repository.ReviewVersionRepository;
+import com.daon.rewrite.reviewversion.service.ReviewRetrySnapshotService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
@@ -51,6 +52,7 @@ public class CoverLetterService {
     private final CoverLetterInputPolicy inputPolicy;
     private final LlmJobRepository llmJobRepository;
     private final ReviewVersionRepository reviewVersionRepository;
+    private final ReviewRetrySnapshotService retrySnapshotService;
     private final LlmJobService llmJobService;
     private final IdGenerator idGenerator;
     private final Clock clock;
@@ -205,7 +207,8 @@ public class CoverLetterService {
      * 같은 최초 첨삭 중 중복 제출은 REVIEWING과 기존 Job을 반환한다.
      * 이미 첨삭 완료된 자기소개서는 REVIEWED와 null Job을 반환한다.
      * 새 작업은 저장된 원본의 필수값 검증 후 생성하며, 검증 실패나 기존 Job 재사용에는 새 버전을 만들지 않는다.
-     * Job·버전·REVIEWING 전환을 함께 커밋하고 AI 완료를 기다리지 않고 반환하며, worker 실행은 커밋 후 이벤트 리스너로 이어진다.
+     * 최초 첨삭 재시도는 직전 실패 시도의 성공 문항을 이어받아 새 Job의 임시 결과로 저장한다.
+     * Job·버전·문항 입력·REVIEWING 전환을 함께 커밋하고 AI 완료를 기다리지 않고 반환하며, worker 실행은 커밋 후 이벤트 리스너로 이어진다.
      */
     @Transactional
     public SubmitCoverLetterResult submit(String coverLetterId) {
@@ -262,12 +265,31 @@ public class CoverLetterService {
                 now
         ));
 
+        // 직전 최초 첨삭이 일부 성공 후 실패했다면 성공 문항을 이어받고, 나머지는 제출 시점의 원본 답변을 입력으로 고정한다.
+        stageReviewQuestions(job, nextVersionNumber, coverLetter.getId(), questions);
+
         coverLetter.startReview(now);
 
         // ReviewJobEventListener가 커밋 후 최초 첨삭 worker를 실행한다. 메모리 이벤트의 재전달은 보장하지 않는다.
         eventPublisher.publishEvent(new LlmJobCreatedEvent(job.getId()));
 
         return new SubmitCoverLetterResult(coverLetter, job);
+    }
+
+    private void stageReviewQuestions(
+            LlmJob job,
+            long versionNumber,
+            String coverLetterId,
+            List<CoverLetterQuestion> questions
+    ) {
+        List<ReviewRetrySnapshotService.QuestionInput> inputs = questions.stream()
+                .map(question -> new ReviewRetrySnapshotService.QuestionInput(question, question.getOriginalAnswer()))
+                .toList();
+        retrySnapshotService.stage(
+                job,
+                retrySnapshotService.plan(coverLetterId, versionNumber, LlmJobType.COVER_LETTER_REVIEW, null, null, inputs),
+                inputs
+        );
     }
 
     private void validateListQuery(int page, int size) {

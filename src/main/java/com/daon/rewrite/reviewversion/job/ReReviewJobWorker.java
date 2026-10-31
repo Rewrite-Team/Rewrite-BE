@@ -28,7 +28,7 @@ public class ReReviewJobWorker {
             if (work == null) {
                 return;
             }
-            Optional<ReviewClientException.Reason> failureReason = jobRunner.run(jobId, work.request());
+            Optional<ReviewClientException.Reason> failureReason = jobRunner.run(jobId, work);
             // 실패 문항이 있으면 이번 Job을 실패 처리하고, 성공 문항과 이전 성공 버전은 보존한다.
             if (failureReason.isPresent()) {
                 transactionService.fail(jobId, failureReason.get());

@@ -14,6 +14,7 @@ import com.daon.rewrite.reviewversion.client.ReviewQuestion;
 import com.daon.rewrite.reviewversion.client.ReviewRequest;
 import com.daon.rewrite.llmjob.entity.LlmJobRequestRefType;
 import com.daon.rewrite.reviewversion.entity.ReviewJobQuestionResult;
+import com.daon.rewrite.reviewversion.entity.ReviewJobQuestionResultStatus;
 import com.daon.rewrite.reviewversion.repository.ReviewJobQuestionResultRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -22,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * 재첨삭의 시작·실패 전이를 자기소개서와 Job의 행 잠금 안에서 처리한다.
@@ -91,7 +93,11 @@ class ReReviewJobTransactionService {
                                 result.getInputAnswer()
                         ))
                         .toList()
-        ));
+        ), questionResults.stream()
+                // 요청 시 직전 실패 시도에서 이어받은 완료 문항은 다시 호출하지 않는다.
+                .filter(result -> result.getStatus() == ReviewJobQuestionResultStatus.PROCESSING)
+                .map(result -> result.getQuestion().getId())
+                .collect(Collectors.toSet()));
     }
 
     /** 이번 Job·표시 상태만 실패로 전환한다. latestReviewedVersionId와 성공 문항 결과는 유지한다. */

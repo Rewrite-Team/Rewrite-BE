@@ -254,6 +254,21 @@ public class LlmJob {
     }
 
     /**
+     * 직전 실패 시도에서 가져온 완료 문항 수를 진행률에 반영한다. 아직 문항이 처리되지 않은 대기·진행 Job에서만 호출한다.
+     * 이후 새로 완료하는 문항은 advanceProgress가 이어서 증가시킨다.
+     */
+    public void restoreReusedProgress(int reusedCount, String progressMessage) {
+        if ((status != LlmJobStatus.PENDING && status != LlmJobStatus.PROCESSING)
+                || progressCurrent != 0
+                || reusedCount < 0
+                || reusedCount > progressTotal) {
+            throw new IllegalStateException("재사용 진행률을 복원할 수 없는 Job입니다.");
+        }
+        this.progressCurrent = reusedCount;
+        this.progressMessage = progressMessage;
+    }
+
+    /**
      * 결과 리소스를 저장한 호출자가 완료 진행률·결과 참조·종료 시각을 함께 확정한다.
      * 진행률은 작업별 완료 단위에 맞춰 호출자가 전달한다.
      */
